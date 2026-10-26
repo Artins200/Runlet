@@ -103,11 +103,11 @@ export function renderTree() {
   updateSize();
 }
 function iconFor(path, isDir) {
-  if (isDir) return '📁';
+  if (isDir) return '';
   const e = (path.split('.').pop() || '').toLowerCase();
-  return ({ html: '🟠', htm: '🟠', css: '🔵', scss: '🔵', js: '🟡', mjs: '🟡', ts: '🔷',
-            json: '🟣', md: '📄', png: '🖼', jpg: '🖼', jpeg: '🖼', gif: '🖼', webp: '🖼',
-            svg: '✒', woff2: '🔤', ttf: '🔤', mp3: '🎵', mp4: '🎬', txt: '📄' })[e] || '📄';
+  return ({ html: '', htm: '', css: '', scss: '', js: '', mjs: '', ts: '',
+            json: '', md: '', png: '', jpg: '', jpeg: '', gif: '', webp: '',
+            svg: '', woff2: '', ttf: '', mp3: '', mp4: '', txt: '' })[e] || '';
 }
 export function updateSize() {
   const n = $('#projectSize'), s = $('#statusSize');
@@ -400,7 +400,7 @@ export function renderLibs() {
         el('div', { class: 'grow' }, el('b', { text: lib.name }), el('small', { text: lib.desc })),
         el('select', { class: 'mini-select', title: 'Версия' },
           ...lib.versions.map(v => el('option', { value: v, selected: (typeof dep === 'object' && dep.version === v) ? 'selected' : null, text: v }))),
-        el('button', { class: 'mini-btn ' + (dep ? 'active' : ''), text: dep ? '✓' : '+' }));
+        el('button', { class: 'mini-btn ' + (dep ? 'active' : ''), text: dep ? '' : '+' }));
       const sel = row.querySelector('select'), btn = row.querySelector('button');
       btn.classList.toggle('active', !!dep);
       btn.addEventListener('click', () => {
@@ -455,7 +455,7 @@ export function renderAssets() {
     const src = isImg ? safeDataSrc(f.content) : '';
     tile.innerHTML = `<div class="tile-ico">${src ?
       `<img src="${esc(src)}" style="width:100%;height:64px;object-fit:contain;border-radius:8px">` :
-      (/\.mp3|wav/.test(p) ? '🎵' : /\.mp4|webm/.test(p) ? '🎬' : '🔤')}</div>
+      (/\.mp3|wav/.test(p) ? '' : /\.mp4|webm/.test(p) ? '' : '')}</div>
       <b>${esc(p.split('/').pop())}</b><small>${fmtBytes(f.content.length)} · ${esc(mimeOf(p))}</small>`;
     const row = el('div', { class: 'rowflex mt8' },
       el('button', { class: 'mini-btn', text: 'Вставить', onclick: () => insertAsset(p) }),
@@ -535,7 +535,7 @@ export function versionsDialog(selected = null) {
     <div class="grow"><b>${esc(s.label)}</b><small>${new Date(s.at).toLocaleString('ru-RU')} · ${Object.keys(s.files).length} файлов</small></div>
     <button class="mini-btn" data-restore="${s.id}">Восстановить</button>
     <button class="mini-btn" data-diff="${s.id}">Diff</button>
-    <button class="mini-btn" data-del="${s.id}">✕</button></div>`).join('');
+    <button class="mini-btn" data-del="${s.id}"></button></div>`).join('');
   ctx.modal({ title: 'История версий', wide: true,
     body: `<div class="rowflex mb8"><button class="mini-btn" id="makeSnap">＋ Создать снапшот</button>
       <span class="muted" style="font-size:11px">Хранится до 25 последних версий</span></div><div class="list-rows">${rows || '<div class="empty-note">Снапшотов пока нет</div>'}</div>
@@ -582,10 +582,10 @@ export async function shareDialog() {
       </div>
       <div class="field"><label>Embed-код</label><textarea id="embedCode" rows="3" readonly>${esc(embedCode({ height: 520 }))}</textarea></div>
       <div class="tabs-line" id="shareActions">
-        <button data-act="copyLink">📋 Копировать ссылку</button><button data-act="copyEmbed">📋 Embed</button>
+        <button data-act="copyLink"> Копировать ссылку</button><button data-act="copyEmbed"> Embed</button>
         <button data-act="gist">GitHub Gist</button><button data-act="pen">CodePen</button>
         <button data-act="fiddle">JSFiddle</button><button data-act="stackblitz">StackBlitz</button>
-        <button data-act="email">✉ Пригласить</button><button data-act="qr">QR-код</button>
+        <button data-act="email"> Пригласить</button><button data-act="qr">QR-код</button>
       </div><div id="shareExtra" class="mt8"></div>`,
     okText: 'Готово',
     onMount: root => {

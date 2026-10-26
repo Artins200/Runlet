@@ -42,7 +42,7 @@ const CSP = [
   "img-src 'self' data: blob: https: file:",
   "font-src 'self' data: https:",
   "connect-src 'self' https: http://localhost:* http://127.0.0.1:* ws: wss:",
-  "frame-src 'self' data: blob: about:",
+  "frame-src 'self' data: blob: about: http://127.0.0.1:* http://localhost:*",
   "worker-src 'self' blob:",
   "object-src 'none'",
   "base-uri 'self'",
@@ -156,6 +156,69 @@ function apiGuard(req) {
 }
 const analyzeHits = [];
 
+/* ── Live Server (browser mode): in-memory project + auto-reload ─── */
+let liveFiles = {}, liveEntry = 'index.html', liveVersion = 1, liveActive = false;
+const LIVE_MIME = {
+  '.html': 'text/html; charset=utf-8', '.htm': 'text/html; charset=utf-8',
+  '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8',
+  '.mjs': 'text/javascript; charset=utf-8', '.json': 'application/json; charset=utf-8',
+  '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg',
+  '.gif': 'image/gif', '.webp': 'image/webp', '.ico': 'image/x-icon',
+  '.woff2': 'font/woff2', '.woff': 'font/woff', '.ttf': 'font/ttf',
+  '.mp3': 'audio/mpeg', '.mp4': 'video/mp4', '.webm': 'video/webm',
+  '.txt': 'text/plain; charset=utf-8', '.md': 'text/markdown; charset=utf-8',
+  '.xml': 'application/xml', '.map': 'application/json', '.webmanifest': 'application/manifest+json'
+};
+function liveSafeName(n) {
+  if (typeof n !== 'string' || !n || n.length > 300 || n.includes('\0') || n.includes('\\')) return null;
+  if (n.startsWith('/') || /^[A-Za-z]:/.test(n) || n.split('/').some(x => x === '..' || x === '')) return null;
+  return n;
+}
+function setLiveProject(project) {
+  if (!project || typeof project !== 'object' || !project.files || typeof project.files !== 'object') return false;
+  const next = {};
+  let total = 0;
+  for (const [name, content] of Object.entries(project.files).slice(0, 300)) {
+    const key = liveSafeName(name);
+    if (!key || typeof content !== 'string') continue;
+    total += content.length;
+    if (total > 8 * 1024 * 1024) break;
+    next[key] = content;
+  }
+  if (!Object.keys(next).length) return false;
+  liveFiles = next;
+  liveEntry = liveSafeName(project.entry) || (next['index.html'] ? 'index.html' : Object.keys(next)[0]);
+  liveActive = true; liveVersion++;
+  return true;
+}
+function liveBody(content, ext) {
+  if (/^data:/i.test(content)) {
+    const comma = content.indexOf(','), meta = content.slice(5, comma), payload = content.slice(comma + 1);
+    if (/;base64/i.test(meta)) return { body: Buffer.from(payload, 'base64'), type: meta.split(';')[0] };
+    return { body: Buffer.from(decodeURIComponent(payload), 'utf8'), type: meta.split(';')[0] };
+  }
+  return { body: Buffer.from(content, 'utf8'), type: LIVE_MIME[ext] || 'application/octet-stream' };
+}
+function serveLive(pathname, res) {
+  if (!liveActive) return send(res, 404, 'Live Server не запущен', 'text/plain; charset=utf-8');
+  if (pathname === '/live/__version') return send(res, 200, { v: liveVersion });
+  let name = decodeURIComponent(pathname.replace(/^\/live\/?/, '')) || liveEntry;
+  if (!liveFiles[name]) {
+    if (!path.extname(name) && liveFiles['index.html']) name = 'index.html';
+    else return send(res, 404, '404 — файл не найден в проекте', 'text/plain; charset=utf-8');
+  }
+  const ext = path.extname(name).toLowerCase();
+  const out = liveBody(liveFiles[name], ext);
+  if (/text\/html/i.test(out.type)) {
+    const script = `<script>(function(){var v=${liveVersion};setInterval(function(){fetch('/live/__version').then(function(r){return r.json()}).then(function(d){if(d.v!==v)location.reload()})},900)})();<\/script>`;
+    let html = out.body.toString('utf8');
+    html = /<\/body>/i.test(html) ? html.replace(/<\/body>/i, script + '</body>') : html + script;
+    return send(res, 200, Buffer.from(html, 'utf8'), 'text/html; charset=utf-8');
+  }
+  return send(res, 200, out.body, out.type);
+}
+
+
 const server = http.createServer(async (req, res) => {
   let url;
   try { url = new URL(req.url, 'http://localhost'); } catch (_) { return send(res, 400, { error: 'bad url' }); }
@@ -198,11 +261,25 @@ const server = http.createServer(async (req, res) => {
         return send(res, 200, { ok: true });
       }
     }
+    if (p === '/api/live/project') {
+      if (req.method === 'PUT') {
+        let data;
+        try { data = JSON.parse(body); } catch (_) { return send(res, 400, { error: 'bad json' }); }
+        if (!setLiveProject(data)) return send(res, 400, { error: 'invalid project' });
+        return send(res, 200, { ok: true, url: '/live/', version: liveVersion });
+      }
+      if (req.method === 'DELETE') {
+        liveActive = false; liveFiles = {}; liveVersion++;
+        return send(res, 200, { ok: true });
+      }
+      if (req.method === 'GET') return send(res, 200, { ok: liveActive, version: liveVersion, url: '/live/' });
+    }
     if (p === '/api/files' && req.method === 'GET') return send(res, 200, { files: fs.readdirSync(STORE) });
     if (p === '/api/run' && req.method === 'POST') return send(res, 200, { ok: true });
     return send(res, 404, { error: 'unknown endpoint' });
   }
 
+  if (p === '/live' || p.startsWith('/live/')) return serveLive(p === '/live' ? '/live/' : p, res);
   let file = safePath(p);
   if (!file || !fs.existsSync(file)) {
     if (p === '/' || p === '/index.html') file = path.join(root, 'app/index.html');

@@ -58,10 +58,10 @@ export function contrast(a, b) {
   return ((Math.max(l1, l2) + .05) / (Math.min(l1, l2) + .05));
 }
 export function contrastVerdict(ratio, big = false) {
-  if (ratio >= 7) return 'AAA ✅';
-  if (ratio >= (big ? 3 : 4.5)) return 'AA ✅';
-  if (ratio >= 3) return 'только крупный текст ⚠';
-  return 'не проходит ❌';
+  if (ratio >= 7) return 'AAA ';
+  if (ratio >= (big ? 3 : 4.5)) return 'AA ';
+  if (ratio >= 3) return 'только крупный текст ';
+  return 'не проходит ';
 }
 export function paletteFrom(hex, count = 6) {
   const hsl = hexToHsl(hex) || { h: 260, s: 70, l: 55 };
@@ -221,8 +221,8 @@ export function generateMockData(count = 5) {
 export function uuid() { return crypto.randomUUID ? crypto.randomUUID() : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => { const r = Math.random() * 16 | 0; return (c === 'x' ? r : (r & 3 | 8)).toString(16); }); }
 export function generateTests(code) {
   const fns = [...code.matchAll(/(?:function\s+([\w$]+)|const\s+([\w$]+)\s*=\s*\([^)]*\)\s*=>)/g)].map(m => m[1] || m[2]);
-  if (!fns.length) return `// Функции не найдены. Пример теста:\nfunction assert(c, m) { if (!c) throw new Error('❌ ' + m); console.log('✅ ' + m); }\nassert(1 + 1 === 2, 'сложение');`;
-  return `// Автотесты для: ${fns.join(', ')}\nfunction assert(condition, message) {\n  if (!condition) throw new Error('❌ ' + message);\n  console.log('✅ ' + message);\n}\n\n` +
+  if (!fns.length) return `// Функции не найдены. Пример теста:\nfunction assert(c, m) { if (!c) throw new Error(' ' + m); console.log(' ' + m); }\nassert(1 + 1 === 2, 'сложение');`;
+  return `// Автотесты для: ${fns.join(', ')}\nfunction assert(condition, message) {\n  if (!condition) throw new Error(' ' + message);\n  console.log(' ' + message);\n}\n\n` +
     fns.map(f => `assert(typeof ${f} === 'function', '${f} — функция');\n// TODO: проверьте результат ${f}(...)`).join('\n\n');
 }
 export function generateDocs(code) {

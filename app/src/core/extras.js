@@ -5,6 +5,7 @@ import { getDoc, setDoc, insertText } from './editor.js';
 import { runAnalysis } from './analyzer.js';
 import { write } from './state.js';
 import { paletteFrom, unitConvert, specificity, randomColor, safeCalc } from './tools.js';
+import { icon } from './icons.js';
 
 /* ══════════════════ learning ══════════════════ */
 export function initLearn() {
@@ -14,7 +15,7 @@ export function initLearn() {
 export function renderLearn() {
   const host = $('#learnPanel'); if (!host) return;
   const done = Object.keys(state.progress).filter(k => state.progress[k]).length;
-  host.innerHTML = `<div class="rowflex mb8"><span class="pill pill-accent">🎓 ${done}/${LESSONS.length} уроков</span>
+  host.innerHTML = `<div class="rowflex mb8"><span class="pill pill-accent"> ${done}/${LESSONS.length} уроков</span>
     <div class="progress" style="flex:1"><i style="width:${Math.round(done / LESSONS.length * 100)}%"></i></div></div>
     <div class="tabs-line" id="learnTabs"><button class="active" data-lt="lessons">Уроки</button>
       <button data-lt="quiz">Квизы</button><button data-lt="recipes">Рецепты</button>
@@ -34,7 +35,7 @@ function renderLearnTab(tab) {
     for (const l of LESSONS) {
       const done = state.progress[l.id];
       const row = el('div', { class: 'list-row' },
-        el('div', { class: 'grow' }, el('b', { text: (done ? '✅ ' : '📘 ') + l.title }),
+        el('div', { class: 'grow' }, el('b', { text: (done ? ' ' : ' ') + l.title }),
           el('small', { text: l.lang + ' · ' + l.task.slice(0, 60) + '…' })),
         el('button', { class: 'mini-btn', text: done ? 'Повторить' : 'Начать' }));
       row.querySelector('button').onclick = () => openLesson(l);
@@ -50,7 +51,7 @@ function renderLearnTab(tab) {
       group.forEach(x => x.classList.remove('correct', 'wrong'));
       b.classList.add(oi === q.a ? 'correct' : 'wrong');
       group[q.a].classList.add('correct');
-      box.querySelector('#qr' + qi).innerHTML = `<div class="beginner mt8">${oi === q.a ? '✅ Верно! ' : '❌ Не совсем. '}${esc(q.why)}</div>`;
+      box.querySelector('#qr' + qi).innerHTML = `<div class="beginner mt8">${oi === q.a ? ' Верно! ' : ' Не совсем. '}${esc(q.why)}</div>`;
       if (oi === q.a) { state.progress['quiz' + qi] = true; toast('Достижение: верный ответ', 'ok'); }
     });
   } else if (tab === 'recipes') {
@@ -58,7 +59,7 @@ function renderLearnTab(tab) {
     const list = box.querySelector('.list-rows');
     for (const r of RECIPES) {
       const row = el('div', { class: 'list-row', style: { flexDirection: 'column', alignItems: 'stretch' } },
-        el('b', { text: '❓ ' + r.t }), el('code', { class: 'inline', text: r.a, style: { marginTop: '6px', whiteSpace: 'pre-wrap' } }),
+        el('b', { text: ' ' + r.t }), el('code', { class: 'inline', text: r.a, style: { marginTop: '6px', whiteSpace: 'pre-wrap' } }),
         el('button', { class: 'mini-btn mt8', text: 'Вставить', style: { alignSelf: 'flex-start' } }));
       row.querySelector('button').onclick = () => { insertText(r.a, /\{|:|;/.test(r.a) && !/\(\)/.test(r.a) ? 'css' : 'js'); toast('Рецепт вставлен', 'ok'); };
       list.appendChild(row);
@@ -73,15 +74,15 @@ function renderLearnTab(tab) {
     drawViz('loop');
   } else {
     const badges = [
-      ['Первый шаг', () => Object.keys(state.progress).length > 0, '🚀'],
-      ['HTML-мастер', () => LESSONS.filter(l => l.lang === 'HTML').every(l => state.progress[l.id]), '🟠'],
-      ['CSS-стилист', () => LESSONS.filter(l => l.lang === 'CSS').every(l => state.progress[l.id]), '🔵'],
-      ['JS-ниндзя', () => LESSONS.filter(l => l.lang === 'JS').every(l => state.progress[l.id]), '🟡'],
-      ['Знаток', () => QUIZZES.every((_, i) => state.progress['quiz' + i]), '🧠'],
-      ['Аналитик', () => !!state.report, '🐍']
+      ['Первый шаг', () => Object.keys(state.progress).length > 0, 'check'],
+      ['HTML-мастер', () => LESSONS.filter(l => l.lang === 'HTML').every(l => state.progress[l.id]), 'code'],
+      ['CSS-стилист', () => LESSONS.filter(l => l.lang === 'CSS').every(l => state.progress[l.id]), 'palette'],
+      ['JS-ниндзя', () => LESSONS.filter(l => l.lang === 'JS').every(l => state.progress[l.id]), 'braces'],
+      ['Знаток', () => QUIZZES.every((_, i) => state.progress['quiz' + i]), 'book'],
+      ['Аналитик', () => !!state.report, 'chart']
     ];
     box.innerHTML = `<div class="grid-cards">${badges.map(([n, f, ico]) => `<div class="tile" style="opacity:${f() ? 1 : .4}">
-      <div class="tile-ico">${ico}</div><b>${esc(n)}</b><small>${f() ? 'Получено ✅' : 'Ещё не получено'}</small></div>`).join('')}</div>
+      <div class="tile-ico">${icon(ico, 18)}</div><b>${esc(n)}</b><small>${f() ? 'Получено ' : 'Ещё не получено'}</small></div>`).join('')}</div>
       <div class="beginner mt8"><b>Следующий шаг:</b> ${nextStep()}</div>`;
   }
 }
@@ -97,20 +98,20 @@ export function openLesson(lesson) {
       <h4 style="margin:14px 0 6px">Задание</h4><p>${esc(lesson.task)}</p>
       <div class="field"><label>Ваш код (панель ${lesson.lang})</label><textarea id="lessonCode" rows="9" style="font:12px var(--mono)">${esc(getDoc(pane).slice(0, 2000))}</textarea></div>
       <div class="rowflex"><button class="mini-btn" id="lessonLoad">↻ Загрузить стартовый код</button>
-        <button class="mini-btn" id="lessonHint">💡 Подсказка</button><button class="mini-btn" id="lessonCheck">✅ Проверить</button></div>
+        <button class="mini-btn" id="lessonHint"> Подсказка</button><button class="mini-btn" id="lessonCheck"> Проверить</button></div>
       <div id="lessonResult" class="mt8"></div>`,
     okText: 'Закрыть',
     onMount: root => {
       const ta = root.querySelector('#lessonCode');
       root.querySelector('#lessonLoad').onclick = () => { ta.value = lesson.starter; setDoc(lesson.starter, pane); };
-      root.querySelector('#lessonHint').onclick = () => { root.querySelector('#lessonResult').innerHTML = `<div class="beginner">💡 ${esc(lesson.hint)}</div>`; };
+      root.querySelector('#lessonHint').onclick = () => { root.querySelector('#lessonResult').innerHTML = `<div class="beginner"> ${esc(lesson.hint)}</div>`; };
       root.querySelector('#lessonCheck').onclick = () => {
         const code = ta.value;
         setDoc(code, pane);
         const ok = lesson.check(code);
         root.querySelector('#lessonResult').innerHTML = ok ?
-          '<div class="beginner" style="border-color:var(--ok);color:var(--ok)">✅ Верно! Задание зачтено.</div>' :
-          `<div class="beginner" style="border-color:var(--err);color:var(--err)">❌ Пока не подходит. ${esc(lesson.hint)}</div>`;
+          '<div class="beginner" style="border-color:var(--ok);color:var(--ok)"> Верно! Задание зачтено.</div>' :
+          `<div class="beginner" style="border-color:var(--err);color:var(--err)"> Пока не подходит. ${esc(lesson.hint)}</div>`;
         if (ok) { state.progress[lesson.id] = true; emit('learn:progress'); toast('Урок пройден!', 'ok', 'Обучение'); renderLearn(); }
       };
     }
@@ -185,14 +186,14 @@ export function initPlugins() {
 }
 export function renderPlugins() {
   const host = $('#pluginsPanel'); if (!host) return;
-  host.innerHTML = `<div class="rowflex mb8"><span class="pill pill-accent">🔌 ${state.plugins.length} активно</span>
-    <button class="mini-btn" id="plugUrl">＋ По ссылке</button></div><div class="list-rows" id="plugList"></div>
+  host.innerHTML = `<div class="rowflex mb8"><span class="pill pill-accent"> ${state.plugins.length} активно</span>
+    <button class="mini-btn" id="plugUrl">По ссылке</button></div><div class="list-rows" id="plugList"></div>
     <div class="beginner mt8"><b>API для плагинов:</b> window.Runlet.pluginAPI — state, toast, emit, on, insertText, setDoc, getDoc, analyze(). Плагины запускаются в песочнице без доступа к файлам ОС.</div>`;
   const list = host.querySelector('#plugList');
   for (const p of PLUGIN_CATALOG) {
     const active = state.plugins.includes(p.id);
     const row = el('div', { class: 'list-row' },
-      el('div', { style: { fontSize: '20px' }, text: p.icon }),
+      el('div', { class: 'pr-ico', html: icon(p.icon || 'puzzle', 17) }),
       el('div', { class: 'grow' }, el('b', { text: p.name }), el('small', { text: p.desc })),
       el('button', { class: 'mini-btn' + (active ? ' active' : ''), text: active ? 'Открыть' : 'Включить' }));
     row.querySelector('button').onclick = () => {
@@ -204,7 +205,7 @@ export function renderPlugins() {
   host.querySelector('#plugUrl').onclick = () => ctx.modal({
     title: 'Установить плагин по ссылке',
     body: `<div class="field"><label>URL JS-файла (только HTTPS)</label><input id="plugSrc" placeholder="https://example.com/plugin.js"></div>
-      <div class="beginner">⚠ Сторонний код выполняется в отдельном sandboxed iframe без доступа к DOM редактора, файлам ОС и сети. Разрешены только явно описанные команды.</div>`,
+      <div class="beginner"> Сторонний код выполняется в отдельном sandboxed iframe без доступа к DOM редактора, файлам ОС и сети. Разрешены только явно описанные команды.</div>`,
     okText: 'Установить',
     onOk: async root => {
       const url = root.querySelector('#plugSrc').value.trim(); if (!url) return false;
@@ -311,7 +312,7 @@ export function installPluginCode(code, name = 'custom') {
         if (!PLUGIN_SAFE_COMMANDS.has(target)) continue;
         const title = String(def.title || id).replace(/[<>&"']/g, '').slice(0, 80);
         ctx.registerCommand?.('plugin:' + id, {
-          title, group: 'Плагины', icon: '🔌', run: () => ctx.runCommand?.(target)
+          title, group: 'Плагины', icon: '', run: () => ctx.runCommand?.(target)
         });
         registered++;
       }
@@ -365,8 +366,8 @@ export function openPlugin(id) {
   }
 }
 function pluginTerminal() {
-  ctx.modal({ title: '▸ Терминал Runlet', wide: true,
-    body: `<div id="termOut" style="height:280px;overflow:auto;background:var(--code-bg);border-radius:12px;padding:12px;font:12px var(--mono)">Runlet terminal v1.0 — введите help\n</div>
+  ctx.modal({ title: 'Терминал Runlet', wide: true,
+    body: `<div id="termOut" style="height:280px;overflow:auto;background:var(--code-bg);border-radius:12px;padding:12px;font:12px var(--mono)">Runlet terminal 1.0 — введите help\n</div>
       <div class="repl-bar"><span class="repl-prompt">$</span><input id="termIn" placeholder="help" style="flex:1;font:12px var(--mono)"><button class="mini-btn" id="termRun">↵</button></div>`,
     okText: 'Закрыть',
     onMount: root => {
@@ -393,7 +394,7 @@ function pluginTerminal() {
     } });
 }
 function pluginCalc() {
-  ctx.modal({ title: '🧮 Калькулятор', narrow: true,
+  ctx.modal({ title: 'Калькулятор', narrow: true,
     body: `<div class="field"><label>Выражение</label><input id="calcIn" value="(16 * 2 + 8) / 2"></div>
       <div id="calcOut" class="gen-preview" style="color:var(--text);background:var(--card-2)">18</div>
       <div class="rowflex"><button class="mini-btn" data-e="px">px→rem</button><button class="mini-btn" data-e="rem">rem→px</button></div>`,
@@ -410,7 +411,7 @@ function pluginCalc() {
     } });
 }
 function pluginRegex() {
-  ctx.modal({ title: '.* Генератор regex', narrow: true,
+  ctx.modal({ title: 'Генератор regex', narrow: true,
     body: `<div class="field"><label>Что ищем</label><select id="rgxType" class="field"><option value="email">E-mail</option><option value="phone">Телефон РФ</option><option value="url">URL</option><option value="hex">HEX-цвет</option><option value="date">Дата ДД.ММ.ГГГГ</option><option value="cyr">Кириллица</option></select></div>
       <div class="field"><label>Шаблон</label><input id="rgxOut" readonly></div><div class="field"><label>Тест</label><input id="rgxTest" value="test@example.com"></div>
       <div id="rgxRes" class="gen-preview" style="background:var(--card-2);color:var(--text)"></div>`,
@@ -421,14 +422,14 @@ function pluginRegex() {
       const upd = () => {
         const p = presets[root.querySelector('#rgxType').value];
         root.querySelector('#rgxOut').value = '/' + p + '/';
-        try { root.querySelector('#rgxRes').textContent = new RegExp(p).test(root.querySelector('#rgxTest').value) ? '✅ Совпадает' : '❌ Не совпадает'; }
+        try { root.querySelector('#rgxRes').textContent = new RegExp(p).test(root.querySelector('#rgxTest').value) ? ' Совпадает' : ' Не совпадает'; }
         catch (e) { root.querySelector('#rgxRes').textContent = e.message; }
       };
       root.querySelectorAll('#rgxType,#rgxTest').forEach(x => x.addEventListener('input', upd)); upd();
     } });
 }
 function pluginUnits() {
-  ctx.modal({ title: '⇄ Конвертер единиц', narrow: true,
+  ctx.modal({ title: 'Конвертер единиц', narrow: true,
     body: `<div class="field-row"><div class="field"><label>Значение</label><input id="uVal" type="number" value="16"></div>
       <div class="field"><label>Из</label><select id="uFrom"><option>px</option><option>rem</option><option>em</option><option>%</option></select></div>
       <div class="field"><label>В</label><select id="uTo"><option>rem</option><option>px</option><option>em</option><option>%</option></select></div></div>
@@ -443,13 +444,13 @@ function pluginUnits() {
 function pluginNotes() {
   const key = 'runlet:plugin:notes';
   const saved = localStorage.getItem(key) || '# Заметки\n\n- Записать идеи по проекту\n';
-  ctx.modal({ title: '📝 Заметки', wide: true,
+  ctx.modal({ title: 'Заметки', wide: true,
     body: `<textarea id="notesArea" style="width:100%;height:320px;border:1px solid var(--border);border-radius:12px;background:var(--code-bg);padding:12px;font:13px var(--mono)">${esc(saved)}</textarea>`,
     okText: 'Сохранить',
     onOk: root => { localStorage.setItem(key, root.querySelector('#notesArea').value); toast('Заметки сохранены', 'ok'); } });
 }
 function pluginPomodoro() {
-  ctx.modal({ title: '🍅 Помодоро', narrow: true,
+  ctx.modal({ title: 'Помодоро', narrow: true,
     body: `<div style="text-align:center"><div id="pomoTime" style="font-size:58px;font-weight:800;letter-spacing:-3px">25:00</div>
       <div class="muted">Работа 25 мин / отдых 5 мин</div>
       <div class="rowflex mt8" style="justify-content:center"><button class="mini-btn" id="pomoStart">▶ Старт</button>
@@ -468,7 +469,7 @@ function pluginPomodoro() {
     } });
 }
 function pluginThemes() {
-  ctx.modal({ title: '🎨 Генератор темы', narrow: true,
+  ctx.modal({ title: 'Генератор темы', narrow: true,
     body: `<div class="field"><label>Базовый цвет</label><input type="color" id="thColor" value="#7c6cf6"></div>
       <div id="thSwatches" class="rowflex"></div><pre id="thCss" style="font:11px var(--mono);background:var(--code-bg);padding:10px;border-radius:12px;margin-top:10px"></pre>`,
     okText: 'Применить акцент',
@@ -483,7 +484,7 @@ function pluginThemes() {
     } });
 }
 function pluginDiagram() {
-  ctx.modal({ title: '◫ Диаграмма', narrow: true,
+  ctx.modal({ title: 'Диаграмма', narrow: true,
     body: `<div class="field"><label>Узлы (через ->)</label><input id="dgIn" value="HTML -> CSSOM -> Render tree -> Layout -> Paint"></div>
       <div id="dgOut" class="gen-preview" style="background:var(--card-2);color:var(--text);height:auto;min-height:120px;flex-direction:column;gap:6px"></div>`,
     okText: 'Вставить Mermaid',
@@ -503,7 +504,7 @@ export function initFeatures() {
   const c = coverage();
   host.innerHTML = `<div class="beginner" style="margin:0 0 10px"><b>Карта идей: ${c.done} реализовано, ${c.partial} частично, всего ${c.total}.</b><br>
     <div class="progress mt8"><i style="width:${c.percent}%"></i></div>
-    <small class="dim">🟢 сделано · 🟡 частично · ⚪ в планах</small></div>
+    <small class="dim"> сделано ·  частично ·  в планах</small></div>
     <input id="featFilter" placeholder="Фильтр по названию…" style="width:100%;height:29px;border-radius:9px;border:1px solid var(--border);background:var(--code-bg);padding:0 9px;margin-bottom:8px">
     <div id="featList"></div>`;
   const list = host.querySelector('#featList');

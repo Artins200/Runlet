@@ -5,12 +5,24 @@
   var __getOwnPropNames = Object.getOwnPropertyNames;
   var __getProtoOf = Object.getPrototypeOf;
   var __hasOwnProp = Object.prototype.hasOwnProperty;
+  var __esm = (fn, res, err2) => function __init() {
+    if (err2) throw err2[0];
+    try {
+      return fn && (res = (0, fn[__getOwnPropNames(fn)[0]])(fn = 0)), res;
+    } catch (e) {
+      throw err2 = [e], e;
+    }
+  };
   var __commonJS = (cb, mod) => function __require() {
     try {
       return mod || (0, cb[__getOwnPropNames(cb)[0]])((mod = { exports: {} }).exports, mod), mod.exports;
     } catch (e) {
       throw mod = 0, e;
     }
+  };
+  var __export = (target, all) => {
+    for (var name2 in all)
+      __defProp(target, name2, { get: all[name2], enumerable: true });
   };
   var __copyProps = (to, from, except, desc) => {
     if (from && typeof from === "object" || typeof from === "function") {
@@ -28,6 +40,2092 @@
     isNodeMode || !mod || !mod.__esModule ? __defProp(target, "default", { value: mod, enumerable: true }) : target,
     mod
   ));
+
+  // app/src/core/core.js
+  function registerCommand(id2, def) {
+    commands.set(id2, { id: id2, ...def });
+  }
+  function runCommand(id2, arg) {
+    const c = commands.get(id2);
+    if (!c) {
+      console.warn("[runlet] unknown command", id2);
+      return void 0;
+    }
+    try {
+      const r = c.run(arg);
+      if (r && typeof r.catch === "function") r.catch((e) => toast("\u041E\u0448\u0438\u0431\u043A\u0430 \u043A\u043E\u043C\u0430\u043D\u0434\u044B: " + e.message, "err"));
+      return r;
+    } catch (e) {
+      toast(`${id2}: ${e.message}`, "err");
+      console.error(e);
+    }
+  }
+  function on(evt, fn) {
+    if (!listeners.has(evt)) listeners.set(evt, /* @__PURE__ */ new Set());
+    listeners.get(evt).add(fn);
+    return () => off(evt, fn);
+  }
+  function off(evt, fn) {
+    listeners.get(evt)?.delete(fn);
+  }
+  function emit(evt, data3) {
+    for (const fn of [...listeners.get(evt) || []]) {
+      try {
+        fn(data3);
+      } catch (e) {
+        console.error("[runlet] listener", evt, e);
+      }
+    }
+  }
+  function el(tag, attrs = {}, ...kids) {
+    const n = document.createElement(tag);
+    for (const [k, v] of Object.entries(attrs || {})) {
+      if (v == null || v === false) continue;
+      if (k === "class") n.className = v;
+      else if (k === "html") n.innerHTML = v;
+      else if (k === "text") n.textContent = v;
+      else if (k.startsWith("on") && typeof v === "function") n.addEventListener(k.slice(2).toLowerCase(), v);
+      else if (k === "style" && typeof v === "object") Object.assign(n.style, v);
+      else n.setAttribute(k, v === true ? "" : v);
+    }
+    for (const kid of kids.flat()) {
+      if (kid == null || kid === false) continue;
+      n.appendChild(typeof kid === "string" || typeof kid === "number" ? document.createTextNode(String(kid)) : kid);
+    }
+    return n;
+  }
+  function esc(s) {
+    return String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+  }
+  function uid(prefix = "id") {
+    return prefix + "-" + Math.random().toString(36).slice(2, 9);
+  }
+  function debounce(fn, ms = 200) {
+    let t2;
+    const d = (...a) => {
+      clearTimeout(t2);
+      t2 = setTimeout(() => fn(...a), ms);
+    };
+    d.cancel = () => clearTimeout(t2);
+    d.flush = (...a) => {
+      clearTimeout(t2);
+      fn(...a);
+    };
+    return d;
+  }
+  function fmtBytes(n) {
+    if (n < 1024) return n + " \u0411";
+    if (n < 1048576) return (n / 1024).toFixed(1) + " \u041A\u0411";
+    return (n / 1048576).toFixed(2) + " \u041C\u0411";
+  }
+  function download(name2, content2, mime = "text/plain") {
+    const blob = content2 instanceof Blob ? content2 : new Blob([content2], { type: mime + ";charset=utf-8" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = name2;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => {
+      URL.revokeObjectURL(a.href);
+      a.remove();
+    }, 1500);
+  }
+  async function copy(text) {
+    try {
+      await navigator.clipboard.writeText(text);
+      return true;
+    } catch (_) {
+      const ta = document.createElement("textarea");
+      ta.value = text;
+      document.body.appendChild(ta);
+      ta.select();
+      try {
+        document.execCommand("copy");
+      } catch (e) {
+      }
+      ta.remove();
+      return true;
+    }
+  }
+  function toast(msg, type = "info", title = "") {
+    const icons = { ok: "", err: "", warn: "", info: "\u2139" };
+    const box = $("#toasts");
+    if (!box) return;
+    const node = el(
+      "div",
+      { class: "toast " + type },
+      el("span", { class: "t-icon", text: icons[type] || "\u2022" }),
+      el("div", {}, title ? el("b", { text: title }) : null, el("span", { text: msg }))
+    );
+    box.appendChild(node);
+    setTimeout(() => {
+      node.style.opacity = "0";
+      node.style.transform = "translateX(30px)";
+      node.style.transition = ".25s";
+    }, 3800);
+    setTimeout(() => node.remove(), 4200);
+    logAction(msg, type);
+  }
+  function logAction(msg, kind = "info") {
+    state.activity.unshift({ t: Date.now(), msg, kind });
+    if (state.activity.length > 300) state.activity.length = 300;
+    emit("activity", state.activity);
+  }
+  function markDirty(v = true) {
+    state.dirty = v;
+    $("#dirtyDot")?.classList.toggle("on", v);
+    $(".pane-dirty")?.classList.toggle("on", v);
+  }
+  function busy(v) {
+    $("#readyIndicator")?.classList.toggle("busy", v);
+    const label = $("#readyIndicator");
+    if (label) label.innerHTML = "<i></i>" + (v ? "\u0430\u043D\u0430\u043B\u0438\u0437\u2026" : "\u0433\u043E\u0442\u043E\u0432");
+  }
+  function applyLocale() {
+    const en = state.settings.locale === "en";
+    const map = [
+      ['[data-cmd="run"] span', "Run"],
+      [".btn-analyze span", "Analyze"],
+      ['[data-rail-tab="files"]', "Files"],
+      ['[data-rail-tab="search"]', "Search"],
+      ['[data-rail-tab="libs"]', "Libraries"],
+      ['[data-rail-tab="assets"]', "Assets"],
+      ['[data-rail-tab="plugins"]', "Plugins"],
+      ['[data-rail-tab="learn"]', "Lessons"],
+      ['[data-rail-tab="features"]', "Ideas"],
+      ['[data-insp-tab="analysis"]', "Analysis"],
+      ['[data-insp-tab="console"]', "Console"],
+      ['[data-insp-tab="debug"]', "Debug"],
+      ['[data-insp-tab="network"]', "Network"],
+      ['[data-insp-tab="storage"]', "Storage"],
+      ['[data-sub-tab="perf"]', "Perf"],
+      ['[data-insp-tab="log"]', "Log"],
+      ['[data-cmd="settings"]', "Settings"],
+      ['[data-cmd="tour"] span', "Tour"]
+    ];
+    for (const [sel, enText] of map) {
+      const node = $(sel);
+      if (!node) continue;
+      if (!node.dataset.ru) node.dataset.ru = node.textContent.trim();
+      node.textContent = en ? enText : node.dataset.ru;
+    }
+    document.documentElement.lang = state.settings.locale === "ar" ? "ar" : state.settings.locale;
+  }
+  function safeDataSrc(v) {
+    if (typeof v !== "string" || v.length > 8 * 1024 * 1024) return "";
+    return /^(data:(image|audio|video|font)\/[a-z0-9.+_-]+[;,]|blob:|https:\/\/)/i.test(v) ? v : "";
+  }
+  function sanitizeColor(v, fallback = "#7c6cf6") {
+    return typeof v === "string" && /^#(?:[0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$/i.test(v) ? v : fallback;
+  }
+  function applyTheme() {
+    const s = state.settings;
+    s.accent = sanitizeColor(s.accent);
+    s.fontSize = Math.max(9, Math.min(28, Number(s.fontSize) || 13));
+    s.lineHeight = Math.max(1, Math.min(2.5, Number(s.lineHeight) || 1.6));
+    s.tabSize = Math.max(1, Math.min(8, Math.round(Number(s.tabSize) || 2)));
+    s.theme = ["auto", "dark", "light", "contrast"].includes(s.theme) ? s.theme : "auto";
+    s.density = ["comfy", "compact"].includes(s.density) ? s.density : "comfy";
+    s.fontFamily = ["mono", "system", "courier", "sans"].includes(s.fontFamily) ? s.fontFamily : "mono";
+    let theme2 = s.theme;
+    if (theme2 === "auto") theme2 = matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
+    document.documentElement.dataset.theme = theme2;
+    document.documentElement.dataset.density = s.density;
+    document.documentElement.style.setProperty("--accent", s.accent);
+    document.documentElement.style.setProperty("--accent2", shiftHue(s.accent, 42));
+    document.documentElement.style.setProperty("--cm-fs", s.fontSize + "px");
+    document.documentElement.style.setProperty("--cm-lh", String(s.lineHeight));
+    const mono = {
+      mono: '"JetBrains Mono", "Fira Code", "SF Mono", Consolas, monospace',
+      system: "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
+      courier: '"Courier New", Courier, monospace',
+      sans: "var(--sans)"
+    }[s.fontFamily];
+    document.documentElement.style.setProperty("--mono", mono);
+    const c = $("#accentInput");
+    if (c) c.value = s.accent;
+    emit("theme", theme2);
+  }
+  function shiftHue(hex, deg) {
+    try {
+      const n = parseInt(hex.slice(1), 16);
+      let r = (n >> 16) / 255, g2 = (n >> 8 & 255) / 255, b = (n & 255) / 255;
+      const max2 = Math.max(r, g2, b), min = Math.min(r, g2, b), l = (max2 + min) / 2;
+      let h = 0, s = 0;
+      if (max2 !== min) {
+        const d = max2 - min;
+        s = l > 0.5 ? d / (2 - max2 - min) : d / (max2 + min);
+        h = max2 === r ? (g2 - b) / d + (g2 < b ? 6 : 0) : max2 === g2 ? (b - r) / d + 2 : (r - g2) / d + 4;
+        h *= 60;
+      }
+      h = (h + deg) % 360;
+      const c2 = (1 - Math.abs(2 * l - 1)) * s, x2 = c2 * (1 - Math.abs(h / 60 % 2 - 1)), m = l - c2 / 2;
+      let rr = 0, gg = 0, bb = 0;
+      if (h < 60) [rr, gg, bb] = [c2, x2, 0];
+      else if (h < 120) [rr, gg, bb] = [x2, c2, 0];
+      else if (h < 180) [rr, gg, bb] = [0, c2, x2];
+      else if (h < 240) [rr, gg, bb] = [0, x2, c2];
+      else if (h < 300) [rr, gg, bb] = [x2, 0, c2];
+      else [rr, gg, bb] = [c2, 0, x2];
+      return "#" + [rr, gg, bb].map((v) => Math.round((v + m) * 255).toString(16).padStart(2, "0")).join("");
+    } catch (e) {
+      return "#b06cf6";
+    }
+  }
+  function keyEventToString(e) {
+    const parts = [];
+    if (e.ctrlKey || e.metaKey) parts.push("Ctrl");
+    if (e.altKey) parts.push("Alt");
+    if (e.shiftKey) parts.push("Shift");
+    let k = e.key;
+    if (k === " ") k = "Space";
+    else if (k.length === 1) k = k.toUpperCase();
+    else k = { ArrowUp: "ArrowUp", ArrowDown: "ArrowDown", Escape: "Esc", "`": "`" }[k] || k;
+    parts.push(k);
+    return parts.join("+");
+  }
+  function parseKey(combo) {
+    const p = (combo || "").split("+").map((x2) => x2.trim());
+    const key = p.pop() || "";
+    return {
+      ctrl: p.includes("Ctrl") || p.includes("Meta"),
+      alt: p.includes("Alt"),
+      shift: p.includes("Shift"),
+      key: key.length === 1 ? key.toLowerCase() : key
+    };
+  }
+  function matchKey(e, combo) {
+    const k = parseKey(combo);
+    const key = e.key.length === 1 ? e.key.toLowerCase() : e.key;
+    const want = k.key === "Esc" ? "Escape" : k.key;
+    return !!(e.ctrlKey || e.metaKey) === k.ctrl && e.altKey === k.alt && e.shiftKey === k.shift && (key === want || key.toLowerCase() === String(want).toLowerCase());
+  }
+  var DEFAULT_SETTINGS, DEFAULT_FILES, state, ctx, listeners, commands, $, $$;
+  var init_core = __esm({
+    "app/src/core/core.js"() {
+      DEFAULT_SETTINGS = {
+        theme: "auto",
+        accent: "#4f8ff7",
+        density: "comfy",
+        fontSize: 13,
+        fontFamily: "mono",
+        lineHeight: 1.6,
+        tabSize: 2,
+        showWhitespace: false,
+        showInvisibles: true,
+        wrap: false,
+        cursorStyle: "smooth",
+        smoothScroll: true,
+        stickyHeaders: true,
+        minimap: true,
+        breadcrumbs: true,
+        autoRun: true,
+        autoRunDelay: 650,
+        autoAnalyze: true,
+        autoAnalyzeDelay: 1600,
+        autoSave: true,
+        autoSaveInterval: 20,
+        formatOnPaste: true,
+        trimTrailingWhitespace: true,
+        presets: "balanced",
+        locale: "ru",
+        firstRun: true,
+        welcomeSeen: false,
+        pythonEngine: true,
+        hotCss: true,
+        hotJs: true,
+        codeToPreview: true,
+        timeLimit: 4e3,
+        confirmDelete: true,
+        showLauncher: true,
+        windowedMode: false,
+        nativeFrame: false,
+        livePort: 5500,
+        // Customisable quick-action toolbar. Commands come from the registry;
+        // users can replace any entry from a preset list in Settings -> Buttons.
+        toolbarButtons: ["run", "liveServer", "openSite", "format", "save", "download", "exportProject", "importProject"],
+        toolbarSecondary: ["analyze", "windowedMode", "openThreeD", "tour", "helpWelcome"],
+        // Least-privilege sandbox for the preview iframe. Enabling these widens the
+        // attack surface for untrusted/shared projects — keep them off by default.
+        sandboxPermissions: {
+          popups: false,
+          modals: false,
+          downloads: false,
+          pointerLock: false,
+          orientationLock: false,
+          forms: true
+        },
+        keybindings: {
+          "run": "Ctrl+Enter",
+          "format": "Ctrl+Shift+F",
+          "save": "Ctrl+S",
+          "download": "Ctrl+Shift+S",
+          "palette": "Ctrl+Shift+P",
+          "analyze": "Ctrl+Shift+A",
+          "snippets": "Ctrl+Shift+K",
+          "shortcuts": "F1",
+          "newFile": "Ctrl+Alt+N",
+          "findInProject": "Ctrl+Shift+J",
+          "toggleComment": "Ctrl+/",
+          "duplicateLine": "Ctrl+Shift+D",
+          "moveLineUp": "Alt+ArrowUp",
+          "moveLineDown": "Alt+ArrowDown",
+          "multiCursor": "Ctrl+D",
+          "layoutColumns": "Alt+1",
+          "layoutRows": "Alt+2",
+          "layoutTabs": "Alt+3",
+          "previewFullscreen": "Alt+Enter",
+          "liveServer": "Ctrl+Shift+L",
+          "windowedMode": "Ctrl+Shift+W"
+        }
+      };
+      DEFAULT_FILES = {
+        "index.html": `<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="\u041C\u043E\u044F \u0441\u0442\u0440\u0430\u043D\u0438\u0446\u0430 \u043D\u0430 Runlet">
+  <title>\u041F\u0440\u0438\u0432\u0435\u0442, Runlet!</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main class="card">
+    <span class="badge">Runlet studio</span>
+    <h1>\u041F\u0440\u0438\u0432\u0435\u0442, Runlet!</h1>
+    <p>\u041F\u0438\u0448\u0438 \u043A\u043E\u0434 \u0441\u043B\u0435\u0432\u0430 \u2014 \u0440\u0435\u0437\u0443\u043B\u044C\u0442\u0430\u0442 \u043F\u043E\u044F\u0432\u0438\u0442\u0441\u044F \u0441\u043F\u0440\u0430\u0432\u0430. \u0410 \u0432\u043A\u043B\u0430\u0434\u043A\u0430 \xAB\u0410\u043D\u0430\u043B\u0438\u0437\xBB \u0440\u0430\u0441\u0441\u043A\u0430\u0436\u0435\u0442, \u0447\u0442\u043E \u0434\u0435\u043B\u0430\u0435\u0442 \u043A\u043E\u0434 \u0438 \u0433\u0434\u0435 \u043E\u0448\u0438\u0431\u043A\u0438.</p>
+    <div class="row">
+      <button id="btn">\u041D\u0430\u0436\u043C\u0438 \u043C\u0435\u043D\u044F</button>
+      <button class="ghost" id="reset">\u0421\u0431\u0440\u043E\u0441\u0438\u0442\u044C</button>
+    </div>
+    <div id="output" class="output">\u0417\u0434\u0435\u0441\u044C \u043F\u043E\u044F\u0432\u0438\u0442\u0441\u044F \u0440\u0435\u0437\u0443\u043B\u044C\u0442\u0430\u0442</div>
+  </main>
+  <script src="script.js"><\/script>
+</body>
+</html>`,
+        "style.css": `@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
+
+:root {
+  --accent: #7c6cf6;
+  --bg: #10132a;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  font-family: Inter, system-ui, sans-serif;
+  background: radial-gradient(circle at 20% 10%, #2a2160, transparent 55%), var(--bg);
+  color: #eef0ff;
+}
+.card {
+  width: min(560px, 90vw);
+  padding: 36px;
+  border-radius: 28px;
+  background: rgba(255, 255, 255, .07);
+  border: 1px solid rgba(255, 255, 255, .13);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, .35);
+  backdrop-filter: blur(14px);
+}
+.badge {
+  display: inline-block;
+  padding: 5px 12px;
+  border-radius: 99px;
+  font-size: 12px;
+  font-weight: 600;
+  background: var(--accent);
+}
+h1 { margin: 18px 0 8px; font-size: 34px; letter-spacing: -1px; }
+p { color: #b9bddc; line-height: 1.65; }
+.row { display: flex; gap: 10px; margin: 22px 0 14px; flex-wrap: wrap; }
+button {
+  border: 0;
+  border-radius: 13px;
+  padding: 12px 20px;
+  font-weight: 700;
+  color: #fff;
+  background: linear-gradient(135deg, var(--accent), #b06cf6);
+  cursor: pointer;
+  transition: transform .2s, box-shadow .2s;
+}
+button:hover { transform: translateY(-2px); box-shadow: 0 8px 22px #7c6cf655; }
+button.ghost { background: rgba(255,255,255,.1); }
+.output {
+  min-height: 46px;
+  padding: 12px 16px;
+  border-radius: 14px;
+  background: rgba(0,0,0,.22);
+  font-family: ui-monospace, monospace;
+  font-size: 14px;
+  color: #9ef5c9;
+}
+`,
+        "script.js": `const btn = document.querySelector('#btn');
+const reset = document.querySelector('#reset');
+const output = document.querySelector('#output');
+let clicks = 0;
+
+btn.addEventListener('click', () => {
+  clicks += 1;
+  output.textContent = '\u041A\u043B\u0438\u043A\u043E\u0432: ' + clicks;
+  console.log('\u041F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u0435\u043B\u044C \u043D\u0430\u0436\u0430\u043B \u043A\u043D\u043E\u043F\u043A\u0443', clicks);
+});
+
+reset.addEventListener('click', () => {
+  clicks = 0;
+  output.textContent = '\u0421\u0447\u0451\u0442\u0447\u0438\u043A \u0441\u0431\u0440\u043E\u0448\u0435\u043D';
+});
+
+// \u041F\u043E\u043F\u0440\u043E\u0431\u0443\u0439\u0442\u0435 \u0434\u043E\u0431\u0430\u0432\u0438\u0442\u044C \u0441\u044E\u0434\u0430 fetch, setTimeout \u0438\u043B\u0438 localStorage \u2014
+// Python-\u0434\u0432\u0438\u0436\u043E\u043A \u0443\u0432\u0438\u0434\u0438\u0442 \u044D\u0442\u043E \u0432 \u043E\u0442\u0447\u0451\u0442\u0435 \u0438 \u043E\u0431\u044A\u044F\u0441\u043D\u0438\u0442 \u043F\u043E\u0432\u0435\u0434\u0435\u043D\u0438\u0435.
+`
+      };
+      state = {
+        files: {},
+        // path -> { content, kind, mime, size, updated }
+        entry: "index.html",
+        panes: { html: "index.html", css: "style.css", js: "script.js" },
+        activePane: "html",
+        activeFile: "index.html",
+        layout: "columns",
+        collapsed: { html: false, css: false, js: false },
+        projectName: "\u041C\u043E\u0439 \u043F\u0440\u043E\u0435\u043A\u0442",
+        settings: JSON.parse(JSON.stringify(DEFAULT_SETTINGS)),
+        deps: [],
+        dirty: false,
+        logs: [],
+        activity: [],
+        snapshots: [],
+        report: null,
+        engine: "unknown",
+        breakpoints: {},
+        watch: [],
+        trace: [],
+        traceIndex: -1,
+        network: [],
+        storageData: {},
+        domTree: null,
+        computedStyles: {},
+        perf: {},
+        consoleFilter: "all",
+        welcomeSeen: false,
+        consoleSearch: "",
+        consoleGroup: true,
+        inspectMode: false,
+        jsEnabled: true,
+        externalEnabled: true,
+        alertsAsToast: true,
+        autoRun: true,
+        device: "desktop",
+        deviceSize: { w: 1e3, h: 600 },
+        zoom: "fit",
+        windowedMode: false,
+        liveServer: null,
+        userSnippets: [],
+        plugins: [],
+        progress: {},
+        collabPeers: {},
+        analytics: { views: 0, embeds: 0 }
+      };
+      ctx = {};
+      listeners = /* @__PURE__ */ new Map();
+      commands = /* @__PURE__ */ new Map();
+      $ = (sel, root = document) => root.querySelector(sel);
+      $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
+    }
+  });
+
+  // node_modules/fflate/esm/browser.js
+  function deflateSync(data3, opts) {
+    return dopt(data3, opts || {}, 0, 0);
+  }
+  function inflateSync(data3, opts) {
+    return inflt(data3, { i: 2 }, opts && opts.out, opts && opts.dictionary);
+  }
+  function strToU8(str, latin1) {
+    if (latin1) {
+      var ar_1 = new u8(str.length);
+      for (var i4 = 0; i4 < str.length; ++i4)
+        ar_1[i4] = str.charCodeAt(i4);
+      return ar_1;
+    }
+    if (te)
+      return te.encode(str);
+    var l = str.length;
+    var ar = new u8(str.length + (str.length >> 1));
+    var ai = 0;
+    var w = function(v) {
+      ar[ai++] = v;
+    };
+    for (var i4 = 0; i4 < l; ++i4) {
+      if (ai + 5 > ar.length) {
+        var n = new u8(ai + 8 + (l - i4 << 1));
+        n.set(ar);
+        ar = n;
+      }
+      var c = str.charCodeAt(i4);
+      if (c < 128 || latin1)
+        w(c);
+      else if (c < 2048)
+        w(192 | c >> 6), w(128 | c & 63);
+      else if (c > 55295 && c < 57344)
+        c = 65536 + (c & 1023 << 10) | str.charCodeAt(++i4) & 1023, w(240 | c >> 18), w(128 | c >> 12 & 63), w(128 | c >> 6 & 63), w(128 | c & 63);
+      else
+        w(224 | c >> 12), w(128 | c >> 6 & 63), w(128 | c & 63);
+    }
+    return slc(ar, 0, ai);
+  }
+  function strFromU8(dat, latin1) {
+    if (latin1) {
+      var r = "";
+      for (var i4 = 0; i4 < dat.length; i4 += 16384)
+        r += String.fromCharCode.apply(null, dat.subarray(i4, i4 + 16384));
+      return r;
+    } else if (td) {
+      return td.decode(dat);
+    } else {
+      var _a3 = dutf8(dat), s = _a3.s, r = _a3.r;
+      if (r.length)
+        err(8);
+      return s;
+    }
+  }
+  function zipSync(data3, opts) {
+    if (!opts)
+      opts = {};
+    var r = {};
+    var files = [];
+    fltn(data3, "", r, opts);
+    var o = 0;
+    var tot = 0;
+    for (var fn in r) {
+      var _a3 = r[fn], file = _a3[0], p = _a3[1];
+      var compression = p.level == 0 ? 0 : 8;
+      var f = strToU8(fn), s = f.length;
+      var com = p.comment, m = com && strToU8(com), ms = m && m.length;
+      var exl = exfl(p.extra);
+      if (s > 65535)
+        err(11);
+      var d = compression ? deflateSync(file, p) : file, l = d.length;
+      var c = crc();
+      c.p(file);
+      files.push(mrg(p, {
+        size: file.length,
+        crc: c.d(),
+        c: d,
+        f,
+        m,
+        u: s != fn.length || m && com.length != ms,
+        o,
+        compression
+      }));
+      o += 30 + s + exl + l;
+      tot += 76 + 2 * (s + exl) + (ms || 0) + l;
+    }
+    var out = new u8(tot + 22), oe = o, cdl = tot - o;
+    for (var i4 = 0; i4 < files.length; ++i4) {
+      var f = files[i4];
+      wzh(out, f.o, f, f.f, f.u, f.c.length);
+      var badd = 30 + f.f.length + exfl(f.extra);
+      out.set(f.c, f.o + badd);
+      wzh(out, o, f, f.f, f.u, f.c.length, f.o, f.m), o += 16 + badd + (f.m ? f.m.length : 0);
+    }
+    wzf(out, o, files.length, cdl, oe);
+    return out;
+  }
+  function unzipSync(data3, opts) {
+    var files = {};
+    var e = data3.length - 22;
+    for (; b4(data3, e) != 101010256; --e) {
+      if (!e || data3.length - e > 65558)
+        err(13);
+    }
+    ;
+    var c = b2(data3, e + 8);
+    if (!c)
+      return {};
+    var o = b4(data3, e + 16);
+    var z = b4(data3, e - 20) == 117853008;
+    if (z) {
+      var ze = b4(data3, e - 12);
+      z = b4(data3, ze) == 101075792;
+      if (z) {
+        c = b4(data3, ze + 32);
+        o = b4(data3, ze + 48);
+      }
+    }
+    var fltr = opts && opts.filter;
+    for (var i4 = 0; i4 < c; ++i4) {
+      var _a3 = zh(data3, o, z), c_2 = _a3[0], sc = _a3[1], su = _a3[2], fn = _a3[3], no = _a3[4], off2 = _a3[5], b = slzh(data3, off2);
+      o = no;
+      if (!fltr || fltr({
+        name: fn,
+        size: sc,
+        originalSize: su,
+        compression: c_2
+      })) {
+        if (!c_2)
+          files[fn] = slc(data3, b, b + sc);
+        else if (c_2 == 8)
+          files[fn] = inflateSync(data3.subarray(b, b + sc), { out: new u8(su) });
+        else
+          err(14, "unknown compression type " + c_2);
+      }
+    }
+    return files;
+  }
+  var u8, u16, i32, fleb, fdeb, clim, freb, _a, fl, revfl, _b, fd, revfd, rev, x, i, hMap, flt, i, i, i, i, fdt, i, flm, flrm, fdm, fdrm, max, bits, bits16, shft, slc, ec, err, inflt, wbits, wbits16, hTree, ln, lc, clen, wfblk, wblk, deo, et, dflt, crct, crc, dopt, mrg, b2, b4, b8, wbytes, fltn, te, td, tds, dutf8, slzh, zh, z64hs, exfl, wzh, wzf;
+  var init_browser = __esm({
+    "node_modules/fflate/esm/browser.js"() {
+      u8 = Uint8Array;
+      u16 = Uint16Array;
+      i32 = Int32Array;
+      fleb = new u8([
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        1,
+        1,
+        1,
+        1,
+        2,
+        2,
+        2,
+        2,
+        3,
+        3,
+        3,
+        3,
+        4,
+        4,
+        4,
+        4,
+        5,
+        5,
+        5,
+        5,
+        0,
+        /* unused */
+        0,
+        0,
+        /* impossible */
+        0
+      ]);
+      fdeb = new u8([
+        0,
+        0,
+        0,
+        0,
+        1,
+        1,
+        2,
+        2,
+        3,
+        3,
+        4,
+        4,
+        5,
+        5,
+        6,
+        6,
+        7,
+        7,
+        8,
+        8,
+        9,
+        9,
+        10,
+        10,
+        11,
+        11,
+        12,
+        12,
+        13,
+        13,
+        /* unused */
+        0,
+        0
+      ]);
+      clim = new u8([16, 17, 18, 0, 8, 7, 9, 6, 10, 5, 11, 4, 12, 3, 13, 2, 14, 1, 15]);
+      freb = function(eb, start) {
+        var b = new u16(31);
+        for (var i4 = 0; i4 < 31; ++i4) {
+          b[i4] = start += 1 << eb[i4 - 1];
+        }
+        var r = new i32(b[30]);
+        for (var i4 = 1; i4 < 30; ++i4) {
+          for (var j = b[i4]; j < b[i4 + 1]; ++j) {
+            r[j] = j - b[i4] << 5 | i4;
+          }
+        }
+        return { b, r };
+      };
+      _a = freb(fleb, 2);
+      fl = _a.b;
+      revfl = _a.r;
+      fl[28] = 258, revfl[258] = 28;
+      _b = freb(fdeb, 0);
+      fd = _b.b;
+      revfd = _b.r;
+      rev = new u16(32768);
+      for (i = 0; i < 32768; ++i) {
+        x = (i & 43690) >> 1 | (i & 21845) << 1;
+        x = (x & 52428) >> 2 | (x & 13107) << 2;
+        x = (x & 61680) >> 4 | (x & 3855) << 4;
+        rev[i] = ((x & 65280) >> 8 | (x & 255) << 8) >> 1;
+      }
+      hMap = (function(cd, mb, r) {
+        var s = cd.length;
+        var i4 = 0;
+        var l = new u16(mb);
+        for (; i4 < s; ++i4) {
+          if (cd[i4])
+            ++l[cd[i4] - 1];
+        }
+        var le = new u16(mb);
+        for (i4 = 1; i4 < mb; ++i4) {
+          le[i4] = le[i4 - 1] + l[i4 - 1] << 1;
+        }
+        var co;
+        if (r) {
+          co = new u16(1 << mb);
+          var rvb = 15 - mb;
+          for (i4 = 0; i4 < s; ++i4) {
+            if (cd[i4]) {
+              var sv = i4 << 4 | cd[i4];
+              var r_1 = mb - cd[i4];
+              var v = le[cd[i4] - 1]++ << r_1;
+              for (var m = v | (1 << r_1) - 1; v <= m; ++v) {
+                co[rev[v] >> rvb] = sv;
+              }
+            }
+          }
+        } else {
+          co = new u16(s);
+          for (i4 = 0; i4 < s; ++i4) {
+            if (cd[i4]) {
+              co[i4] = rev[le[cd[i4] - 1]++] >> 15 - cd[i4];
+            }
+          }
+        }
+        return co;
+      });
+      flt = new u8(288);
+      for (i = 0; i < 144; ++i)
+        flt[i] = 8;
+      for (i = 144; i < 256; ++i)
+        flt[i] = 9;
+      for (i = 256; i < 280; ++i)
+        flt[i] = 7;
+      for (i = 280; i < 288; ++i)
+        flt[i] = 8;
+      fdt = new u8(32);
+      for (i = 0; i < 32; ++i)
+        fdt[i] = 5;
+      flm = /* @__PURE__ */ hMap(flt, 9, 0);
+      flrm = /* @__PURE__ */ hMap(flt, 9, 1);
+      fdm = /* @__PURE__ */ hMap(fdt, 5, 0);
+      fdrm = /* @__PURE__ */ hMap(fdt, 5, 1);
+      max = function(a) {
+        var m = a[0];
+        for (var i4 = 1; i4 < a.length; ++i4) {
+          if (a[i4] > m)
+            m = a[i4];
+        }
+        return m;
+      };
+      bits = function(d, p, m) {
+        var o = p / 8 | 0;
+        return (d[o] | d[o + 1] << 8) >> (p & 7) & m;
+      };
+      bits16 = function(d, p) {
+        var o = p / 8 | 0;
+        return (d[o] | d[o + 1] << 8 | d[o + 2] << 16) >> (p & 7);
+      };
+      shft = function(p) {
+        return (p + 7) / 8 | 0;
+      };
+      slc = function(v, s, e) {
+        if (s == null || s < 0)
+          s = 0;
+        if (e == null || e > v.length)
+          e = v.length;
+        return new u8(v.subarray(s, e));
+      };
+      ec = [
+        "unexpected EOF",
+        "invalid block type",
+        "invalid length/literal",
+        "invalid distance",
+        "stream finished",
+        "no stream handler",
+        ,
+        // determined by compression function
+        "no callback",
+        "invalid UTF-8 data",
+        "extra field too long",
+        "date not in range 1980-2099",
+        "filename too long",
+        "stream finishing",
+        "invalid zip data"
+        // determined by unknown compression method
+      ];
+      err = function(ind, msg, nt) {
+        var e = new Error(msg || ec[ind]);
+        e.code = ind;
+        if (Error.captureStackTrace)
+          Error.captureStackTrace(e, err);
+        if (!nt)
+          throw e;
+        return e;
+      };
+      inflt = function(dat, st, buf, dict) {
+        var sl = dat.length, dl = dict ? dict.length : 0;
+        if (!sl || st.f && !st.l)
+          return buf || new u8(0);
+        var noBuf = !buf;
+        var resize = noBuf || st.i != 2;
+        var noSt = st.i;
+        if (noBuf)
+          buf = new u8(sl * 3);
+        var cbuf = function(l2) {
+          var bl = buf.length;
+          if (l2 > bl) {
+            var nbuf = new u8(Math.max(bl * 2, l2));
+            nbuf.set(buf);
+            buf = nbuf;
+          }
+        };
+        var final = st.f || 0, pos = st.p || 0, bt = st.b || 0, lm = st.l, dm = st.d, lbt = st.m, dbt = st.n;
+        var tbts = sl * 8;
+        do {
+          if (!lm) {
+            final = bits(dat, pos, 1);
+            var type = bits(dat, pos + 1, 3);
+            pos += 3;
+            if (!type) {
+              var s = shft(pos) + 4, l = dat[s - 4] | dat[s - 3] << 8, t2 = s + l;
+              if (t2 > sl) {
+                if (noSt)
+                  err(0);
+                break;
+              }
+              if (resize)
+                cbuf(bt + l);
+              buf.set(dat.subarray(s, t2), bt);
+              st.b = bt += l, st.p = pos = t2 * 8, st.f = final;
+              continue;
+            } else if (type == 1)
+              lm = flrm, dm = fdrm, lbt = 9, dbt = 5;
+            else if (type == 2) {
+              var hLit = bits(dat, pos, 31) + 257, hcLen = bits(dat, pos + 10, 15) + 4;
+              var tl = hLit + bits(dat, pos + 5, 31) + 1;
+              pos += 14;
+              var ldt = new u8(tl);
+              var clt = new u8(19);
+              for (var i4 = 0; i4 < hcLen; ++i4) {
+                clt[clim[i4]] = bits(dat, pos + i4 * 3, 7);
+              }
+              pos += hcLen * 3;
+              var clb = max(clt), clbmsk = (1 << clb) - 1;
+              var clm = hMap(clt, clb, 1);
+              for (var i4 = 0; i4 < tl; ) {
+                var r = clm[bits(dat, pos, clbmsk)];
+                pos += r & 15;
+                var s = r >> 4;
+                if (s < 16) {
+                  ldt[i4++] = s;
+                } else {
+                  var c = 0, n = 0;
+                  if (s == 16)
+                    n = 3 + bits(dat, pos, 3), pos += 2, c = ldt[i4 - 1];
+                  else if (s == 17)
+                    n = 3 + bits(dat, pos, 7), pos += 3;
+                  else if (s == 18)
+                    n = 11 + bits(dat, pos, 127), pos += 7;
+                  while (n--)
+                    ldt[i4++] = c;
+                }
+              }
+              var lt2 = ldt.subarray(0, hLit), dt = ldt.subarray(hLit);
+              lbt = max(lt2);
+              dbt = max(dt);
+              lm = hMap(lt2, lbt, 1);
+              dm = hMap(dt, dbt, 1);
+            } else
+              err(1);
+            if (pos > tbts) {
+              if (noSt)
+                err(0);
+              break;
+            }
+          }
+          if (resize)
+            cbuf(bt + 131072);
+          var lms = (1 << lbt) - 1, dms = (1 << dbt) - 1;
+          var lpos = pos;
+          for (; ; lpos = pos) {
+            var c = lm[bits16(dat, pos) & lms], sym = c >> 4;
+            pos += c & 15;
+            if (pos > tbts) {
+              if (noSt)
+                err(0);
+              break;
+            }
+            if (!c)
+              err(2);
+            if (sym < 256)
+              buf[bt++] = sym;
+            else if (sym == 256) {
+              lpos = pos, lm = null;
+              break;
+            } else {
+              var add2 = sym - 254;
+              if (sym > 264) {
+                var i4 = sym - 257, b = fleb[i4];
+                add2 = bits(dat, pos, (1 << b) - 1) + fl[i4];
+                pos += b;
+              }
+              var d = dm[bits16(dat, pos) & dms], dsym = d >> 4;
+              if (!d)
+                err(3);
+              pos += d & 15;
+              var dt = fd[dsym];
+              if (dsym > 3) {
+                var b = fdeb[dsym];
+                dt += bits16(dat, pos) & (1 << b) - 1, pos += b;
+              }
+              if (pos > tbts) {
+                if (noSt)
+                  err(0);
+                break;
+              }
+              if (resize)
+                cbuf(bt + 131072);
+              var end = bt + add2;
+              if (bt < dt) {
+                var shift2 = dl - dt, dend = Math.min(dt, end);
+                if (shift2 + bt < 0)
+                  err(3);
+                for (; bt < dend; ++bt)
+                  buf[bt] = dict[shift2 + bt];
+              }
+              for (; bt < end; ++bt)
+                buf[bt] = buf[bt - dt];
+            }
+          }
+          st.l = lm, st.p = lpos, st.b = bt, st.f = final;
+          if (lm)
+            final = 1, st.m = lbt, st.d = dm, st.n = dbt;
+        } while (!final);
+        return bt != buf.length && noBuf ? slc(buf, 0, bt) : buf.subarray(0, bt);
+      };
+      wbits = function(d, p, v) {
+        v <<= p & 7;
+        var o = p / 8 | 0;
+        d[o] |= v;
+        d[o + 1] |= v >> 8;
+      };
+      wbits16 = function(d, p, v) {
+        v <<= p & 7;
+        var o = p / 8 | 0;
+        d[o] |= v;
+        d[o + 1] |= v >> 8;
+        d[o + 2] |= v >> 16;
+      };
+      hTree = function(d, mb) {
+        var t2 = [];
+        for (var i4 = 0; i4 < d.length; ++i4) {
+          if (d[i4])
+            t2.push({ s: i4, f: d[i4] });
+        }
+        var s = t2.length;
+        var t22 = t2.slice();
+        if (!s)
+          return { t: et, l: 0 };
+        if (s == 1) {
+          var v = new u8(t2[0].s + 1);
+          v[t2[0].s] = 1;
+          return { t: v, l: 1 };
+        }
+        t2.sort(function(a, b) {
+          return a.f - b.f;
+        });
+        t2.push({ s: -1, f: 25001 });
+        var l = t2[0], r = t2[1], i0 = 0, i1 = 1, i22 = 2;
+        t2[0] = { s: -1, f: l.f + r.f, l, r };
+        while (i1 != s - 1) {
+          l = t2[t2[i0].f < t2[i22].f ? i0++ : i22++];
+          r = t2[i0 != i1 && t2[i0].f < t2[i22].f ? i0++ : i22++];
+          t2[i1++] = { s: -1, f: l.f + r.f, l, r };
+        }
+        var maxSym = t22[0].s;
+        for (var i4 = 1; i4 < s; ++i4) {
+          if (t22[i4].s > maxSym)
+            maxSym = t22[i4].s;
+        }
+        var tr = new u16(maxSym + 1);
+        var mbt = ln(t2[i1 - 1], tr, 0);
+        if (mbt > mb) {
+          var i4 = 0, dt = 0;
+          var lft = mbt - mb, cst = 1 << lft;
+          t22.sort(function(a, b) {
+            return tr[b.s] - tr[a.s] || a.f - b.f;
+          });
+          for (; i4 < s; ++i4) {
+            var i2_1 = t22[i4].s;
+            if (tr[i2_1] > mb) {
+              dt += cst - (1 << mbt - tr[i2_1]);
+              tr[i2_1] = mb;
+            } else
+              break;
+          }
+          dt >>= lft;
+          while (dt > 0) {
+            var i2_2 = t22[i4].s;
+            if (tr[i2_2] < mb)
+              dt -= 1 << mb - tr[i2_2]++ - 1;
+            else
+              ++i4;
+          }
+          for (; i4 >= 0 && dt; --i4) {
+            var i2_3 = t22[i4].s;
+            if (tr[i2_3] == mb) {
+              --tr[i2_3];
+              ++dt;
+            }
+          }
+          mbt = mb;
+        }
+        return { t: new u8(tr), l: mbt };
+      };
+      ln = function(n, l, d) {
+        return n.s == -1 ? Math.max(ln(n.l, l, d + 1), ln(n.r, l, d + 1)) : l[n.s] = d;
+      };
+      lc = function(c) {
+        var s = c.length;
+        while (s && !c[--s])
+          ;
+        var cl = new u16(++s);
+        var cli = 0, cln = c[0], cls = 1;
+        var w = function(v) {
+          cl[cli++] = v;
+        };
+        for (var i4 = 1; i4 <= s; ++i4) {
+          if (c[i4] == cln && i4 != s)
+            ++cls;
+          else {
+            if (!cln && cls > 2) {
+              for (; cls > 138; cls -= 138)
+                w(32754);
+              if (cls > 2) {
+                w(cls > 10 ? cls - 11 << 5 | 28690 : cls - 3 << 5 | 12305);
+                cls = 0;
+              }
+            } else if (cls > 3) {
+              w(cln), --cls;
+              for (; cls > 6; cls -= 6)
+                w(8304);
+              if (cls > 2)
+                w(cls - 3 << 5 | 8208), cls = 0;
+            }
+            while (cls--)
+              w(cln);
+            cls = 1;
+            cln = c[i4];
+          }
+        }
+        return { c: cl.subarray(0, cli), n: s };
+      };
+      clen = function(cf, cl) {
+        var l = 0;
+        for (var i4 = 0; i4 < cl.length; ++i4)
+          l += cf[i4] * cl[i4];
+        return l;
+      };
+      wfblk = function(out, pos, dat) {
+        var s = dat.length;
+        var o = shft(pos + 2);
+        out[o] = s & 255;
+        out[o + 1] = s >> 8;
+        out[o + 2] = out[o] ^ 255;
+        out[o + 3] = out[o + 1] ^ 255;
+        for (var i4 = 0; i4 < s; ++i4)
+          out[o + i4 + 4] = dat[i4];
+        return (o + 4 + s) * 8;
+      };
+      wblk = function(dat, out, final, syms, lf, df, eb, li, bs, bl, p) {
+        wbits(out, p++, final);
+        ++lf[256];
+        var _a3 = hTree(lf, 15), dlt = _a3.t, mlb = _a3.l;
+        var _b2 = hTree(df, 15), ddt = _b2.t, mdb = _b2.l;
+        var _c = lc(dlt), lclt = _c.c, nlc = _c.n;
+        var _d = lc(ddt), lcdt = _d.c, ndc = _d.n;
+        var lcfreq = new u16(19);
+        for (var i4 = 0; i4 < lclt.length; ++i4)
+          ++lcfreq[lclt[i4] & 31];
+        for (var i4 = 0; i4 < lcdt.length; ++i4)
+          ++lcfreq[lcdt[i4] & 31];
+        var _e = hTree(lcfreq, 7), lct = _e.t, mlcb = _e.l;
+        var nlcc = 19;
+        for (; nlcc > 4 && !lct[clim[nlcc - 1]]; --nlcc)
+          ;
+        var flen = bl + 5 << 3;
+        var ftlen = clen(lf, flt) + clen(df, fdt) + eb;
+        var dtlen = clen(lf, dlt) + clen(df, ddt) + eb + 14 + 3 * nlcc + clen(lcfreq, lct) + 2 * lcfreq[16] + 3 * lcfreq[17] + 7 * lcfreq[18];
+        if (bs >= 0 && flen <= ftlen && flen <= dtlen)
+          return wfblk(out, p, dat.subarray(bs, bs + bl));
+        var lm, ll, dm, dl;
+        wbits(out, p, 1 + (dtlen < ftlen)), p += 2;
+        if (dtlen < ftlen) {
+          lm = hMap(dlt, mlb, 0), ll = dlt, dm = hMap(ddt, mdb, 0), dl = ddt;
+          var llm = hMap(lct, mlcb, 0);
+          wbits(out, p, nlc - 257);
+          wbits(out, p + 5, ndc - 1);
+          wbits(out, p + 10, nlcc - 4);
+          p += 14;
+          for (var i4 = 0; i4 < nlcc; ++i4)
+            wbits(out, p + 3 * i4, lct[clim[i4]]);
+          p += 3 * nlcc;
+          var lcts = [lclt, lcdt];
+          for (var it = 0; it < 2; ++it) {
+            var clct = lcts[it];
+            for (var i4 = 0; i4 < clct.length; ++i4) {
+              var len = clct[i4] & 31;
+              wbits(out, p, llm[len]), p += lct[len];
+              if (len > 15)
+                wbits(out, p, clct[i4] >> 5 & 127), p += clct[i4] >> 12;
+            }
+          }
+        } else {
+          lm = flm, ll = flt, dm = fdm, dl = fdt;
+        }
+        for (var i4 = 0; i4 < li; ++i4) {
+          var sym = syms[i4];
+          if (sym > 255) {
+            var len = sym >> 18 & 31;
+            wbits16(out, p, lm[len + 257]), p += ll[len + 257];
+            if (len > 7)
+              wbits(out, p, sym >> 23 & 31), p += fleb[len];
+            var dst = sym & 31;
+            wbits16(out, p, dm[dst]), p += dl[dst];
+            if (dst > 3)
+              wbits16(out, p, sym >> 5 & 8191), p += fdeb[dst];
+          } else {
+            wbits16(out, p, lm[sym]), p += ll[sym];
+          }
+        }
+        wbits16(out, p, lm[256]);
+        return p + ll[256];
+      };
+      deo = /* @__PURE__ */ new i32([65540, 131080, 131088, 131104, 262176, 1048704, 1048832, 2114560, 2117632]);
+      et = /* @__PURE__ */ new u8(0);
+      dflt = function(dat, lvl, plvl, pre, post, st) {
+        var s = st.z || dat.length;
+        var o = new u8(pre + s + 5 * (1 + Math.ceil(s / 7e3)) + post);
+        var w = o.subarray(pre, o.length - post);
+        var lst = st.l;
+        var pos = (st.r || 0) & 7;
+        if (lvl) {
+          if (pos)
+            w[0] = st.r >> 3;
+          var opt = deo[lvl - 1];
+          var n = opt >> 13, c = opt & 8191;
+          var msk_1 = (1 << plvl) - 1;
+          var prev = st.p || new u16(32768), head = st.h || new u16(msk_1 + 1);
+          var bs1_1 = Math.ceil(plvl / 3), bs2_1 = 2 * bs1_1;
+          var hsh = function(i5) {
+            return (dat[i5] ^ dat[i5 + 1] << bs1_1 ^ dat[i5 + 2] << bs2_1) & msk_1;
+          };
+          var syms = new i32(25e3);
+          var lf = new u16(288), df = new u16(32);
+          var lc_1 = 0, eb = 0, i4 = st.i || 0, li = 0, wi = st.w || 0, bs = 0;
+          for (; i4 + 2 < s; ++i4) {
+            var hv = hsh(i4);
+            var imod = i4 & 32767, pimod = head[hv];
+            prev[imod] = pimod;
+            head[hv] = imod;
+            if (wi <= i4) {
+              var rem = s - i4;
+              if ((lc_1 > 7e3 || li > 24576) && (rem > 423 || !lst)) {
+                pos = wblk(dat, w, 0, syms, lf, df, eb, li, bs, i4 - bs, pos);
+                li = lc_1 = eb = 0, bs = i4;
+                for (var j = 0; j < 286; ++j)
+                  lf[j] = 0;
+                for (var j = 0; j < 30; ++j)
+                  df[j] = 0;
+              }
+              var l = 2, d = 0, ch_1 = c, dif = imod - pimod & 32767;
+              if (rem > 2 && hv == hsh(i4 - dif)) {
+                var maxn = Math.min(n, rem) - 1;
+                var maxd = Math.min(32767, i4);
+                var ml = Math.min(258, rem);
+                while (dif <= maxd && --ch_1 && imod != pimod) {
+                  if (dat[i4 + l] == dat[i4 + l - dif]) {
+                    var nl = 0;
+                    for (; nl < ml && dat[i4 + nl] == dat[i4 + nl - dif]; ++nl)
+                      ;
+                    if (nl > l) {
+                      l = nl, d = dif;
+                      if (nl > maxn)
+                        break;
+                      var mmd = Math.min(dif, nl - 2);
+                      var md = 0;
+                      for (var j = 0; j < mmd; ++j) {
+                        var ti = i4 - dif + j & 32767;
+                        var pti = prev[ti];
+                        var cd = ti - pti & 32767;
+                        if (cd > md)
+                          md = cd, pimod = ti;
+                      }
+                    }
+                  }
+                  imod = pimod, pimod = prev[imod];
+                  dif += imod - pimod & 32767;
+                }
+              }
+              if (d) {
+                syms[li++] = 268435456 | revfl[l] << 18 | revfd[d];
+                var lin = revfl[l] & 31, din = revfd[d] & 31;
+                eb += fleb[lin] + fdeb[din];
+                ++lf[257 + lin];
+                ++df[din];
+                wi = i4 + l;
+                ++lc_1;
+              } else {
+                syms[li++] = dat[i4];
+                ++lf[dat[i4]];
+              }
+            }
+          }
+          for (i4 = Math.max(i4, wi); i4 < s; ++i4) {
+            syms[li++] = dat[i4];
+            ++lf[dat[i4]];
+          }
+          pos = wblk(dat, w, lst, syms, lf, df, eb, li, bs, i4 - bs, pos);
+          if (!lst) {
+            st.r = pos & 7 | w[pos / 8 | 0] << 3;
+            pos -= 7;
+            st.h = head, st.p = prev, st.i = i4, st.w = wi;
+          }
+        } else {
+          for (var i4 = st.w || 0; i4 < s + lst; i4 += 65535) {
+            var e = i4 + 65535;
+            if (e >= s) {
+              w[pos / 8 | 0] = lst;
+              e = s;
+            }
+            pos = wfblk(w, pos + 1, dat.subarray(i4, e));
+          }
+          st.i = s;
+        }
+        return slc(o, 0, pre + shft(pos) + post);
+      };
+      crct = /* @__PURE__ */ (function() {
+        var t2 = new Int32Array(256);
+        for (var i4 = 0; i4 < 256; ++i4) {
+          var c = i4, k = 9;
+          while (--k)
+            c = (c & 1 && -306674912) ^ c >>> 1;
+          t2[i4] = c;
+        }
+        return t2;
+      })();
+      crc = function() {
+        var c = -1;
+        return {
+          p: function(d) {
+            var cr = c;
+            for (var i4 = 0; i4 < d.length; ++i4)
+              cr = crct[cr & 255 ^ d[i4]] ^ cr >>> 8;
+            c = cr;
+          },
+          d: function() {
+            return ~c;
+          }
+        };
+      };
+      dopt = function(dat, opt, pre, post, st) {
+        if (!st) {
+          st = { l: 1 };
+          if (opt.dictionary) {
+            var dict = opt.dictionary.subarray(-32768);
+            var newDat = new u8(dict.length + dat.length);
+            newDat.set(dict);
+            newDat.set(dat, dict.length);
+            dat = newDat;
+            st.w = dict.length;
+          }
+        }
+        return dflt(dat, opt.level == null ? 6 : opt.level, opt.mem == null ? st.l ? Math.ceil(Math.max(8, Math.min(13, Math.log(dat.length))) * 1.5) : 20 : 12 + opt.mem, pre, post, st);
+      };
+      mrg = function(a, b) {
+        var o = {};
+        for (var k in a)
+          o[k] = a[k];
+        for (var k in b)
+          o[k] = b[k];
+        return o;
+      };
+      b2 = function(d, b) {
+        return d[b] | d[b + 1] << 8;
+      };
+      b4 = function(d, b) {
+        return (d[b] | d[b + 1] << 8 | d[b + 2] << 16 | d[b + 3] << 24) >>> 0;
+      };
+      b8 = function(d, b) {
+        return b4(d, b) + b4(d, b + 4) * 4294967296;
+      };
+      wbytes = function(d, b, v) {
+        for (; v; ++b)
+          d[b] = v, v >>>= 8;
+      };
+      fltn = function(d, p, t2, o) {
+        for (var k in d) {
+          var val = d[k], n = p + k, op = o;
+          if (Array.isArray(val))
+            op = mrg(o, val[1]), val = val[0];
+          if (ArrayBuffer.isView(val))
+            t2[n] = [val, op];
+          else {
+            t2[n += "/"] = [new u8(0), op];
+            fltn(val, n, t2, o);
+          }
+        }
+      };
+      te = typeof TextEncoder != "undefined" && /* @__PURE__ */ new TextEncoder();
+      td = typeof TextDecoder != "undefined" && /* @__PURE__ */ new TextDecoder();
+      tds = 0;
+      try {
+        td.decode(et, { stream: true });
+        tds = 1;
+      } catch (e) {
+      }
+      dutf8 = function(d) {
+        for (var r = "", i4 = 0; ; ) {
+          var c = d[i4++];
+          var eb = (c > 127) + (c > 223) + (c > 239);
+          if (i4 + eb > d.length)
+            return { s: r, r: slc(d, i4 - 1) };
+          if (!eb)
+            r += String.fromCharCode(c);
+          else if (eb == 3) {
+            c = ((c & 15) << 18 | (d[i4++] & 63) << 12 | (d[i4++] & 63) << 6 | d[i4++] & 63) - 65536, r += String.fromCharCode(55296 | c >> 10, 56320 | c & 1023);
+          } else if (eb & 1)
+            r += String.fromCharCode((c & 31) << 6 | d[i4++] & 63);
+          else
+            r += String.fromCharCode((c & 15) << 12 | (d[i4++] & 63) << 6 | d[i4++] & 63);
+        }
+      };
+      slzh = function(d, b) {
+        return b + 30 + b2(d, b + 26) + b2(d, b + 28);
+      };
+      zh = function(d, b, z) {
+        var fnl = b2(d, b + 28), efl = b2(d, b + 30), fn = strFromU8(d.subarray(b + 46, b + 46 + fnl), !(b2(d, b + 8) & 2048)), es = b + 46 + fnl;
+        var _a3 = z64hs(d, es, efl, z, b4(d, b + 20), b4(d, b + 24), b4(d, b + 42)), sc = _a3[0], su = _a3[1], off2 = _a3[2];
+        return [b2(d, b + 10), sc, su, fn, es + efl + b2(d, b + 32), off2];
+      };
+      z64hs = function(d, b, l, z, sc, su, off2) {
+        var nsc = sc == 4294967295, nsu = su == 4294967295, noff = off2 == 4294967295, e = b + l;
+        var nf = nsc + nsu + noff;
+        if (z && nf) {
+          for (; b + 4 < e; b += 4 + b2(d, b + 2)) {
+            if (b2(d, b) == 1) {
+              return [
+                nsc ? b8(d, b + 4 + 8 * nsu) : sc,
+                nsu ? b8(d, b + 4) : su,
+                noff ? b8(d, b + 4 + 8 * (nsu + nsc)) : off2,
+                1
+              ];
+            }
+          }
+          if (z < 2)
+            err(13);
+        }
+        return [sc, su, off2, 0];
+      };
+      exfl = function(ex) {
+        var le = 0;
+        if (ex) {
+          for (var k in ex) {
+            var l = ex[k].length;
+            if (l > 65535)
+              err(9);
+            le += l + 4;
+          }
+        }
+        return le;
+      };
+      wzh = function(d, b, f, fn, u, c, ce, co) {
+        var fl2 = fn.length, ex = f.extra, col = co && co.length;
+        var exl = exfl(ex);
+        wbytes(d, b, ce != null ? 33639248 : 67324752), b += 4;
+        if (ce != null)
+          d[b++] = 20, d[b++] = f.os;
+        d[b] = 20, b += 2;
+        d[b++] = f.flag << 1 | (c < 0 && 8), d[b++] = u && 8;
+        d[b++] = f.compression & 255, d[b++] = f.compression >> 8;
+        var dt = new Date(f.mtime == null ? Date.now() : f.mtime), y = dt.getFullYear() - 1980;
+        if (y < 0 || y > 119)
+          err(10);
+        wbytes(d, b, y << 25 | dt.getMonth() + 1 << 21 | dt.getDate() << 16 | dt.getHours() << 11 | dt.getMinutes() << 5 | dt.getSeconds() >> 1), b += 4;
+        if (c != -1) {
+          wbytes(d, b, f.crc);
+          wbytes(d, b + 4, c < 0 ? -c - 2 : c);
+          wbytes(d, b + 8, f.size);
+        }
+        wbytes(d, b + 12, fl2);
+        wbytes(d, b + 14, exl), b += 16;
+        if (ce != null) {
+          wbytes(d, b, col);
+          wbytes(d, b + 6, f.attrs);
+          wbytes(d, b + 10, ce), b += 14;
+        }
+        d.set(fn, b);
+        b += fl2;
+        if (exl) {
+          for (var k in ex) {
+            var exf = ex[k], l = exf.length;
+            wbytes(d, b, +k);
+            wbytes(d, b + 2, l);
+            d.set(exf, b + 4), b += 4 + l;
+          }
+        }
+        if (col)
+          d.set(co, b), b += col;
+        return b;
+      };
+      wzf = function(o, b, c, d, e) {
+        wbytes(o, b, 101010256);
+        wbytes(o, b + 8, c);
+        wbytes(o, b + 10, c);
+        wbytes(o, b + 12, d);
+        wbytes(o, b + 16, e);
+      };
+    }
+  });
+
+  // app/src/core/state.js
+  async function initStorage() {
+    try {
+      const req = indexedDB.open("runlet-db", 1);
+      req.onupgradeneeded = () => {
+        const d = req.result;
+        if (!d.objectStoreNames.contains("kv")) d.createObjectStore("kv");
+      };
+      req.onsuccess = () => {
+        db = req.result;
+      };
+    } catch (e) {
+    }
+    const hash3 = location.hash || "";
+    if (hash3.startsWith("#p=")) {
+      const code2 = hash3.slice(3);
+      if (code2.length <= 2e6) {
+        let loaded = null, shareError = null;
+        try {
+          loaded = await decodeShare(code2);
+        } catch (e) {
+          if (e.code === "PASSWORD_REQUIRED") {
+            const pass = await askPassword();
+            if (pass) {
+              try {
+                loaded = await decodeShare(code2, pass);
+              } catch (e2) {
+                shareError = e2;
+              }
+            }
+          } else shareError = e;
+        }
+        if (loaded && loaded.files) {
+          state.readOnly = !!loaded.readOnly;
+          setProject(loaded, loaded.projectName || "\u0418\u0437 \u0441\u0441\u044B\u043B\u043A\u0438");
+          toast(state.readOnly ? "\u041F\u0440\u043E\u0435\u043A\u0442 \u0437\u0430\u0433\u0440\u0443\u0436\u0435\u043D \u0438\u0437 \u0441\u0441\u044B\u043B\u043A\u0438 (\u0440\u0435\u0436\u0438\u043C \u0442\u043E\u043B\u044C\u043A\u043E \u0434\u043B\u044F \u0447\u0442\u0435\u043D\u0438\u044F)" : "\u041F\u0440\u043E\u0435\u043A\u0442 \u0437\u0430\u0433\u0440\u0443\u0436\u0435\u043D \u0438\u0437 \u0441\u0441\u044B\u043B\u043A\u0438", "ok", "\u0428\u0430\u0440\u0438\u043D\u0433");
+          emit("readOnly:changed", state.readOnly);
+          return true;
+        }
+        toast("\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u043E\u0442\u043A\u0440\u044B\u0442\u044C \u0441\u0441\u044B\u043B\u043A\u0443: " + (shareError?.message || "\u043F\u043E\u0432\u0440\u0435\u0436\u0434\u0451\u043D\u043D\u044B\u0435 \u0434\u0430\u043D\u043D\u044B\u0435"), "err", "\u0428\u0430\u0440\u0438\u043D\u0433");
+      } else toast("\u0421\u0441\u044B\u043B\u043A\u0430 \u043D\u0430 \u043F\u0440\u043E\u0435\u043A\u0442 \u0441\u043B\u0438\u0448\u043A\u043E\u043C \u0434\u043B\u0438\u043D\u043D\u0430\u044F", "err", "\u0428\u0430\u0440\u0438\u043D\u0433");
+    }
+    const rawSettings = localStorage.getItem(LS_SETTINGS);
+    if (rawSettings) {
+      try {
+        Object.assign(state.settings, sanitizeSettings(JSON.parse(rawSettings)));
+      } catch (e) {
+      }
+    }
+    const raw = localStorage.getItem(LS_KEY);
+    if (raw) {
+      try {
+        const data3 = JSON.parse(raw);
+        setProject(data3, data3.projectName, true);
+        return false;
+      } catch (e) {
+        console.warn("session restore failed", e);
+      }
+    }
+    resetProject();
+    loadFromIDB().then((d) => {
+      if (d && d.files && !localStorage.getItem(LS_KEY)) setProject(d, d.projectName, true);
+    });
+    return false;
+  }
+  function idbPut(key, val) {
+    return new Promise((res) => {
+      if (!db) return res(false);
+      try {
+        const tx = db.transaction("kv", "readwrite");
+        tx.objectStore("kv").put(val, key);
+        tx.oncomplete = () => res(true);
+        tx.onerror = () => res(false);
+      } catch (e) {
+        res(false);
+      }
+    });
+  }
+  function idbGet(key) {
+    return new Promise((res) => {
+      if (!db) return setTimeout(() => idbGet(key).then(res), 250);
+      try {
+        const tx = db.transaction("kv", "readonly");
+        const r = tx.objectStore("kv").get(key);
+        r.onsuccess = () => res(r.result || null);
+        r.onerror = () => res(null);
+      } catch (e) {
+        res(null);
+      }
+    });
+  }
+  function safePathKey(p, maxLen = 300) {
+    if (typeof p !== "string" || !p || p.length > maxLen || p.includes("\0") || p.includes("\\") || p.startsWith("/") || /^[A-Za-z]:/.test(p) || UNSAFE_KEYS.has(p)) return null;
+    const parts = p.split("/");
+    if (parts.some((x2) => x2 === ".." || x2 === "." || x2 === "" || UNSAFE_KEYS.has(x2) || /^\s|\s$/.test(x2))) return null;
+    if (!/[\w.-]/.test(p) || /[<>:"|?*\x00-\x1f]/.test(p)) return null;
+    return p;
+  }
+  function setProject(data3, name2, restoreEditors = false) {
+    state.files = {};
+    for (const [p, f] of Object.entries(data3.files || {})) {
+      const key = safePathKey(p);
+      if (!key) continue;
+      state.files[key] = typeof f === "string" ? makeFile(f, key) : makeFile(String(f?.content ?? ""), key);
+    }
+    if (!Object.keys(state.files).length) resetProject();
+    state.entry = data3.entry || ("index.html" in state.files ? "index.html" : Object.keys(state.files)[0]);
+    state.projectName = name2 || data3.projectName || "\u041C\u043E\u0439 \u043F\u0440\u043E\u0435\u043A\u0442";
+    const mergedPanes = { ...state.panes, ...data3.panes || {} };
+    state.panes = Object.fromEntries(Object.entries(mergedPanes).map(([k, v]) => [k, ["html", "css", "js"].includes(k) && safePathKey(v) ? v : state.panes[k] || ""]));
+    state.deps = data3.deps || [];
+    state.layout = data3.layout || "columns";
+    state.snapshots = data3.snapshots || [];
+    state.userSnippets = data3.userSnippets || [];
+    state.progress = data3.progress || {};
+    if (data3.settings) Object.assign(state.settings, data3.settings);
+    const pn = $("#projectName");
+    if (pn) pn.value = state.projectName;
+    emit("project:loaded");
+    if (restoreEditors) emit("project:restoreEditors");
+  }
+  function resetProject() {
+    state.files = {};
+    for (const [p, c] of Object.entries(DEFAULT_FILES)) state.files[p] = makeFile(c, p);
+    state.entry = "index.html";
+    state.panes = { html: "index.html", css: "style.css", js: "script.js" };
+    state.deps = [];
+    state.snapshots = [];
+    state.dirty = false;
+    emit("project:loaded");
+    emit("project:restoreEditors");
+  }
+  function makeFile(content2, path = "") {
+    return {
+      content: String(content2 ?? ""),
+      kind: isBinary(path) ? "binary" : "text",
+      mime: mimeOf(path),
+      size: String(content2 ?? "").length,
+      updated: Date.now()
+    };
+  }
+  function mimeOf(p) {
+    const e = (p.split(".").pop() || "").toLowerCase();
+    return {
+      html: "text/html",
+      htm: "text/html",
+      css: "text/css",
+      js: "text/javascript",
+      mjs: "text/javascript",
+      ts: "text/typescript",
+      jsx: "text/jsx",
+      tsx: "text/tsx",
+      json: "application/json",
+      md: "text/markdown",
+      svg: "image/svg+xml",
+      png: "image/png",
+      jpg: "image/jpeg",
+      jpeg: "image/jpeg",
+      gif: "image/gif",
+      webp: "image/webp",
+      ico: "image/x-icon",
+      woff: "font/woff",
+      woff2: "font/woff2",
+      ttf: "font/ttf",
+      otf: "font/otf",
+      mp3: "audio/mpeg",
+      wav: "audio/wav",
+      mp4: "video/mp4",
+      webm: "video/webm",
+      txt: "text/plain",
+      scss: "text/x-scss",
+      pug: "text/x-pug",
+      vue: "text/x-vue",
+      xml: "application/xml"
+    }[e] || "application/octet-stream";
+  }
+  function isBinary(p) {
+    return /^data:/.test(state.files[p]?.content || "") && !/^data:(text|application\/json|image\/svg)/.test(state.files[p]?.content || "");
+  }
+  function isImage(p) {
+    return /^image\//.test(mimeOf(p));
+  }
+  function isText(p) {
+    return /\.(html?|css|js|mjs|cjs|ts|jsx|tsx|json|md|svg|txt|scss|less|pug|vue|xml|map)$/i.test(p);
+  }
+  function read(p) {
+    return state.files[p]?.content ?? "";
+  }
+  function exists(p) {
+    return Object.prototype.hasOwnProperty.call(state.files, p);
+  }
+  function write(p, content2, opts = {}) {
+    const key = safePathKey(p);
+    if (!key) {
+      if (!opts.quiet) toast("\u041D\u0435\u0434\u043E\u043F\u0443\u0441\u0442\u0438\u043C\u043E\u0435 \u0438\u043C\u044F \u0444\u0430\u0439\u043B\u0430 \u2014 \u043F\u0443\u0442\u044C \u043E\u0442\u043A\u043B\u043E\u043D\u0451\u043D", "err", "\u0411\u0435\u0437\u043E\u043F\u0430\u0441\u043D\u043E\u0441\u0442\u044C");
+      return null;
+    }
+    p = key;
+    if (typeof content2 !== "string" || content2.length > 8 * 1024 * 1024) {
+      toast("\u0424\u0430\u0439\u043B \u0441\u043B\u0438\u0448\u043A\u043E\u043C \u0431\u043E\u043B\u044C\u0448\u043E\u0439 \u0438\u043B\u0438 \u043D\u0435 \u0442\u0435\u043A\u0441\u0442\u043E\u0432\u044B\u0439", "err");
+      return null;
+    }
+    const isNew = !exists(p);
+    state.files[p] = makeFile(content2, p);
+    if (opts.keepPane !== true) {
+      for (const [pane, file] of Object.entries(state.panes)) {
+        if (file === p && pane !== opts.fromPane) emit("file:externalChange", { path: p, pane, content: content2 });
+      }
+    }
+    markDirty(true);
+    emit("files:changed", { path: p, isNew });
+    emit("project:size");
+    schedulePersist();
+    return state.files[p];
+  }
+  function remove(p, opts = {}) {
+    const kids = Object.keys(state.files).filter((x2) => x2 === p || x2.startsWith(p + "/"));
+    for (const k of kids) delete state.files[k];
+    for (const [pane, file] of Object.entries(state.panes)) {
+      if (kids.includes(file)) {
+        const candidates = Object.keys(state.files).filter((x2) => paneOf(x2) === pane);
+        state.panes[pane] = candidates[0] || "";
+        emit("project:restoreEditors");
+      }
+    }
+    markDirty(true);
+    emit("files:changed", { path: p, removed: true });
+    emit("project:size");
+    schedulePersist();
+    if (!opts.silent) emit("toast", { msg: `\u0423\u0434\u0430\u043B\u0435\u043D\u043E: ${p}`, type: "ok" });
+  }
+  function rename(oldP, newP) {
+    const from = safePathKey(oldP), to = safePathKey(newP);
+    if (!from || !to || from === to || !exists(from)) return false;
+    oldP = from;
+    newP = to;
+    const kids = Object.keys(state.files).filter((x2) => x2 === oldP || x2.startsWith(oldP + "/"));
+    const oldBase = oldP.split("/").pop();
+    const newBase = newP.split("/").pop();
+    for (const [p, f] of Object.entries(state.files)) {
+      if (!isText(p)) continue;
+      let c = f.content;
+      c = c.split(`"${oldP}"`).join(`"${newP}"`).split(`'${oldP}'`).join(`'${newP}'`);
+      if (oldBase !== newBase) c = c.split(`"${oldBase}"`).join(`"${newBase}"`).split(`'${oldBase}'`).join(`'${newBase}'`);
+      f.content = c;
+      f.size = c.length;
+    }
+    for (const k of kids) {
+      const target = newP + k.slice(oldP.length);
+      state.files[target] = state.files[k];
+      state.files[target].mime = mimeOf(target);
+      delete state.files[k];
+      for (const [pane, file] of Object.entries(state.panes)) if (file === k) state.panes[pane] = target;
+    }
+    if (state.entry === oldP) state.entry = newP;
+    state.activeFile = newP;
+    markDirty(true);
+    emit("files:changed", { path: newP, renamed: true });
+    emit("project:restoreEditors");
+    schedulePersist();
+    return true;
+  }
+  function copyFile(p) {
+    const ext = p.includes(".") ? "." + p.split(".").pop() : "";
+    let n = p.replace(ext, "-copy" + ext), i4 = 2;
+    while (exists(n)) n = p.replace(ext, `-copy${i4++}${ext}`);
+    state.files[n] = { ...makeFile(read(p), n) };
+    markDirty(true);
+    emit("files:changed", { path: n });
+    schedulePersist();
+    return n;
+  }
+  function paneOf(path) {
+    const e = (path.split(".").pop() || "").toLowerCase();
+    if (["html", "htm", "pug", "vue", "svg"].includes(e)) return "html";
+    if (["css", "scss", "less", "sass"].includes(e)) return "css";
+    if (["js", "mjs", "cjs", "ts", "jsx", "tsx", "json"].includes(e)) return "js";
+    return null;
+  }
+  function listFiles() {
+    return Object.keys(state.files).sort();
+  }
+  function allTextFiles() {
+    const out = {};
+    for (const [p, f] of Object.entries(state.files)) if (isText(p)) out[p] = f.content;
+    return out;
+  }
+  function projectSize() {
+    return Object.values(state.files).reduce((n, f) => n + (f.content?.length || 0), 0);
+  }
+  function projectJSON() {
+    return JSON.stringify({
+      version: 2,
+      projectName: state.projectName,
+      entry: state.entry,
+      files: state.files,
+      panes: state.panes,
+      deps: state.deps,
+      layout: state.layout,
+      snapshots: state.snapshots,
+      userSnippets: state.userSnippets,
+      settings: state.settings,
+      progress: state.progress
+    }, null, 2);
+  }
+  function importProjectJSON(text) {
+    const d = typeof text === "string" ? JSON.parse(text) : text;
+    if (!d || typeof d !== "object" || Array.isArray(d)) throw new Error("\u041D\u0435\u043A\u043E\u0440\u0440\u0435\u043A\u0442\u043D\u044B\u0439 \u043F\u0440\u043E\u0435\u043A\u0442");
+    const files = {};
+    let total = 0;
+    for (const [p, f] of Object.entries(d.files || d)) {
+      const key = safePathKey(p);
+      const content2 = typeof f === "string" ? f : String(f?.content ?? "");
+      total += content2.length;
+      if (key && total < 8 * 1024 * 1024) files[key] = content2.slice(0, 2 * 1024 * 1024);
+    }
+    setProject({ ...d, files }, String(d.projectName || "\u041F\u0440\u043E\u0435\u043A\u0442").slice(0, 200), true);
+    schedulePersist();
+    return true;
+  }
+  function startAutoSave() {
+    setInterval(() => {
+      if (state.settings.autoSave && state.dirty) {
+        persistNow();
+        emit("webhook", "save");
+      }
+    }, Math.max(5, state.settings.autoSaveInterval) * 1e3);
+  }
+  function makeSnapshot(label = "\u0412\u0435\u0440\u0441\u0438\u044F") {
+    const snap = {
+      id: Date.now().toString(36),
+      label,
+      at: Date.now(),
+      files: Object.fromEntries(Object.entries(state.files).map(([p, f]) => [p, f.content])),
+      entry: state.entry,
+      panes: { ...state.panes }
+    };
+    state.snapshots.unshift(snap);
+    if (state.snapshots.length > 25) state.snapshots.length = 25;
+    schedulePersist();
+    emit("snapshots");
+    return snap;
+  }
+  function restoreSnapshot(id2) {
+    const s = state.snapshots.find((x2) => x2.id === id2);
+    if (!s) return false;
+    setProject({ files: s.files, entry: s.entry, panes: s.panes }, state.projectName, true);
+    return true;
+  }
+  function diffText(a, b) {
+    const A = a.split("\n"), B = b.split("\n");
+    const dp = Array.from({ length: A.length + 1 }, () => new Uint16Array(B.length + 1));
+    for (let i5 = A.length - 1; i5 >= 0; i5--)
+      for (let j2 = B.length - 1; j2 >= 0; j2--)
+        dp[i5][j2] = A[i5] === B[j2] ? dp[i5 + 1][j2 + 1] + 1 : Math.max(dp[i5 + 1][j2], dp[i5][j2 + 1]);
+    const out = [];
+    let i4 = 0, j = 0;
+    while (i4 < A.length && j < B.length) {
+      if (A[i4] === B[j]) {
+        out.push({ t: "=", v: A[i4] });
+        i4++;
+        j++;
+      } else if (dp[i4 + 1][j] >= dp[i4][j + 1]) {
+        out.push({ t: "-", v: A[i4++] });
+      } else {
+        out.push({ t: "+", v: B[j++] });
+      }
+    }
+    while (i4 < A.length) out.push({ t: "-", v: A[i4++] });
+    while (j < B.length) out.push({ t: "+", v: B[j++] });
+    return out;
+  }
+  function applyPreset(name2) {
+    const p = PRESETS[name2];
+    if (!p) return;
+    Object.assign(state.settings, p.patch);
+    state.settings.presets = name2;
+    applySettings();
+    toast("\u041F\u0440\u0438\u043C\u0435\u043D\u0451\u043D \u043F\u0440\u0435\u0441\u0435\u0442 \xAB" + p.label + "\xBB", "ok", "\u041D\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0438");
+  }
+  function applySettings() {
+    applyTheme();
+    applyLocale();
+    localStorage.setItem(LS_SETTINGS, JSON.stringify(state.settings));
+    emit("settings:changed");
+    schedulePersist();
+  }
+  function exportSettings() {
+    return JSON.stringify(state.settings, null, 2);
+  }
+  function sanitizeSettings(d) {
+    const out = {};
+    if (!d || typeof d !== "object" || Array.isArray(d)) return out;
+    const ref2 = DEFAULT_SETTINGS;
+    for (const [k, v] of Object.entries(d)) {
+      if (UNSAFE_KEYS.has(k) || !Object.prototype.hasOwnProperty.call(ref2, k)) continue;
+      const orig = ref2[k];
+      if (typeof orig === "boolean" && typeof v === "boolean") out[k] = v;
+      else if (typeof orig === "number" && typeof v === "number" && Math.abs(v) < 1e7) out[k] = v;
+      else if (typeof orig === "string" && typeof v === "string" && v.length < 200) out[k] = v;
+      else if (Array.isArray(orig) && Array.isArray(v)) out[k] = v.slice(0, 100);
+      else if (orig && typeof orig === "object" && !Array.isArray(orig) && v && typeof v === "object" && !Array.isArray(v)) {
+        const nested = {};
+        for (const [nk, nv] of Object.entries(v)) {
+          if (UNSAFE_KEYS.has(nk) || !Object.prototype.hasOwnProperty.call(orig, nk)) continue;
+          if (typeof orig[nk] === typeof nv && (typeof nv === "boolean" || typeof nv === "number" || typeof nv === "string" && nv.length < 200)) nested[nk] = nv;
+        }
+        out[k] = { ...orig, ...nested };
+      }
+    }
+    return out;
+  }
+  function importSettings(text) {
+    Object.assign(state.settings, sanitizeSettings(JSON.parse(text)));
+    applySettings();
+    return true;
+  }
+  function resetSettings() {
+    Object.assign(state.settings, JSON.parse(JSON.stringify(DEFAULT_SETTINGS)));
+    applySettings();
+    toast("\u041D\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0438 \u0441\u0431\u0440\u043E\u0448\u0435\u043D\u044B", "ok");
+  }
+  function toB64u(bytes) {
+    let bin = "";
+    for (let i4 = 0; i4 < bytes.length; i4 += 32768) bin += String.fromCharCode(...bytes.subarray(i4, i4 + 32768));
+    return btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  }
+  function fromB64u(code2) {
+    const b64 = code2.replace(/-/g, "+").replace(/_/g, "/");
+    const bin = atob(b64 + "===".slice((b64.length + 3) % 4));
+    return Uint8Array.from(bin, (c) => c.charCodeAt(0));
+  }
+  async function shareKey(password, salt) {
+    if (!globalThis.crypto?.subtle) throw new Error("Web Crypto \u043D\u0435\u0434\u043E\u0441\u0442\u0443\u043F\u0435\u043D \u2014 \u043F\u0430\u0440\u043E\u043B\u044C\u043D\u0430\u044F \u0441\u0441\u044B\u043B\u043A\u0430 \u043D\u0435 \u043F\u043E\u0434\u0434\u0435\u0440\u0436\u0438\u0432\u0430\u0435\u0442\u0441\u044F");
+    const base2 = await crypto.subtle.importKey("raw", new TextEncoder().encode(password), "PBKDF2", false, ["deriveKey"]);
+    return crypto.subtle.deriveKey(
+      { name: "PBKDF2", salt, iterations: SHARE_PBKDF2_ITER, hash: "SHA-256" },
+      base2,
+      { name: "AES-GCM", length: 256 },
+      false,
+      ["encrypt", "decrypt"]
+    );
+  }
+  function validateShared(p) {
+    if (!p || typeof p !== "object" || Array.isArray(p) || !p.files || typeof p.files !== "object" || Array.isArray(p.files))
+      throw new Error("\u041D\u0435\u043A\u043E\u0440\u0440\u0435\u043A\u0442\u043D\u044B\u0439 \u0444\u043E\u0440\u043C\u0430\u0442 \u043F\u0440\u043E\u0435\u043A\u0442\u0430");
+    const files = {};
+    let total = 0;
+    for (const [k, v] of Object.entries(p.files).slice(0, 200)) {
+      const key = safePathKey(k);
+      if (!key || typeof v !== "string") continue;
+      total += v.length;
+      if (total > MAX_SHARE_JSON) throw new Error("\u041F\u0440\u043E\u0435\u043A\u0442 \u0432 \u0441\u0441\u044B\u043B\u043A\u0435 \u0441\u043B\u0438\u0448\u043A\u043E\u043C \u0431\u043E\u043B\u044C\u0448\u043E\u0439");
+      files[key] = v.slice(0, 2 * 1024 * 1024);
+    }
+    if (!Object.keys(files).length) throw new Error("\u0412 \u0441\u0441\u044B\u043B\u043A\u0435 \u043D\u0435\u0442 \u0444\u0430\u0439\u043B\u043E\u0432");
+    return {
+      v: 3,
+      files,
+      entry: safePathKey(p.entry) || Object.keys(files)[0],
+      panes: { ...state.panes, ...p.panes && typeof p.panes === "object" ? Object.fromEntries(
+        Object.entries(p.panes).filter(([k, v]) => ["html", "css", "js"].includes(k) && typeof v === "string" && safePathKey(v))
+      ) : {} },
+      deps: Array.isArray(p.deps) ? p.deps.filter((d) => typeof d === "string" && d.length < 80).slice(0, 50) : [],
+      projectName: typeof p.projectName === "string" ? p.projectName.slice(0, 200) : "\u0418\u0437 \u0441\u0441\u044B\u043B\u043A\u0438",
+      readOnly: !!p.readOnly
+    };
+  }
+  async function encodeShare(opts = {}) {
+    const payload = validateShared({
+      v: 3,
+      files: Object.fromEntries(Object.entries(state.files).map(([p, f]) => [p, f.content])),
+      entry: state.entry,
+      panes: state.panes,
+      deps: state.deps,
+      projectName: state.projectName,
+      readOnly: !!opts.readOnly
+    });
+    const bytes = deflateSync(strToU8(JSON.stringify(payload)), { level: 9 });
+    if (bytes.length > MAX_SHARE_JSON) throw new Error("\u041F\u0440\u043E\u0435\u043A\u0442 \u0441\u043B\u0438\u0448\u043A\u043E\u043C \u0431\u043E\u043B\u044C\u0448\u043E\u0439 \u0434\u043B\u044F \u0441\u0441\u044B\u043B\u043A\u0438");
+    if (opts.password) {
+      const salt = crypto.getRandomValues(new Uint8Array(16));
+      const iv = crypto.getRandomValues(new Uint8Array(12));
+      const key = await shareKey(String(opts.password).slice(0, 200), salt);
+      const cipher = new Uint8Array(await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, bytes));
+      const code2 = "E" + toB64u(salt) + "." + toB64u(iv) + "." + toB64u(cipher);
+      if (code2.length > MAX_SHARE_CODE) throw new Error("\u041F\u0440\u043E\u0435\u043A\u0442 \u0441\u043B\u0438\u0448\u043A\u043E\u043C \u0431\u043E\u043B\u044C\u0448\u043E\u0439 \u0434\u043B\u044F \u0441\u0441\u044B\u043B\u043A\u0438");
+      return code2;
+    }
+    return toB64u(bytes);
+  }
+  async function decodeShare(code2, password = null) {
+    if (typeof code2 !== "string" || !code2 || code2.length > MAX_SHARE_CODE || !/^[A-Za-z0-9._-]+$/.test(code2))
+      throw new Error("\u041D\u0435\u043A\u043E\u0440\u0440\u0435\u043A\u0442\u043D\u0430\u044F \u0441\u0441\u044B\u043B\u043A\u0430");
+    let bytes;
+    if (code2.startsWith("E")) {
+      if (!password) {
+        const e = new Error("\u0422\u0440\u0435\u0431\u0443\u0435\u0442\u0441\u044F \u043F\u0430\u0440\u043E\u043B\u044C");
+        e.code = "PASSWORD_REQUIRED";
+        throw e;
+      }
+      const parts = code2.slice(1).split(".");
+      if (parts.length !== 3) throw new Error("\u041F\u043E\u0432\u0440\u0435\u0436\u0434\u0451\u043D\u043D\u0430\u044F \u0441\u0441\u044B\u043B\u043A\u0430");
+      const salt = fromB64u(parts[0]), iv = fromB64u(parts[1]), cipher = fromB64u(parts[2]);
+      if (salt.length !== 16 || iv.length !== 12 || cipher.length > MAX_SHARE_JSON) throw new Error("\u041F\u043E\u0432\u0440\u0435\u0436\u0434\u0451\u043D\u043D\u0430\u044F \u0441\u0441\u044B\u043B\u043A\u0430");
+      const key = await shareKey(String(password).slice(0, 200), salt);
+      try {
+        bytes = new Uint8Array(await crypto.subtle.decrypt({ name: "AES-GCM", iv }, key, cipher));
+      } catch (_) {
+        throw new Error("\u041D\u0435\u0432\u0435\u0440\u043D\u044B\u0439 \u043F\u0430\u0440\u043E\u043B\u044C");
+      }
+    } else bytes = fromB64u(code2);
+    if (bytes.length > MAX_SHARE_JSON) throw new Error("\u0421\u0441\u044B\u043B\u043A\u0430 \u0441\u043B\u0438\u0448\u043A\u043E\u043C \u0431\u043E\u043B\u044C\u0448\u0430\u044F");
+    const out = inflateSync(bytes, { out: new Uint8Array(MAX_SHARE_JSON) });
+    const json2 = strFromU8(out);
+    if (json2.length > MAX_SHARE_JSON) throw new Error("\u041F\u0440\u043E\u0435\u043A\u0442 \u0441\u043B\u0438\u0448\u043A\u043E\u043C \u0431\u043E\u043B\u044C\u0448\u043E\u0439");
+    return validateShared(JSON.parse(json2));
+  }
+  function askPassword() {
+    return new Promise((resolve) => {
+      const overlay = document.createElement("div");
+      overlay.style.cssText = "position:fixed;inset:0;z-index:99999;display:grid;place-items:center;background:rgba(4,5,14,.88);font:14px system-ui;color:#fff";
+      const card = document.createElement("div");
+      card.style.cssText = "background:#181b2c;border:1px solid #ffffff22;border-radius:20px;padding:24px;width:min(380px,92vw);box-shadow:0 20px 60px #0008";
+      const h = document.createElement("h2");
+      h.textContent = " \u041F\u0440\u043E\u0435\u043A\u0442 \u0437\u0430\u0449\u0438\u0449\u0451\u043D \u043F\u0430\u0440\u043E\u043B\u0435\u043C";
+      h.style.cssText = "margin:0 0 8px;font-size:18px";
+      const p = document.createElement("p");
+      p.textContent = "\u0421\u0441\u044B\u043B\u043A\u0430 \u0437\u0430\u0448\u0438\u0444\u0440\u043E\u0432\u0430\u043D\u0430 AES-GCM. \u0412\u0432\u0435\u0434\u0438\u0442\u0435 \u043F\u0430\u0440\u043E\u043B\u044C, \u0447\u0442\u043E\u0431\u044B \u043E\u0442\u043A\u0440\u044B\u0442\u044C \u043F\u0440\u043E\u0435\u043A\u0442.";
+      p.style.cssText = "color:#979cb9;font-size:12px;line-height:1.5";
+      const input = document.createElement("input");
+      input.type = "password";
+      input.placeholder = "\u041F\u0430\u0440\u043E\u043B\u044C";
+      input.style.cssText = "width:100%;height:38px;border-radius:11px;border:1px solid #ffffff33;background:#121424;color:#fff;padding:0 12px;outline:0";
+      const row = document.createElement("div");
+      row.style.cssText = "display:flex;gap:8px;margin-top:12px";
+      const ok = document.createElement("button");
+      ok.textContent = "\u041E\u0442\u043A\u0440\u044B\u0442\u044C";
+      ok.style.cssText = "flex:1;height:36px;border:0;border-radius:11px;background:#7c6cf6;color:#fff;font-weight:700";
+      const cancel = document.createElement("button");
+      cancel.textContent = "\u041E\u0442\u043C\u0435\u043D\u0430";
+      cancel.style.cssText = "height:36px;padding:0 14px;border:1px solid #ffffff33;border-radius:11px;background:transparent;color:#ccc";
+      const finish = (v) => {
+        overlay.remove();
+        resolve(v);
+      };
+      ok.onclick = () => finish(input.value);
+      cancel.onclick = () => finish("");
+      input.onkeydown = (e) => {
+        if (e.key === "Enter") finish(input.value);
+        if (e.key === "Escape") finish("");
+      };
+      row.append(ok, cancel);
+      card.append(h, p, input, row);
+      overlay.appendChild(card);
+      document.body.appendChild(overlay);
+      input.focus();
+    });
+  }
+  function setReadOnly(v) {
+    state.readOnly = !!v;
+    emit("readOnly:changed", state.readOnly);
+  }
+  var LS_KEY, LS_SETTINGS, db, loadFromIDB, UNSAFE_KEYS, persistNow, schedulePersist, PRESETS, MAX_SHARE_CODE, MAX_SHARE_JSON, SHARE_PBKDF2_ITER;
+  var init_state = __esm({
+    "app/src/core/state.js"() {
+      init_core();
+      init_browser();
+      LS_KEY = "runlet:session:v2";
+      LS_SETTINGS = "runlet:settings:v2";
+      db = null;
+      loadFromIDB = () => idbGet("project");
+      UNSAFE_KEYS = /* @__PURE__ */ new Set(["__proto__", "constructor", "prototype"]);
+      persistNow = () => {
+        try {
+          const data3 = {
+            projectName: state.projectName,
+            entry: state.entry,
+            files: state.files,
+            panes: state.panes,
+            deps: state.deps,
+            layout: state.layout,
+            snapshots: state.snapshots.slice(0, 20),
+            userSnippets: state.userSnippets,
+            progress: state.progress,
+            savedAt: Date.now()
+          };
+          localStorage.setItem(LS_KEY, JSON.stringify(data3));
+          localStorage.setItem(LS_SETTINGS, JSON.stringify(state.settings));
+          idbPut("project", data3);
+          if (projectSize() > 4.5 * 1024 * 1024) {
+            toast("\u041F\u0440\u043E\u0435\u043A\u0442 \u043F\u0440\u0438\u0431\u043B\u0438\u0437\u0438\u043B\u0441\u044F \u043A \u043B\u0438\u043C\u0438\u0442\u0443 \u0445\u0440\u0430\u043D\u0438\u043B\u0438\u0449\u0430 (>4.5 \u041C\u0411) \u2014 \u0432\u044B\u0433\u0440\u0443\u0437\u0438\u0442\u0435 \u0431\u043E\u043B\u044C\u0448\u0438\u0435 \u0430\u0441\u0441\u0435\u0442\u044B", "warn", "\u0425\u0440\u0430\u043D\u0438\u043B\u0438\u0449\u0435");
+          }
+          state.dirty = false;
+          emit("saved");
+          return true;
+        } catch (e) {
+          toast("\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u0441\u043E\u0445\u0440\u0430\u043D\u0438\u0442\u044C: " + e.message, "err", "\u0425\u0440\u0430\u043D\u0438\u043B\u0438\u0449\u0435");
+          return false;
+        }
+      };
+      schedulePersist = debounce(() => {
+        if (state.settings.autoSave) persistNow();
+      }, 900);
+      PRESETS = {
+        minimal: { label: "\u041C\u0438\u043D\u0438\u043C\u0430\u043B\u0438\u0437\u043C", patch: { fontSize: 13, density: "compact", minimap: false, showWhitespace: false, wrap: true, autoAnalyze: false, theme: "dark" } },
+        balanced: { label: "\u0411\u0430\u043B\u0430\u043D\u0441", patch: { fontSize: 13, density: "comfy", minimap: true, showWhitespace: false, wrap: false, autoAnalyze: true, autoRun: true } },
+        pro: { label: "Pro / \u043F\u043B\u043E\u0442\u043D\u044B\u0439", patch: { fontSize: 12, density: "compact", minimap: true, showWhitespace: true, wrap: false, tabSize: 2, showInvisibles: true, autoAnalyze: true, autoRunDelay: 350 } },
+        teacher: { label: "\u0414\u043B\u044F \u043E\u0431\u0443\u0447\u0435\u043D\u0438\u044F", patch: { fontSize: 16, density: "comfy", minimap: false, wrap: true, showWhitespace: true, theme: "light", autoAnalyze: true } }
+      };
+      MAX_SHARE_CODE = 2e6;
+      MAX_SHARE_JSON = 4 * 1024 * 1024;
+      SHARE_PBKDF2_ITER = 15e4;
+    }
+  });
 
   // node_modules/js-beautify/js/src/core/output.js
   var require_output = __commonJS({
@@ -906,35 +3004,35 @@
         this._input.restart();
         this.__tokens = new TokenStream();
         this._reset();
-        var current2;
+        var current3;
         var previous = new Token3(TOKEN.START, "");
         var open_token = null;
         var open_stack = [];
         var comments = new TokenStream();
         while (previous.type !== TOKEN.EOF) {
-          current2 = this._get_next_token(previous, open_token);
-          while (this._is_comment(current2)) {
-            comments.add(current2);
-            current2 = this._get_next_token(previous, open_token);
+          current3 = this._get_next_token(previous, open_token);
+          while (this._is_comment(current3)) {
+            comments.add(current3);
+            current3 = this._get_next_token(previous, open_token);
           }
           if (!comments.isEmpty()) {
-            current2.comments_before = comments;
+            current3.comments_before = comments;
             comments = new TokenStream();
           }
-          current2.parent = open_token;
-          if (this._is_opening(current2)) {
+          current3.parent = open_token;
+          if (this._is_opening(current3)) {
             open_stack.push(open_token);
-            open_token = current2;
-          } else if (open_token && this._is_closing(current2, open_token)) {
-            current2.opened = open_token;
-            open_token.closed = current2;
+            open_token = current3;
+          } else if (open_token && this._is_closing(current3, open_token)) {
+            current3.opened = open_token;
+            open_token.closed = current3;
             open_token = open_stack.pop();
-            current2.parent = open_token;
+            current3.parent = open_token;
           }
-          current2.previous = previous;
-          previous.next = current2;
-          this.__tokens.add(current2);
-          previous = current2;
+          current3.previous = previous;
+          previous.next = current3;
+          this.__tokens.add(current3);
+          previous = current3;
         }
         return this.__tokens;
       };
@@ -4271,2051 +6369,635 @@
     }
   });
 
-  // app/src/core/core.js
-  var DEFAULT_SETTINGS = {
-    theme: "auto",
-    accent: "#7c6cf6",
-    density: "comfy",
-    fontSize: 13,
-    fontFamily: "mono",
-    lineHeight: 1.6,
-    tabSize: 2,
-    showWhitespace: false,
-    showInvisibles: true,
-    wrap: false,
-    cursorStyle: "smooth",
-    smoothScroll: true,
-    stickyHeaders: true,
-    minimap: true,
-    breadcrumbs: true,
-    autoRun: true,
-    autoRunDelay: 650,
-    autoAnalyze: true,
-    autoAnalyzeDelay: 1600,
-    autoSave: true,
-    autoSaveInterval: 20,
-    formatOnPaste: true,
-    trimTrailingWhitespace: true,
-    presets: "balanced",
-    locale: "ru",
-    firstRun: true,
-    pythonEngine: true,
-    hotCss: true,
-    hotJs: true,
-    codeToPreview: true,
-    timeLimit: 4e3,
-    confirmDelete: true,
-    // Least-privilege sandbox for the preview iframe. Enabling these widens the
-    // attack surface for untrusted/shared projects — keep them off by default.
-    sandboxPermissions: {
-      popups: false,
-      modals: false,
-      downloads: false,
-      pointerLock: false,
-      orientationLock: false,
-      forms: true
-    },
-    keybindings: {
-      "run": "Ctrl+Enter",
-      "format": "Ctrl+Shift+F",
-      "save": "Ctrl+S",
-      "download": "Ctrl+Shift+S",
-      "palette": "Ctrl+Shift+P",
-      "analyze": "Ctrl+Shift+A",
-      "assistant": "Ctrl+Shift+I",
-      "snippets": "Ctrl+Shift+K",
-      "shortcuts": "F1",
-      "newFile": "Ctrl+Alt+N",
-      "findInProject": "Ctrl+Shift+J",
-      "toggleComment": "Ctrl+/",
-      "duplicateLine": "Ctrl+Shift+D",
-      "moveLineUp": "Alt+ArrowUp",
-      "moveLineDown": "Alt+ArrowDown",
-      "multiCursor": "Ctrl+D",
-      "layoutColumns": "Alt+1",
-      "layoutRows": "Alt+2",
-      "layoutTabs": "Alt+3",
-      "previewFullscreen": "Alt+Enter"
+  // app/src/core/icons.js
+  function icon(name2, size = 16, cls = "ico") {
+    const body = P[name2] || P.info;
+    return `<svg class="${cls}" viewBox="0 0 24 24" width="${size}" height="${size}" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${body}</svg>`;
+  }
+  function deEmoji(text) {
+    return String(text ?? "").replace(/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}\u{2B00}-\u{2BFF}]/gu, "").replace(/\s{2,}/g, " ").trim();
+  }
+  var P, ICON_NAMES;
+  var init_icons = __esm({
+    "app/src/core/icons.js"() {
+      P = {
+        play: '<path d="M8 5.5 18 12 8 18.5Z" fill="currentColor" stroke="none"/>',
+        stop: '<rect x="6" y="6" width="12" height="12" rx="2" fill="currentColor" stroke="none"/>',
+        refresh: '<path d="M20 11a8 8 0 1 0-2.3 6.3M20 5v6h-6"/>',
+        format: '<path d="M4 6h16M4 10h10M4 14h16M4 18h7"/>',
+        save: '<path d="M5 3h11l3 3v15H5zM8 3v6h8V3M8 21v-7h8v7"/>',
+        download: '<path d="M12 3v12m0 0 4-4m-4 4-4-4M4 19h16"/>',
+        upload: '<path d="M12 16V4m0 0-4 4m4-4 4 4M4 19h16"/>',
+        search: '<circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/>',
+        settings: '<circle cx="12" cy="12" r="3.2"/><path d="M12 2v3m0 14v3M2 12h3m14 0h3M5 5l2 2m10 10 2 2M19 5l-2 2M7 17l-2 2"/>',
+        sliders: '<path d="M4 7h9m4 0h3M4 17h3m4 0h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/>',
+        columns: '<rect x="3" y="4" width="5" height="16" rx="1.3"/><rect x="9.5" y="4" width="5" height="16" rx="1.3"/><rect x="16" y="4" width="5" height="16" rx="1.3"/>',
+        rows: '<rect x="3" y="4" width="18" height="4.3" rx="1.3"/><rect x="3" y="9.8" width="18" height="4.3" rx="1.3"/><rect x="3" y="15.6" width="18" height="4.3" rx="1.3"/>',
+        tabs: '<path d="M3 8a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/>',
+        theme: '<path d="M12 3a9 9 0 1 0 9 9 7 7 0 0 1-9-9Z"/>',
+        density: '<path d="M4 7h16M4 12h16M4 17h16"/>',
+        chart: '<path d="M4 19V5m0 14h16M7 15l4-5 3 3 5-7"/>',
+        folder: '<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/>',
+        file: '<path d="M6 3h8l4 4v14H6zM14 3v5h4"/>',
+        files: '<path d="M8 3h7l4 4v10M5 7v14h11l3-3V7Z"/>',
+        plus: '<path d="M12 5v14M5 12h14"/>',
+        minus: '<path d="M5 12h14"/>',
+        close: '<path d="m6 6 12 12M18 6 6 18"/>',
+        check: '<path d="m4 12 5 5L20 6"/>',
+        chevronDown: '<path d="m6 9 6 6 6-6"/>',
+        chevronRight: '<path d="m9 6 6 6-6 6"/>',
+        chevronUp: '<path d="m6 15 6-6 6 6"/>',
+        arrowUp: '<path d="M12 19V5m0 0-5 5m5-5 5 5"/>',
+        arrowDown: '<path d="M12 5v14m0 0-5-5m5 5 5-5"/>',
+        arrowLeft: '<path d="M19 12H5m0 0 5-5m-5 5 5 5"/>',
+        arrowRight: '<path d="M5 12h14m0 0-5-5m5 5-5 5"/>',
+        maximize: '<path d="M4 9V4h5M20 15v5h-5M4 4l6 6M20 20l-6-6"/>',
+        minimize: '<path d="M4 9h6M20 15h-6M4 9l6 6M20 15l-6-6"/>',
+        external: '<path d="M13 4h7v7M20 4 9 15M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/>',
+        grid: '<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18M15 3v18"/>',
+        ruler: '<path d="M3 8h18v8H3zM7 8v4M11 8v3M15 8v4M19 8v3"/>',
+        droplet: '<path d="M12 3s6 6.5 6 10.5A6 6 0 0 1 6 13.5C6 9.5 12 3 12 3Z"/>',
+        target: '<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/><path d="M12 2v3m0 14v3M2 12h3m14 0h3"/>',
+        rotate: '<path d="M20 11a8 8 0 1 0-2.3 6.3M20 5v6h-6"/>',
+        monitor: '<rect x="2.5" y="4" width="19" height="13" rx="2"/><path d="M9 21h6M12 17v4"/>',
+        tablet: '<rect x="5" y="2.5" width="14" height="19" rx="2"/><path d="M11 18.5h2"/>',
+        phone: '<rect x="7" y="2.5" width="10" height="19" rx="2"/><path d="M11 18.5h2"/>',
+        resize: '<path d="M4 14 14 4M8 18 18 8"/>',
+        code: '<path d="m8 6-6 6 6 6m8-12 6 6-6 6m-2-14-4 16"/>',
+        cube: '<path d="m12 2 9 5v10l-9 5-9-5V7Z"/><path d="m3 7 9 5 9-5M12 12v10"/>',
+        box: '<path d="M3 7.5 12 3l9 4.5v9L12 21l-9-4.5Z"/><path d="M3 7.5 12 12l9-4.5M12 12v9"/>',
+        layers: '<path d="m12 3 9 5-9 5-9-5Z"/><path d="m3 12 9 5 9-5M3 16l9 5 9-5"/>',
+        book: '<path d="M4 4.5A2.5 2.5 0 0 1 6.5 2H20v17H6.5A2.5 2.5 0 0 0 4 21.5Z"/><path d="M4 18.5A2.5 2.5 0 0 1 6.5 16H20"/>',
+        puzzle: '<path d="M9 3h6v3a2 2 0 1 0 4 0V3h2v6h-3a2 2 0 1 0 0 4h3v6h-6v-3a2 2 0 1 0-4 0v3H3v-6h3a2 2 0 1 0 0-4H3V3Z"/>',
+        list: '<path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>',
+        terminal: '<rect x="2.5" y="4" width="19" height="16" rx="2"/><path d="m6 9 3 3-3 3M12 15h6"/>',
+        bug: '<rect x="6" y="7" width="12" height="12" rx="4"/><path d="M9 7V5a3 3 0 0 1 6 0v2M3 11h3m12 0h3M3 16h3m12 0h3M6 20l-2 2m14-2 2 2"/>',
+        network: '<circle cx="12" cy="4" r="2"/><circle cx="5" cy="19" r="2"/><circle cx="19" cy="19" r="2"/><path d="M12 6v6m0 0-6 6m6-6 6 6"/>',
+        database: '<ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/>',
+        gauge: '<path d="M4 18a8 8 0 1 1 16 0"/><path d="m12 14 4-4"/><circle cx="12" cy="18" r="1.4" fill="currentColor" stroke="none"/>',
+        journal: '<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 7h8M8 11h8M8 15h5"/>',
+        copy: '<rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/>',
+        edit: '<path d="M4 20h4l11-11-4-4L4 16Z"/><path d="m14 6 4 4"/>',
+        trash: '<path d="M4 7h16M9 7V4h6v3M6 7l1 14h10l1-14M10 11v6m4-6v6"/>',
+        globe: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18"/>',
+        server: '<rect x="3" y="3" width="18" height="8" rx="2"/><rect x="3" y="13" width="18" height="8" rx="2"/><path d="M7 7h.01M7 17h.01"/>',
+        window: '<rect x="2.5" y="4" width="19" height="16" rx="2"/><path d="M2.5 9h19M6 6.5h.01M9 6.5h.01M12 6.5h.01"/>',
+        keyboard: '<rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M6 13h.01M10 13h.01M14 13h.01M18 13h.01M8 16h8"/>',
+        info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5h.01"/>',
+        help: '<circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 1 1 3.5 2.3c-.9.4-1 1.1-1 1.7M12 17h.01"/>',
+        home: '<path d="M4 11 12 4l8 7v9H4Z"/><path d="M9 20v-6h6v6"/>',
+        clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+        eye: '<path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6-10-6-10-6Z"/><circle cx="12" cy="12" r="2.6"/>',
+        eyeOff: '<path d="M4 4 20 20M9.9 5.2A11 11 0 0 1 12 5c6.5 0 10 7 10 7a16 16 0 0 1-3 3.6M6.2 7.6C3.5 9.2 2 12 2 12s3.5 7 10 7a10 10 0 0 0 3.3-.5"/>',
+        filter: '<path d="M3 5h18l-7 8v6l-4 2v-8Z"/>',
+        link: '<path d="M10 13a5 5 0 0 0 7 0l2-2a5 5 0 0 0-7-7l-1 1M14 11a5 5 0 0 0-7 0l-2 2a5 5 0 0 0 7 7l1-1"/>',
+        image: '<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="8.5" cy="9.5" r="1.5"/><path d="m4 17 5-5 3 3 4-4 4 4"/>',
+        palette: '<path d="M12 3a9 9 0 0 0 0 18c1.4 0 2-1 2-2s-.8-2 .3-2.7A2 2 0 0 0 15 12a8 8 0 0 1-3-9Z"/><circle cx="7.5" cy="11" r="1" fill="currentColor" stroke="none"/><circle cx="10" cy="7" r="1" fill="currentColor" stroke="none"/><circle cx="15" cy="8" r="1" fill="currentColor" stroke="none"/>',
+        scissors: '<circle cx="6" cy="6" r="2.5"/><circle cx="6" cy="18" r="2.5"/><path d="M8 8 20 18M8 16 20 6"/>',
+        brackets: '<path d="M8 4H5a2 2 0 0 0-2 2v4a2 2 0 0 1-2 2 2 2 0 0 1 2 2v4a2 2 0 0 0 2 2h3M16 4h3a2 2 0 0 1 2 2v4a2 2 0 0 0 2 2 2 2 0 0 0-2 2v4a2 2 0 0 1-2 2h-3"/>',
+        indent: '<path d="M4 6h16M4 12h10M4 18h16M17 10l3 2-3 2"/>',
+        wrap: '<path d="M4 6h16M4 12h13a3 3 0 0 1 0 6h-3m0 0 2-2m-2 2 2 2M4 18h5"/>',
+        pin: '<path d="M9 3h6l-1 6 4 3v2H6v-2l4-3Z"/><path d="M12 14v7"/>',
+        more: '<circle cx="5" cy="12" r="1.4" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.4" fill="currentColor" stroke="none"/><circle cx="19" cy="12" r="1.4" fill="currentColor" stroke="none"/>',
+        cursor: '<path d="M5 3v16l4-4 3 5 2-1-3-5h6Z"/>',
+        move: '<path d="M12 3v18M3 12h18M9 6l3-3 3 3M9 18l3 3 3-3M6 9l-3 3 3 3M18 9l3 3-3 3"/>',
+        sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5M17.5 17.5 19 19M19 5l-1.5 1.5M6.5 17.5 5 19"/>',
+        moon: '<path d="M20 14A8 8 0 0 1 10 4a8 8 0 1 0 10 10Z"/>',
+        contrast: '<circle cx="12" cy="12" r="9"/><path d="M12 3v18a9 9 0 0 0 0-18Z" fill="currentColor" stroke="none"/>',
+        spark: '<path d="M12 3v4m0 10v4M3 12h4m10 0h4M6 6l2.5 2.5M15.5 15.5 18 18M18 6l-2.5 2.5M8.5 15.5 6 18"/>',
+        package: '<path d="m12 3 9 4.5v9L12 21l-9-4.5v-9Z"/><path d="M3 7.5 12 12l9-4.5M12 12v9"/>',
+        archive: '<rect x="3" y="4" width="18" height="5" rx="1"/><path d="M5 9v11h14V9M10 13h4"/>',
+        history: '<path d="M3 12a9 9 0 1 0 3-6.7M3 4v5h5"/><path d="M12 8v5l3 2"/>',
+        shield: '<path d="M12 3 4 6v6c0 5 3.5 8 8 9 4.5-1 8-4 8-9V6Z"/><path d="m9 12 2 2 4-4"/>',
+        wand: '<path d="m4 20 10-10M13 6l5 5M6 3l1 2 2 1-2 1-1 2-1-2-2-1 2-1ZM19 14l.7 1.3L21 16l-1.3.7L19 18l-.7-1.3L17 16l1.3-.7Z"/>',
+        text: '<path d="M4 6V4h16v2M12 4v16M9 20h6"/>',
+        braces: '<path d="M9 3H7a2 2 0 0 0-2 2v4a2 2 0 0 1-2 2 2 2 0 0 1 2 2v6a2 2 0 0 0 2 2h2M15 3h2a2 2 0 0 1 2 2v4a2 2 0 0 0 2 2 2 2 0 0 0-2 2v6a2 2 0 0 1-2 2h-2"/>',
+        users: '<circle cx="9" cy="8" r="3"/><path d="M3 20v-2a6 6 0 0 1 12 0v2M16 5a3 3 0 0 1 0 6m2 9v-2a5 5 0 0 0-2-4"/>',
+        key: '<circle cx="8" cy="15" r="4"/><path d="m11 12 9-9 2 2-2 2 1 1-2 2-1-1-2 2 2 2-2 2-2-2-2 2"/>'
+      };
+      ICON_NAMES = Object.keys(P);
     }
-  };
-  var DEFAULT_FILES = {
-    "index.html": `<!DOCTYPE html>
-<html lang="ru">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="\u041C\u043E\u044F \u0441\u0442\u0440\u0430\u043D\u0438\u0446\u0430 \u043D\u0430 Runlet">
-  <title>\u041F\u0440\u0438\u0432\u0435\u0442, Runlet!</title>
-  <link rel="stylesheet" href="style.css">
-</head>
-<body>
-  <main class="card">
-    <span class="badge">Runlet studio</span>
-    <h1>\u041F\u0440\u0438\u0432\u0435\u0442, Runlet! \u{1F44B}</h1>
-    <p>\u041F\u0438\u0448\u0438 \u043A\u043E\u0434 \u0441\u043B\u0435\u0432\u0430 \u2014 \u0440\u0435\u0437\u0443\u043B\u044C\u0442\u0430\u0442 \u043F\u043E\u044F\u0432\u0438\u0442\u0441\u044F \u0441\u043F\u0440\u0430\u0432\u0430. \u0410 \u0432\u043A\u043B\u0430\u0434\u043A\u0430 \xAB\u0410\u043D\u0430\u043B\u0438\u0437\xBB \u0440\u0430\u0441\u0441\u043A\u0430\u0436\u0435\u0442, \u0447\u0442\u043E \u0434\u0435\u043B\u0430\u0435\u0442 \u043A\u043E\u0434 \u0438 \u0433\u0434\u0435 \u043E\u0448\u0438\u0431\u043A\u0438.</p>
-    <div class="row">
-      <button id="btn">\u041D\u0430\u0436\u043C\u0438 \u043C\u0435\u043D\u044F</button>
-      <button class="ghost" id="reset">\u0421\u0431\u0440\u043E\u0441\u0438\u0442\u044C</button>
-    </div>
-    <div id="output" class="output"> here will be the result </div>
-  </main>
-  <script src="script.js"><\/script>
-</body>
-</html>`,
-    "style.css": `@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
-
-:root {
-  --accent: #7c6cf6;
-  --bg: #10132a;
-}
-* { box-sizing: border-box; }
-body {
-  margin: 0;
-  min-height: 100vh;
-  display: grid;
-  place-items: center;
-  font-family: Inter, system-ui, sans-serif;
-  background: radial-gradient(circle at 20% 10%, #2a2160, transparent 55%), var(--bg);
-  color: #eef0ff;
-}
-.card {
-  width: min(560px, 90vw);
-  padding: 36px;
-  border-radius: 28px;
-  background: rgba(255, 255, 255, .07);
-  border: 1px solid rgba(255, 255, 255, .13);
-  box-shadow: 0 24px 70px rgba(0, 0, 0, .35);
-  backdrop-filter: blur(14px);
-}
-.badge {
-  display: inline-block;
-  padding: 5px 12px;
-  border-radius: 99px;
-  font-size: 12px;
-  font-weight: 600;
-  background: var(--accent);
-}
-h1 { margin: 18px 0 8px; font-size: 34px; letter-spacing: -1px; }
-p { color: #b9bddc; line-height: 1.65; }
-.row { display: flex; gap: 10px; margin: 22px 0 14px; flex-wrap: wrap; }
-button {
-  border: 0;
-  border-radius: 13px;
-  padding: 12px 20px;
-  font-weight: 700;
-  color: #fff;
-  background: linear-gradient(135deg, var(--accent), #b06cf6);
-  cursor: pointer;
-  transition: transform .2s, box-shadow .2s;
-}
-button:hover { transform: translateY(-2px); box-shadow: 0 8px 22px #7c6cf655; }
-button.ghost { background: rgba(255,255,255,.1); }
-.output {
-  min-height: 46px;
-  padding: 12px 16px;
-  border-radius: 14px;
-  background: rgba(0,0,0,.22);
-  font-family: ui-monospace, monospace;
-  font-size: 14px;
-  color: #9ef5c9;
-}
-`,
-    "script.js": `const btn = document.querySelector('#btn');
-const reset = document.querySelector('#reset');
-const output = document.querySelector('#output');
-let clicks = 0;
-
-btn.addEventListener('click', () => {
-  clicks += 1;
-  output.textContent = '\u041A\u043B\u0438\u043A\u043E\u0432: ' + clicks;
-  console.log('\u041F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u0435\u043B\u044C \u043D\u0430\u0436\u0430\u043B \u043A\u043D\u043E\u043F\u043A\u0443', clicks);
-});
-
-reset.addEventListener('click', () => {
-  clicks = 0;
-  output.textContent = '\u0421\u0447\u0451\u0442\u0447\u0438\u043A \u0441\u0431\u0440\u043E\u0448\u0435\u043D';
-});
-
-// \u041F\u043E\u043F\u0440\u043E\u0431\u0443\u0439\u0442\u0435 \u0434\u043E\u0431\u0430\u0432\u0438\u0442\u044C \u0441\u044E\u0434\u0430 fetch, setTimeout \u0438\u043B\u0438 localStorage \u2014
-// Python-\u0434\u0432\u0438\u0436\u043E\u043A \u0443\u0432\u0438\u0434\u0438\u0442 \u044D\u0442\u043E \u0432 \u043E\u0442\u0447\u0451\u0442\u0435 \u0438 \u043E\u0431\u044A\u044F\u0441\u043D\u0438\u0442 \u043F\u043E\u0432\u0435\u0434\u0435\u043D\u0438\u0435.
-`
-  };
-  var state = {
-    files: {},
-    // path -> { content, kind, mime, size, updated }
-    entry: "index.html",
-    panes: { html: "index.html", css: "style.css", js: "script.js" },
-    activePane: "html",
-    activeFile: "index.html",
-    layout: "columns",
-    collapsed: { html: false, css: false, js: false },
-    projectName: "\u041C\u043E\u0439 \u043F\u0440\u043E\u0435\u043A\u0442",
-    settings: JSON.parse(JSON.stringify(DEFAULT_SETTINGS)),
-    deps: [],
-    dirty: false,
-    logs: [],
-    activity: [],
-    snapshots: [],
-    report: null,
-    engine: "unknown",
-    breakpoints: {},
-    watch: [],
-    trace: [],
-    traceIndex: -1,
-    network: [],
-    storageData: {},
-    domTree: null,
-    computedStyles: {},
-    perf: {},
-    consoleFilter: "all",
-    consoleSearch: "",
-    consoleGroup: true,
-    inspectMode: false,
-    jsEnabled: true,
-    externalEnabled: true,
-    alertsAsToast: true,
-    autoRun: true,
-    device: "desktop",
-    deviceSize: { w: 1e3, h: 600 },
-    zoom: "fit",
-    userSnippets: [],
-    plugins: [],
-    progress: {},
-    collabPeers: {},
-    analytics: { views: 0, embeds: 0 }
-  };
-  var ctx = {};
-  var listeners = /* @__PURE__ */ new Map();
-  var commands = /* @__PURE__ */ new Map();
-  function registerCommand(id2, def) {
-    commands.set(id2, { id: id2, ...def });
-  }
-  function runCommand(id2, arg) {
-    const c = commands.get(id2);
-    if (!c) {
-      console.warn("[runlet] unknown command", id2);
-      return void 0;
-    }
-    try {
-      const r = c.run(arg);
-      if (r && typeof r.catch === "function") r.catch((e) => toast("\u041E\u0448\u0438\u0431\u043A\u0430 \u043A\u043E\u043C\u0430\u043D\u0434\u044B: " + e.message, "err"));
-      return r;
-    } catch (e) {
-      toast(`${id2}: ${e.message}`, "err");
-      console.error(e);
-    }
-  }
-  function on(evt, fn) {
-    if (!listeners.has(evt)) listeners.set(evt, /* @__PURE__ */ new Set());
-    listeners.get(evt).add(fn);
-    return () => off(evt, fn);
-  }
-  function off(evt, fn) {
-    listeners.get(evt)?.delete(fn);
-  }
-  function emit(evt, data3) {
-    for (const fn of [...listeners.get(evt) || []]) {
-      try {
-        fn(data3);
-      } catch (e) {
-        console.error("[runlet] listener", evt, e);
-      }
-    }
-  }
-  var $ = (sel, root = document) => root.querySelector(sel);
-  var $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
-  function el(tag, attrs = {}, ...kids) {
-    const n = document.createElement(tag);
-    for (const [k, v] of Object.entries(attrs || {})) {
-      if (v == null || v === false) continue;
-      if (k === "class") n.className = v;
-      else if (k === "html") n.innerHTML = v;
-      else if (k === "text") n.textContent = v;
-      else if (k.startsWith("on") && typeof v === "function") n.addEventListener(k.slice(2).toLowerCase(), v);
-      else if (k === "style" && typeof v === "object") Object.assign(n.style, v);
-      else n.setAttribute(k, v === true ? "" : v);
-    }
-    for (const kid of kids.flat()) {
-      if (kid == null || kid === false) continue;
-      n.appendChild(typeof kid === "string" || typeof kid === "number" ? document.createTextNode(String(kid)) : kid);
-    }
-    return n;
-  }
-  function esc(s) {
-    return String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
-  }
-  function debounce(fn, ms = 200) {
-    let t2;
-    const d = (...a) => {
-      clearTimeout(t2);
-      t2 = setTimeout(() => fn(...a), ms);
-    };
-    d.cancel = () => clearTimeout(t2);
-    d.flush = (...a) => {
-      clearTimeout(t2);
-      fn(...a);
-    };
-    return d;
-  }
-  function fmtBytes(n) {
-    if (n < 1024) return n + " \u0411";
-    if (n < 1048576) return (n / 1024).toFixed(1) + " \u041A\u0411";
-    return (n / 1048576).toFixed(2) + " \u041C\u0411";
-  }
-  function download(name2, content2, mime = "text/plain") {
-    const blob = content2 instanceof Blob ? content2 : new Blob([content2], { type: mime + ";charset=utf-8" });
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = name2;
-    document.body.appendChild(a);
-    a.click();
-    setTimeout(() => {
-      URL.revokeObjectURL(a.href);
-      a.remove();
-    }, 1500);
-  }
-  async function copy(text) {
-    try {
-      await navigator.clipboard.writeText(text);
-      return true;
-    } catch (_) {
-      const ta = document.createElement("textarea");
-      ta.value = text;
-      document.body.appendChild(ta);
-      ta.select();
-      try {
-        document.execCommand("copy");
-      } catch (e) {
-      }
-      ta.remove();
-      return true;
-    }
-  }
-  function toast(msg, type = "info", title = "") {
-    const icons = { ok: "\u2713", err: "\u2715", warn: "\u26A0", info: "\u2139" };
-    const box = $("#toasts");
-    if (!box) return;
-    const node = el(
-      "div",
-      { class: "toast " + type },
-      el("span", { class: "t-icon", text: icons[type] || "\u2022" }),
-      el("div", {}, title ? el("b", { text: title }) : null, el("span", { text: msg }))
-    );
-    box.appendChild(node);
-    setTimeout(() => {
-      node.style.opacity = "0";
-      node.style.transform = "translateX(30px)";
-      node.style.transition = ".25s";
-    }, 3800);
-    setTimeout(() => node.remove(), 4200);
-    logAction(msg, type);
-  }
-  function logAction(msg, kind = "info") {
-    state.activity.unshift({ t: Date.now(), msg, kind });
-    if (state.activity.length > 300) state.activity.length = 300;
-    emit("activity", state.activity);
-  }
-  function markDirty(v = true) {
-    state.dirty = v;
-    $("#dirtyDot")?.classList.toggle("on", v);
-    $(".pane-dirty")?.classList.toggle("on", v);
-  }
-  function busy(v) {
-    $("#readyIndicator")?.classList.toggle("busy", v);
-    const label = $("#readyIndicator");
-    if (label) label.innerHTML = "<i></i>" + (v ? "\u0430\u043D\u0430\u043B\u0438\u0437\u2026" : "\u0433\u043E\u0442\u043E\u0432");
-  }
-  function applyLocale() {
-    const en = state.settings.locale === "en";
-    const map = [
-      ['[data-cmd="run"] span', "Run"],
-      [".btn-analyze span", "Analyze"],
-      ['[data-rail-tab="files"]', "Files"],
-      ['[data-rail-tab="search"]', "Search"],
-      ['[data-rail-tab="libs"]', "Libraries"],
-      ['[data-rail-tab="assets"]', "Assets"],
-      ['[data-rail-tab="plugins"]', "Plugins"],
-      ['[data-rail-tab="learn"]', "Lessons"],
-      ['[data-rail-tab="features"]', "Ideas"],
-      ['[data-insp-tab="analysis"]', "Analysis"],
-      ['[data-insp-tab="console"]', "Console"],
-      ['[data-insp-tab="debug"]', "Debug"],
-      ['[data-insp-tab="network"]', "Network"],
-      ['[data-insp-tab="storage"]', "Storage"],
-      ['[data-insp-tab="perf"]', "Perf"],
-      ['[data-insp-tab="assistant"]', "Assistant"],
-      ['[data-insp-tab="log"]', "Log"],
-      ['[data-cmd="settings"]', "Settings"],
-      ['[data-cmd="tour"] span', "Tour"]
-    ];
-    for (const [sel, enText] of map) {
-      const node = $(sel);
-      if (!node) continue;
-      if (!node.dataset.ru) node.dataset.ru = node.textContent.trim();
-      node.textContent = en ? enText : node.dataset.ru;
-    }
-    document.documentElement.lang = state.settings.locale === "ar" ? "ar" : state.settings.locale;
-  }
-  function safeDataSrc(v) {
-    if (typeof v !== "string" || v.length > 8 * 1024 * 1024) return "";
-    return /^(data:(image|audio|video|font)\/[a-z0-9.+_-]+[;,]|blob:|https:\/\/)/i.test(v) ? v : "";
-  }
-  function sanitizeColor(v, fallback = "#7c6cf6") {
-    return typeof v === "string" && /^#(?:[0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$/i.test(v) ? v : fallback;
-  }
-  function applyTheme() {
-    const s = state.settings;
-    s.accent = sanitizeColor(s.accent);
-    s.fontSize = Math.max(9, Math.min(28, Number(s.fontSize) || 13));
-    s.lineHeight = Math.max(1, Math.min(2.5, Number(s.lineHeight) || 1.6));
-    s.tabSize = Math.max(1, Math.min(8, Math.round(Number(s.tabSize) || 2)));
-    s.theme = ["auto", "dark", "light", "contrast"].includes(s.theme) ? s.theme : "auto";
-    s.density = ["comfy", "compact"].includes(s.density) ? s.density : "comfy";
-    s.fontFamily = ["mono", "system", "courier", "sans"].includes(s.fontFamily) ? s.fontFamily : "mono";
-    let theme2 = s.theme;
-    if (theme2 === "auto") theme2 = matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
-    document.documentElement.dataset.theme = theme2;
-    document.documentElement.dataset.density = s.density;
-    document.documentElement.style.setProperty("--accent", s.accent);
-    document.documentElement.style.setProperty("--accent2", shiftHue(s.accent, 42));
-    document.documentElement.style.setProperty("--cm-fs", s.fontSize + "px");
-    document.documentElement.style.setProperty("--cm-lh", String(s.lineHeight));
-    const mono = {
-      mono: '"JetBrains Mono", "Fira Code", "SF Mono", Consolas, monospace',
-      system: "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
-      courier: '"Courier New", Courier, monospace',
-      sans: "var(--sans)"
-    }[s.fontFamily];
-    document.documentElement.style.setProperty("--mono", mono);
-    const c = $("#accentInput");
-    if (c) c.value = s.accent;
-    emit("theme", theme2);
-  }
-  function shiftHue(hex, deg) {
-    try {
-      const n = parseInt(hex.slice(1), 16);
-      let r = (n >> 16) / 255, g = (n >> 8 & 255) / 255, b = (n & 255) / 255;
-      const max2 = Math.max(r, g, b), min = Math.min(r, g, b), l = (max2 + min) / 2;
-      let h = 0, s = 0;
-      if (max2 !== min) {
-        const d = max2 - min;
-        s = l > 0.5 ? d / (2 - max2 - min) : d / (max2 + min);
-        h = max2 === r ? (g - b) / d + (g < b ? 6 : 0) : max2 === g ? (b - r) / d + 2 : (r - g) / d + 4;
-        h *= 60;
-      }
-      h = (h + deg) % 360;
-      const c2 = (1 - Math.abs(2 * l - 1)) * s, x2 = c2 * (1 - Math.abs(h / 60 % 2 - 1)), m = l - c2 / 2;
-      let rr = 0, gg = 0, bb = 0;
-      if (h < 60) [rr, gg, bb] = [c2, x2, 0];
-      else if (h < 120) [rr, gg, bb] = [x2, c2, 0];
-      else if (h < 180) [rr, gg, bb] = [0, c2, x2];
-      else if (h < 240) [rr, gg, bb] = [0, x2, c2];
-      else if (h < 300) [rr, gg, bb] = [x2, 0, c2];
-      else [rr, gg, bb] = [c2, 0, x2];
-      return "#" + [rr, gg, bb].map((v) => Math.round((v + m) * 255).toString(16).padStart(2, "0")).join("");
-    } catch (e) {
-      return "#b06cf6";
-    }
-  }
-  function keyEventToString(e) {
-    const parts = [];
-    if (e.ctrlKey || e.metaKey) parts.push("Ctrl");
-    if (e.altKey) parts.push("Alt");
-    if (e.shiftKey) parts.push("Shift");
-    let k = e.key;
-    if (k === " ") k = "Space";
-    else if (k.length === 1) k = k.toUpperCase();
-    else k = { ArrowUp: "ArrowUp", ArrowDown: "ArrowDown", Escape: "Esc", "`": "`" }[k] || k;
-    parts.push(k);
-    return parts.join("+");
-  }
-  function parseKey(combo) {
-    const p = (combo || "").split("+").map((x2) => x2.trim());
-    const key = p.pop() || "";
-    return {
-      ctrl: p.includes("Ctrl") || p.includes("Meta"),
-      alt: p.includes("Alt"),
-      shift: p.includes("Shift"),
-      key: key.length === 1 ? key.toLowerCase() : key
-    };
-  }
-  function matchKey(e, combo) {
-    const k = parseKey(combo);
-    const key = e.key.length === 1 ? e.key.toLowerCase() : e.key;
-    const want = k.key === "Esc" ? "Escape" : k.key;
-    return !!(e.ctrlKey || e.metaKey) === k.ctrl && e.altKey === k.alt && e.shiftKey === k.shift && (key === want || key.toLowerCase() === String(want).toLowerCase());
-  }
-
-  // node_modules/fflate/esm/browser.js
-  var u8 = Uint8Array;
-  var u16 = Uint16Array;
-  var i32 = Int32Array;
-  var fleb = new u8([
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    1,
-    1,
-    1,
-    1,
-    2,
-    2,
-    2,
-    2,
-    3,
-    3,
-    3,
-    3,
-    4,
-    4,
-    4,
-    4,
-    5,
-    5,
-    5,
-    5,
-    0,
-    /* unused */
-    0,
-    0,
-    /* impossible */
-    0
-  ]);
-  var fdeb = new u8([
-    0,
-    0,
-    0,
-    0,
-    1,
-    1,
-    2,
-    2,
-    3,
-    3,
-    4,
-    4,
-    5,
-    5,
-    6,
-    6,
-    7,
-    7,
-    8,
-    8,
-    9,
-    9,
-    10,
-    10,
-    11,
-    11,
-    12,
-    12,
-    13,
-    13,
-    /* unused */
-    0,
-    0
-  ]);
-  var clim = new u8([16, 17, 18, 0, 8, 7, 9, 6, 10, 5, 11, 4, 12, 3, 13, 2, 14, 1, 15]);
-  var freb = function(eb, start) {
-    var b = new u16(31);
-    for (var i4 = 0; i4 < 31; ++i4) {
-      b[i4] = start += 1 << eb[i4 - 1];
-    }
-    var r = new i32(b[30]);
-    for (var i4 = 1; i4 < 30; ++i4) {
-      for (var j = b[i4]; j < b[i4 + 1]; ++j) {
-        r[j] = j - b[i4] << 5 | i4;
-      }
-    }
-    return { b, r };
-  };
-  var _a = freb(fleb, 2);
-  var fl = _a.b;
-  var revfl = _a.r;
-  fl[28] = 258, revfl[258] = 28;
-  var _b = freb(fdeb, 0);
-  var fd = _b.b;
-  var revfd = _b.r;
-  var rev = new u16(32768);
-  for (i = 0; i < 32768; ++i) {
-    x = (i & 43690) >> 1 | (i & 21845) << 1;
-    x = (x & 52428) >> 2 | (x & 13107) << 2;
-    x = (x & 61680) >> 4 | (x & 3855) << 4;
-    rev[i] = ((x & 65280) >> 8 | (x & 255) << 8) >> 1;
-  }
-  var x;
-  var i;
-  var hMap = (function(cd, mb, r) {
-    var s = cd.length;
-    var i4 = 0;
-    var l = new u16(mb);
-    for (; i4 < s; ++i4) {
-      if (cd[i4])
-        ++l[cd[i4] - 1];
-    }
-    var le = new u16(mb);
-    for (i4 = 1; i4 < mb; ++i4) {
-      le[i4] = le[i4 - 1] + l[i4 - 1] << 1;
-    }
-    var co;
-    if (r) {
-      co = new u16(1 << mb);
-      var rvb = 15 - mb;
-      for (i4 = 0; i4 < s; ++i4) {
-        if (cd[i4]) {
-          var sv = i4 << 4 | cd[i4];
-          var r_1 = mb - cd[i4];
-          var v = le[cd[i4] - 1]++ << r_1;
-          for (var m = v | (1 << r_1) - 1; v <= m; ++v) {
-            co[rev[v] >> rvb] = sv;
-          }
-        }
-      }
-    } else {
-      co = new u16(s);
-      for (i4 = 0; i4 < s; ++i4) {
-        if (cd[i4]) {
-          co[i4] = rev[le[cd[i4] - 1]++] >> 15 - cd[i4];
-        }
-      }
-    }
-    return co;
   });
-  var flt = new u8(288);
-  for (i = 0; i < 144; ++i)
-    flt[i] = 8;
-  var i;
-  for (i = 144; i < 256; ++i)
-    flt[i] = 9;
-  var i;
-  for (i = 256; i < 280; ++i)
-    flt[i] = 7;
-  var i;
-  for (i = 280; i < 288; ++i)
-    flt[i] = 8;
-  var i;
-  var fdt = new u8(32);
-  for (i = 0; i < 32; ++i)
-    fdt[i] = 5;
-  var i;
-  var flm = /* @__PURE__ */ hMap(flt, 9, 0);
-  var flrm = /* @__PURE__ */ hMap(flt, 9, 1);
-  var fdm = /* @__PURE__ */ hMap(fdt, 5, 0);
-  var fdrm = /* @__PURE__ */ hMap(fdt, 5, 1);
-  var max = function(a) {
-    var m = a[0];
-    for (var i4 = 1; i4 < a.length; ++i4) {
-      if (a[i4] > m)
-        m = a[i4];
-    }
-    return m;
-  };
-  var bits = function(d, p, m) {
-    var o = p / 8 | 0;
-    return (d[o] | d[o + 1] << 8) >> (p & 7) & m;
-  };
-  var bits16 = function(d, p) {
-    var o = p / 8 | 0;
-    return (d[o] | d[o + 1] << 8 | d[o + 2] << 16) >> (p & 7);
-  };
-  var shft = function(p) {
-    return (p + 7) / 8 | 0;
-  };
-  var slc = function(v, s, e) {
-    if (s == null || s < 0)
-      s = 0;
-    if (e == null || e > v.length)
-      e = v.length;
-    return new u8(v.subarray(s, e));
-  };
-  var ec = [
-    "unexpected EOF",
-    "invalid block type",
-    "invalid length/literal",
-    "invalid distance",
-    "stream finished",
-    "no stream handler",
-    ,
-    // determined by compression function
-    "no callback",
-    "invalid UTF-8 data",
-    "extra field too long",
-    "date not in range 1980-2099",
-    "filename too long",
-    "stream finishing",
-    "invalid zip data"
-    // determined by unknown compression method
-  ];
-  var err = function(ind, msg, nt) {
-    var e = new Error(msg || ec[ind]);
-    e.code = ind;
-    if (Error.captureStackTrace)
-      Error.captureStackTrace(e, err);
-    if (!nt)
-      throw e;
-    return e;
-  };
-  var inflt = function(dat, st, buf, dict) {
-    var sl = dat.length, dl = dict ? dict.length : 0;
-    if (!sl || st.f && !st.l)
-      return buf || new u8(0);
-    var noBuf = !buf;
-    var resize = noBuf || st.i != 2;
-    var noSt = st.i;
-    if (noBuf)
-      buf = new u8(sl * 3);
-    var cbuf = function(l2) {
-      var bl = buf.length;
-      if (l2 > bl) {
-        var nbuf = new u8(Math.max(bl * 2, l2));
-        nbuf.set(buf);
-        buf = nbuf;
-      }
-    };
-    var final = st.f || 0, pos = st.p || 0, bt = st.b || 0, lm = st.l, dm = st.d, lbt = st.m, dbt = st.n;
-    var tbts = sl * 8;
-    do {
-      if (!lm) {
-        final = bits(dat, pos, 1);
-        var type = bits(dat, pos + 1, 3);
-        pos += 3;
-        if (!type) {
-          var s = shft(pos) + 4, l = dat[s - 4] | dat[s - 3] << 8, t2 = s + l;
-          if (t2 > sl) {
-            if (noSt)
-              err(0);
-            break;
-          }
-          if (resize)
-            cbuf(bt + l);
-          buf.set(dat.subarray(s, t2), bt);
-          st.b = bt += l, st.p = pos = t2 * 8, st.f = final;
-          continue;
-        } else if (type == 1)
-          lm = flrm, dm = fdrm, lbt = 9, dbt = 5;
-        else if (type == 2) {
-          var hLit = bits(dat, pos, 31) + 257, hcLen = bits(dat, pos + 10, 15) + 4;
-          var tl = hLit + bits(dat, pos + 5, 31) + 1;
-          pos += 14;
-          var ldt = new u8(tl);
-          var clt = new u8(19);
-          for (var i4 = 0; i4 < hcLen; ++i4) {
-            clt[clim[i4]] = bits(dat, pos + i4 * 3, 7);
-          }
-          pos += hcLen * 3;
-          var clb = max(clt), clbmsk = (1 << clb) - 1;
-          var clm = hMap(clt, clb, 1);
-          for (var i4 = 0; i4 < tl; ) {
-            var r = clm[bits(dat, pos, clbmsk)];
-            pos += r & 15;
-            var s = r >> 4;
-            if (s < 16) {
-              ldt[i4++] = s;
-            } else {
-              var c = 0, n = 0;
-              if (s == 16)
-                n = 3 + bits(dat, pos, 3), pos += 2, c = ldt[i4 - 1];
-              else if (s == 17)
-                n = 3 + bits(dat, pos, 7), pos += 3;
-              else if (s == 18)
-                n = 11 + bits(dat, pos, 127), pos += 7;
-              while (n--)
-                ldt[i4++] = c;
-            }
-          }
-          var lt2 = ldt.subarray(0, hLit), dt = ldt.subarray(hLit);
-          lbt = max(lt2);
-          dbt = max(dt);
-          lm = hMap(lt2, lbt, 1);
-          dm = hMap(dt, dbt, 1);
-        } else
-          err(1);
-        if (pos > tbts) {
-          if (noSt)
-            err(0);
-          break;
-        }
-      }
-      if (resize)
-        cbuf(bt + 131072);
-      var lms = (1 << lbt) - 1, dms = (1 << dbt) - 1;
-      var lpos = pos;
-      for (; ; lpos = pos) {
-        var c = lm[bits16(dat, pos) & lms], sym = c >> 4;
-        pos += c & 15;
-        if (pos > tbts) {
-          if (noSt)
-            err(0);
-          break;
-        }
-        if (!c)
-          err(2);
-        if (sym < 256)
-          buf[bt++] = sym;
-        else if (sym == 256) {
-          lpos = pos, lm = null;
-          break;
-        } else {
-          var add2 = sym - 254;
-          if (sym > 264) {
-            var i4 = sym - 257, b = fleb[i4];
-            add2 = bits(dat, pos, (1 << b) - 1) + fl[i4];
-            pos += b;
-          }
-          var d = dm[bits16(dat, pos) & dms], dsym = d >> 4;
-          if (!d)
-            err(3);
-          pos += d & 15;
-          var dt = fd[dsym];
-          if (dsym > 3) {
-            var b = fdeb[dsym];
-            dt += bits16(dat, pos) & (1 << b) - 1, pos += b;
-          }
-          if (pos > tbts) {
-            if (noSt)
-              err(0);
-            break;
-          }
-          if (resize)
-            cbuf(bt + 131072);
-          var end = bt + add2;
-          if (bt < dt) {
-            var shift2 = dl - dt, dend = Math.min(dt, end);
-            if (shift2 + bt < 0)
-              err(3);
-            for (; bt < dend; ++bt)
-              buf[bt] = dict[shift2 + bt];
-          }
-          for (; bt < end; ++bt)
-            buf[bt] = buf[bt - dt];
-        }
-      }
-      st.l = lm, st.p = lpos, st.b = bt, st.f = final;
-      if (lm)
-        final = 1, st.m = lbt, st.d = dm, st.n = dbt;
-    } while (!final);
-    return bt != buf.length && noBuf ? slc(buf, 0, bt) : buf.subarray(0, bt);
-  };
-  var wbits = function(d, p, v) {
-    v <<= p & 7;
-    var o = p / 8 | 0;
-    d[o] |= v;
-    d[o + 1] |= v >> 8;
-  };
-  var wbits16 = function(d, p, v) {
-    v <<= p & 7;
-    var o = p / 8 | 0;
-    d[o] |= v;
-    d[o + 1] |= v >> 8;
-    d[o + 2] |= v >> 16;
-  };
-  var hTree = function(d, mb) {
-    var t2 = [];
-    for (var i4 = 0; i4 < d.length; ++i4) {
-      if (d[i4])
-        t2.push({ s: i4, f: d[i4] });
-    }
-    var s = t2.length;
-    var t22 = t2.slice();
-    if (!s)
-      return { t: et, l: 0 };
-    if (s == 1) {
-      var v = new u8(t2[0].s + 1);
-      v[t2[0].s] = 1;
-      return { t: v, l: 1 };
-    }
-    t2.sort(function(a, b) {
-      return a.f - b.f;
-    });
-    t2.push({ s: -1, f: 25001 });
-    var l = t2[0], r = t2[1], i0 = 0, i1 = 1, i22 = 2;
-    t2[0] = { s: -1, f: l.f + r.f, l, r };
-    while (i1 != s - 1) {
-      l = t2[t2[i0].f < t2[i22].f ? i0++ : i22++];
-      r = t2[i0 != i1 && t2[i0].f < t2[i22].f ? i0++ : i22++];
-      t2[i1++] = { s: -1, f: l.f + r.f, l, r };
-    }
-    var maxSym = t22[0].s;
-    for (var i4 = 1; i4 < s; ++i4) {
-      if (t22[i4].s > maxSym)
-        maxSym = t22[i4].s;
-    }
-    var tr = new u16(maxSym + 1);
-    var mbt = ln(t2[i1 - 1], tr, 0);
-    if (mbt > mb) {
-      var i4 = 0, dt = 0;
-      var lft = mbt - mb, cst = 1 << lft;
-      t22.sort(function(a, b) {
-        return tr[b.s] - tr[a.s] || a.f - b.f;
-      });
-      for (; i4 < s; ++i4) {
-        var i2_1 = t22[i4].s;
-        if (tr[i2_1] > mb) {
-          dt += cst - (1 << mbt - tr[i2_1]);
-          tr[i2_1] = mb;
-        } else
-          break;
-      }
-      dt >>= lft;
-      while (dt > 0) {
-        var i2_2 = t22[i4].s;
-        if (tr[i2_2] < mb)
-          dt -= 1 << mb - tr[i2_2]++ - 1;
-        else
-          ++i4;
-      }
-      for (; i4 >= 0 && dt; --i4) {
-        var i2_3 = t22[i4].s;
-        if (tr[i2_3] == mb) {
-          --tr[i2_3];
-          ++dt;
-        }
-      }
-      mbt = mb;
-    }
-    return { t: new u8(tr), l: mbt };
-  };
-  var ln = function(n, l, d) {
-    return n.s == -1 ? Math.max(ln(n.l, l, d + 1), ln(n.r, l, d + 1)) : l[n.s] = d;
-  };
-  var lc = function(c) {
-    var s = c.length;
-    while (s && !c[--s])
-      ;
-    var cl = new u16(++s);
-    var cli = 0, cln = c[0], cls = 1;
-    var w = function(v) {
-      cl[cli++] = v;
-    };
-    for (var i4 = 1; i4 <= s; ++i4) {
-      if (c[i4] == cln && i4 != s)
-        ++cls;
-      else {
-        if (!cln && cls > 2) {
-          for (; cls > 138; cls -= 138)
-            w(32754);
-          if (cls > 2) {
-            w(cls > 10 ? cls - 11 << 5 | 28690 : cls - 3 << 5 | 12305);
-            cls = 0;
-          }
-        } else if (cls > 3) {
-          w(cln), --cls;
-          for (; cls > 6; cls -= 6)
-            w(8304);
-          if (cls > 2)
-            w(cls - 3 << 5 | 8208), cls = 0;
-        }
-        while (cls--)
-          w(cln);
-        cls = 1;
-        cln = c[i4];
-      }
-    }
-    return { c: cl.subarray(0, cli), n: s };
-  };
-  var clen = function(cf, cl) {
-    var l = 0;
-    for (var i4 = 0; i4 < cl.length; ++i4)
-      l += cf[i4] * cl[i4];
-    return l;
-  };
-  var wfblk = function(out, pos, dat) {
-    var s = dat.length;
-    var o = shft(pos + 2);
-    out[o] = s & 255;
-    out[o + 1] = s >> 8;
-    out[o + 2] = out[o] ^ 255;
-    out[o + 3] = out[o + 1] ^ 255;
-    for (var i4 = 0; i4 < s; ++i4)
-      out[o + i4 + 4] = dat[i4];
-    return (o + 4 + s) * 8;
-  };
-  var wblk = function(dat, out, final, syms, lf, df, eb, li, bs, bl, p) {
-    wbits(out, p++, final);
-    ++lf[256];
-    var _a3 = hTree(lf, 15), dlt = _a3.t, mlb = _a3.l;
-    var _b2 = hTree(df, 15), ddt = _b2.t, mdb = _b2.l;
-    var _c = lc(dlt), lclt = _c.c, nlc = _c.n;
-    var _d = lc(ddt), lcdt = _d.c, ndc = _d.n;
-    var lcfreq = new u16(19);
-    for (var i4 = 0; i4 < lclt.length; ++i4)
-      ++lcfreq[lclt[i4] & 31];
-    for (var i4 = 0; i4 < lcdt.length; ++i4)
-      ++lcfreq[lcdt[i4] & 31];
-    var _e = hTree(lcfreq, 7), lct = _e.t, mlcb = _e.l;
-    var nlcc = 19;
-    for (; nlcc > 4 && !lct[clim[nlcc - 1]]; --nlcc)
-      ;
-    var flen = bl + 5 << 3;
-    var ftlen = clen(lf, flt) + clen(df, fdt) + eb;
-    var dtlen = clen(lf, dlt) + clen(df, ddt) + eb + 14 + 3 * nlcc + clen(lcfreq, lct) + 2 * lcfreq[16] + 3 * lcfreq[17] + 7 * lcfreq[18];
-    if (bs >= 0 && flen <= ftlen && flen <= dtlen)
-      return wfblk(out, p, dat.subarray(bs, bs + bl));
-    var lm, ll, dm, dl;
-    wbits(out, p, 1 + (dtlen < ftlen)), p += 2;
-    if (dtlen < ftlen) {
-      lm = hMap(dlt, mlb, 0), ll = dlt, dm = hMap(ddt, mdb, 0), dl = ddt;
-      var llm = hMap(lct, mlcb, 0);
-      wbits(out, p, nlc - 257);
-      wbits(out, p + 5, ndc - 1);
-      wbits(out, p + 10, nlcc - 4);
-      p += 14;
-      for (var i4 = 0; i4 < nlcc; ++i4)
-        wbits(out, p + 3 * i4, lct[clim[i4]]);
-      p += 3 * nlcc;
-      var lcts = [lclt, lcdt];
-      for (var it = 0; it < 2; ++it) {
-        var clct = lcts[it];
-        for (var i4 = 0; i4 < clct.length; ++i4) {
-          var len = clct[i4] & 31;
-          wbits(out, p, llm[len]), p += lct[len];
-          if (len > 15)
-            wbits(out, p, clct[i4] >> 5 & 127), p += clct[i4] >> 12;
-        }
-      }
-    } else {
-      lm = flm, ll = flt, dm = fdm, dl = fdt;
-    }
-    for (var i4 = 0; i4 < li; ++i4) {
-      var sym = syms[i4];
-      if (sym > 255) {
-        var len = sym >> 18 & 31;
-        wbits16(out, p, lm[len + 257]), p += ll[len + 257];
-        if (len > 7)
-          wbits(out, p, sym >> 23 & 31), p += fleb[len];
-        var dst = sym & 31;
-        wbits16(out, p, dm[dst]), p += dl[dst];
-        if (dst > 3)
-          wbits16(out, p, sym >> 5 & 8191), p += fdeb[dst];
-      } else {
-        wbits16(out, p, lm[sym]), p += ll[sym];
-      }
-    }
-    wbits16(out, p, lm[256]);
-    return p + ll[256];
-  };
-  var deo = /* @__PURE__ */ new i32([65540, 131080, 131088, 131104, 262176, 1048704, 1048832, 2114560, 2117632]);
-  var et = /* @__PURE__ */ new u8(0);
-  var dflt = function(dat, lvl, plvl, pre, post, st) {
-    var s = st.z || dat.length;
-    var o = new u8(pre + s + 5 * (1 + Math.ceil(s / 7e3)) + post);
-    var w = o.subarray(pre, o.length - post);
-    var lst = st.l;
-    var pos = (st.r || 0) & 7;
-    if (lvl) {
-      if (pos)
-        w[0] = st.r >> 3;
-      var opt = deo[lvl - 1];
-      var n = opt >> 13, c = opt & 8191;
-      var msk_1 = (1 << plvl) - 1;
-      var prev = st.p || new u16(32768), head = st.h || new u16(msk_1 + 1);
-      var bs1_1 = Math.ceil(plvl / 3), bs2_1 = 2 * bs1_1;
-      var hsh = function(i5) {
-        return (dat[i5] ^ dat[i5 + 1] << bs1_1 ^ dat[i5 + 2] << bs2_1) & msk_1;
-      };
-      var syms = new i32(25e3);
-      var lf = new u16(288), df = new u16(32);
-      var lc_1 = 0, eb = 0, i4 = st.i || 0, li = 0, wi = st.w || 0, bs = 0;
-      for (; i4 + 2 < s; ++i4) {
-        var hv = hsh(i4);
-        var imod = i4 & 32767, pimod = head[hv];
-        prev[imod] = pimod;
-        head[hv] = imod;
-        if (wi <= i4) {
-          var rem = s - i4;
-          if ((lc_1 > 7e3 || li > 24576) && (rem > 423 || !lst)) {
-            pos = wblk(dat, w, 0, syms, lf, df, eb, li, bs, i4 - bs, pos);
-            li = lc_1 = eb = 0, bs = i4;
-            for (var j = 0; j < 286; ++j)
-              lf[j] = 0;
-            for (var j = 0; j < 30; ++j)
-              df[j] = 0;
-          }
-          var l = 2, d = 0, ch_1 = c, dif = imod - pimod & 32767;
-          if (rem > 2 && hv == hsh(i4 - dif)) {
-            var maxn = Math.min(n, rem) - 1;
-            var maxd = Math.min(32767, i4);
-            var ml = Math.min(258, rem);
-            while (dif <= maxd && --ch_1 && imod != pimod) {
-              if (dat[i4 + l] == dat[i4 + l - dif]) {
-                var nl = 0;
-                for (; nl < ml && dat[i4 + nl] == dat[i4 + nl - dif]; ++nl)
-                  ;
-                if (nl > l) {
-                  l = nl, d = dif;
-                  if (nl > maxn)
-                    break;
-                  var mmd = Math.min(dif, nl - 2);
-                  var md = 0;
-                  for (var j = 0; j < mmd; ++j) {
-                    var ti = i4 - dif + j & 32767;
-                    var pti = prev[ti];
-                    var cd = ti - pti & 32767;
-                    if (cd > md)
-                      md = cd, pimod = ti;
-                  }
-                }
-              }
-              imod = pimod, pimod = prev[imod];
-              dif += imod - pimod & 32767;
-            }
-          }
-          if (d) {
-            syms[li++] = 268435456 | revfl[l] << 18 | revfd[d];
-            var lin = revfl[l] & 31, din = revfd[d] & 31;
-            eb += fleb[lin] + fdeb[din];
-            ++lf[257 + lin];
-            ++df[din];
-            wi = i4 + l;
-            ++lc_1;
-          } else {
-            syms[li++] = dat[i4];
-            ++lf[dat[i4]];
-          }
-        }
-      }
-      for (i4 = Math.max(i4, wi); i4 < s; ++i4) {
-        syms[li++] = dat[i4];
-        ++lf[dat[i4]];
-      }
-      pos = wblk(dat, w, lst, syms, lf, df, eb, li, bs, i4 - bs, pos);
-      if (!lst) {
-        st.r = pos & 7 | w[pos / 8 | 0] << 3;
-        pos -= 7;
-        st.h = head, st.p = prev, st.i = i4, st.w = wi;
-      }
-    } else {
-      for (var i4 = st.w || 0; i4 < s + lst; i4 += 65535) {
-        var e = i4 + 65535;
-        if (e >= s) {
-          w[pos / 8 | 0] = lst;
-          e = s;
-        }
-        pos = wfblk(w, pos + 1, dat.subarray(i4, e));
-      }
-      st.i = s;
-    }
-    return slc(o, 0, pre + shft(pos) + post);
-  };
-  var crct = /* @__PURE__ */ (function() {
-    var t2 = new Int32Array(256);
-    for (var i4 = 0; i4 < 256; ++i4) {
-      var c = i4, k = 9;
-      while (--k)
-        c = (c & 1 && -306674912) ^ c >>> 1;
-      t2[i4] = c;
-    }
-    return t2;
-  })();
-  var crc = function() {
-    var c = -1;
-    return {
-      p: function(d) {
-        var cr = c;
-        for (var i4 = 0; i4 < d.length; ++i4)
-          cr = crct[cr & 255 ^ d[i4]] ^ cr >>> 8;
-        c = cr;
-      },
-      d: function() {
-        return ~c;
-      }
-    };
-  };
-  var dopt = function(dat, opt, pre, post, st) {
-    if (!st) {
-      st = { l: 1 };
-      if (opt.dictionary) {
-        var dict = opt.dictionary.subarray(-32768);
-        var newDat = new u8(dict.length + dat.length);
-        newDat.set(dict);
-        newDat.set(dat, dict.length);
-        dat = newDat;
-        st.w = dict.length;
-      }
-    }
-    return dflt(dat, opt.level == null ? 6 : opt.level, opt.mem == null ? st.l ? Math.ceil(Math.max(8, Math.min(13, Math.log(dat.length))) * 1.5) : 20 : 12 + opt.mem, pre, post, st);
-  };
-  var mrg = function(a, b) {
-    var o = {};
-    for (var k in a)
-      o[k] = a[k];
-    for (var k in b)
-      o[k] = b[k];
-    return o;
-  };
-  var b2 = function(d, b) {
-    return d[b] | d[b + 1] << 8;
-  };
-  var b4 = function(d, b) {
-    return (d[b] | d[b + 1] << 8 | d[b + 2] << 16 | d[b + 3] << 24) >>> 0;
-  };
-  var b8 = function(d, b) {
-    return b4(d, b) + b4(d, b + 4) * 4294967296;
-  };
-  var wbytes = function(d, b, v) {
-    for (; v; ++b)
-      d[b] = v, v >>>= 8;
-  };
-  function deflateSync(data3, opts) {
-    return dopt(data3, opts || {}, 0, 0);
-  }
-  function inflateSync(data3, opts) {
-    return inflt(data3, { i: 2 }, opts && opts.out, opts && opts.dictionary);
-  }
-  var fltn = function(d, p, t2, o) {
-    for (var k in d) {
-      var val = d[k], n = p + k, op = o;
-      if (Array.isArray(val))
-        op = mrg(o, val[1]), val = val[0];
-      if (ArrayBuffer.isView(val))
-        t2[n] = [val, op];
-      else {
-        t2[n += "/"] = [new u8(0), op];
-        fltn(val, n, t2, o);
-      }
-    }
-  };
-  var te = typeof TextEncoder != "undefined" && /* @__PURE__ */ new TextEncoder();
-  var td = typeof TextDecoder != "undefined" && /* @__PURE__ */ new TextDecoder();
-  var tds = 0;
-  try {
-    td.decode(et, { stream: true });
-    tds = 1;
-  } catch (e) {
-  }
-  var dutf8 = function(d) {
-    for (var r = "", i4 = 0; ; ) {
-      var c = d[i4++];
-      var eb = (c > 127) + (c > 223) + (c > 239);
-      if (i4 + eb > d.length)
-        return { s: r, r: slc(d, i4 - 1) };
-      if (!eb)
-        r += String.fromCharCode(c);
-      else if (eb == 3) {
-        c = ((c & 15) << 18 | (d[i4++] & 63) << 12 | (d[i4++] & 63) << 6 | d[i4++] & 63) - 65536, r += String.fromCharCode(55296 | c >> 10, 56320 | c & 1023);
-      } else if (eb & 1)
-        r += String.fromCharCode((c & 31) << 6 | d[i4++] & 63);
-      else
-        r += String.fromCharCode((c & 15) << 12 | (d[i4++] & 63) << 6 | d[i4++] & 63);
-    }
-  };
-  function strToU8(str, latin1) {
-    if (latin1) {
-      var ar_1 = new u8(str.length);
-      for (var i4 = 0; i4 < str.length; ++i4)
-        ar_1[i4] = str.charCodeAt(i4);
-      return ar_1;
-    }
-    if (te)
-      return te.encode(str);
-    var l = str.length;
-    var ar = new u8(str.length + (str.length >> 1));
-    var ai = 0;
-    var w = function(v) {
-      ar[ai++] = v;
-    };
-    for (var i4 = 0; i4 < l; ++i4) {
-      if (ai + 5 > ar.length) {
-        var n = new u8(ai + 8 + (l - i4 << 1));
-        n.set(ar);
-        ar = n;
-      }
-      var c = str.charCodeAt(i4);
-      if (c < 128 || latin1)
-        w(c);
-      else if (c < 2048)
-        w(192 | c >> 6), w(128 | c & 63);
-      else if (c > 55295 && c < 57344)
-        c = 65536 + (c & 1023 << 10) | str.charCodeAt(++i4) & 1023, w(240 | c >> 18), w(128 | c >> 12 & 63), w(128 | c >> 6 & 63), w(128 | c & 63);
-      else
-        w(224 | c >> 12), w(128 | c >> 6 & 63), w(128 | c & 63);
-    }
-    return slc(ar, 0, ai);
-  }
-  function strFromU8(dat, latin1) {
-    if (latin1) {
-      var r = "";
-      for (var i4 = 0; i4 < dat.length; i4 += 16384)
-        r += String.fromCharCode.apply(null, dat.subarray(i4, i4 + 16384));
-      return r;
-    } else if (td) {
-      return td.decode(dat);
-    } else {
-      var _a3 = dutf8(dat), s = _a3.s, r = _a3.r;
-      if (r.length)
-        err(8);
-      return s;
-    }
-  }
-  var slzh = function(d, b) {
-    return b + 30 + b2(d, b + 26) + b2(d, b + 28);
-  };
-  var zh = function(d, b, z) {
-    var fnl = b2(d, b + 28), efl = b2(d, b + 30), fn = strFromU8(d.subarray(b + 46, b + 46 + fnl), !(b2(d, b + 8) & 2048)), es = b + 46 + fnl;
-    var _a3 = z64hs(d, es, efl, z, b4(d, b + 20), b4(d, b + 24), b4(d, b + 42)), sc = _a3[0], su = _a3[1], off2 = _a3[2];
-    return [b2(d, b + 10), sc, su, fn, es + efl + b2(d, b + 32), off2];
-  };
-  var z64hs = function(d, b, l, z, sc, su, off2) {
-    var nsc = sc == 4294967295, nsu = su == 4294967295, noff = off2 == 4294967295, e = b + l;
-    var nf = nsc + nsu + noff;
-    if (z && nf) {
-      for (; b + 4 < e; b += 4 + b2(d, b + 2)) {
-        if (b2(d, b) == 1) {
-          return [
-            nsc ? b8(d, b + 4 + 8 * nsu) : sc,
-            nsu ? b8(d, b + 4) : su,
-            noff ? b8(d, b + 4 + 8 * (nsu + nsc)) : off2,
-            1
-          ];
-        }
-      }
-      if (z < 2)
-        err(13);
-    }
-    return [sc, su, off2, 0];
-  };
-  var exfl = function(ex) {
-    var le = 0;
-    if (ex) {
-      for (var k in ex) {
-        var l = ex[k].length;
-        if (l > 65535)
-          err(9);
-        le += l + 4;
-      }
-    }
-    return le;
-  };
-  var wzh = function(d, b, f, fn, u, c, ce, co) {
-    var fl2 = fn.length, ex = f.extra, col = co && co.length;
-    var exl = exfl(ex);
-    wbytes(d, b, ce != null ? 33639248 : 67324752), b += 4;
-    if (ce != null)
-      d[b++] = 20, d[b++] = f.os;
-    d[b] = 20, b += 2;
-    d[b++] = f.flag << 1 | (c < 0 && 8), d[b++] = u && 8;
-    d[b++] = f.compression & 255, d[b++] = f.compression >> 8;
-    var dt = new Date(f.mtime == null ? Date.now() : f.mtime), y = dt.getFullYear() - 1980;
-    if (y < 0 || y > 119)
-      err(10);
-    wbytes(d, b, y << 25 | dt.getMonth() + 1 << 21 | dt.getDate() << 16 | dt.getHours() << 11 | dt.getMinutes() << 5 | dt.getSeconds() >> 1), b += 4;
-    if (c != -1) {
-      wbytes(d, b, f.crc);
-      wbytes(d, b + 4, c < 0 ? -c - 2 : c);
-      wbytes(d, b + 8, f.size);
-    }
-    wbytes(d, b + 12, fl2);
-    wbytes(d, b + 14, exl), b += 16;
-    if (ce != null) {
-      wbytes(d, b, col);
-      wbytes(d, b + 6, f.attrs);
-      wbytes(d, b + 10, ce), b += 14;
-    }
-    d.set(fn, b);
-    b += fl2;
-    if (exl) {
-      for (var k in ex) {
-        var exf = ex[k], l = exf.length;
-        wbytes(d, b, +k);
-        wbytes(d, b + 2, l);
-        d.set(exf, b + 4), b += 4 + l;
-      }
-    }
-    if (col)
-      d.set(co, b), b += col;
-    return b;
-  };
-  var wzf = function(o, b, c, d, e) {
-    wbytes(o, b, 101010256);
-    wbytes(o, b + 8, c);
-    wbytes(o, b + 10, c);
-    wbytes(o, b + 12, d);
-    wbytes(o, b + 16, e);
-  };
-  function zipSync(data3, opts) {
-    if (!opts)
-      opts = {};
-    var r = {};
-    var files = [];
-    fltn(data3, "", r, opts);
-    var o = 0;
-    var tot = 0;
-    for (var fn in r) {
-      var _a3 = r[fn], file = _a3[0], p = _a3[1];
-      var compression = p.level == 0 ? 0 : 8;
-      var f = strToU8(fn), s = f.length;
-      var com = p.comment, m = com && strToU8(com), ms = m && m.length;
-      var exl = exfl(p.extra);
-      if (s > 65535)
-        err(11);
-      var d = compression ? deflateSync(file, p) : file, l = d.length;
-      var c = crc();
-      c.p(file);
-      files.push(mrg(p, {
-        size: file.length,
-        crc: c.d(),
-        c: d,
-        f,
-        m,
-        u: s != fn.length || m && com.length != ms,
-        o,
-        compression
-      }));
-      o += 30 + s + exl + l;
-      tot += 76 + 2 * (s + exl) + (ms || 0) + l;
-    }
-    var out = new u8(tot + 22), oe = o, cdl = tot - o;
-    for (var i4 = 0; i4 < files.length; ++i4) {
-      var f = files[i4];
-      wzh(out, f.o, f, f.f, f.u, f.c.length);
-      var badd = 30 + f.f.length + exfl(f.extra);
-      out.set(f.c, f.o + badd);
-      wzh(out, o, f, f.f, f.u, f.c.length, f.o, f.m), o += 16 + badd + (f.m ? f.m.length : 0);
-    }
-    wzf(out, o, files.length, cdl, oe);
-    return out;
-  }
-  function unzipSync(data3, opts) {
-    var files = {};
-    var e = data3.length - 22;
-    for (; b4(data3, e) != 101010256; --e) {
-      if (!e || data3.length - e > 65558)
-        err(13);
-    }
-    ;
-    var c = b2(data3, e + 8);
-    if (!c)
-      return {};
-    var o = b4(data3, e + 16);
-    var z = b4(data3, e - 20) == 117853008;
-    if (z) {
-      var ze = b4(data3, e - 12);
-      z = b4(data3, ze) == 101075792;
-      if (z) {
-        c = b4(data3, ze + 32);
-        o = b4(data3, ze + 48);
-      }
-    }
-    var fltr = opts && opts.filter;
-    for (var i4 = 0; i4 < c; ++i4) {
-      var _a3 = zh(data3, o, z), c_2 = _a3[0], sc = _a3[1], su = _a3[2], fn = _a3[3], no = _a3[4], off2 = _a3[5], b = slzh(data3, off2);
-      o = no;
-      if (!fltr || fltr({
-        name: fn,
-        size: sc,
-        originalSize: su,
-        compression: c_2
-      })) {
-        if (!c_2)
-          files[fn] = slc(data3, b, b + sc);
-        else if (c_2 == 8)
-          files[fn] = inflateSync(data3.subarray(b, b + sc), { out: new u8(su) });
-        else
-          err(14, "unknown compression type " + c_2);
-      }
-    }
-    return files;
-  }
 
-  // app/src/core/state.js
-  var LS_KEY = "runlet:session:v2";
-  var LS_SETTINGS = "runlet:settings:v2";
-  var db = null;
-  async function initStorage() {
-    try {
-      const req = indexedDB.open("runlet-db", 1);
-      req.onupgradeneeded = () => {
-        const d = req.result;
-        if (!d.objectStoreNames.contains("kv")) d.createObjectStore("kv");
-      };
-      req.onsuccess = () => {
-        db = req.result;
-      };
-    } catch (e) {
-    }
-    const hash3 = location.hash || "";
-    if (hash3.startsWith("#p=")) {
-      const code2 = hash3.slice(3);
-      if (code2.length <= 2e6) {
-        let loaded = null, shareError = null;
-        try {
-          loaded = await decodeShare(code2);
-        } catch (e) {
-          if (e.code === "PASSWORD_REQUIRED") {
-            const pass = await askPassword();
-            if (pass) {
-              try {
-                loaded = await decodeShare(code2, pass);
-              } catch (e2) {
-                shareError = e2;
-              }
-            }
-          } else shareError = e;
+  // app/src/core/threeD.js
+  var threeD_exports = {};
+  __export(threeD_exports, {
+    addObject: () => addObject,
+    clearScene: () => clearScene,
+    exportToProject: () => exportToProject,
+    getScene: () => getScene,
+    initThreeD: () => initThreeD,
+    openThreeDWindow: () => openThreeDWindow,
+    setScene: () => setScene,
+    threeDSummary: () => threeDSummary
+  });
+  function geometry(type) {
+    const V = [], F = [];
+    if (type === "cube") {
+      for (let z = -1; z <= 1; z += 2) for (let y = -1; y <= 1; y += 2) for (let x2 = -1; x2 <= 1; x2 += 2) V.push([x2, y, z]);
+      F.push([0, 1, 3, 2], [4, 6, 7, 5], [0, 4, 5, 1], [2, 3, 7, 6], [0, 2, 6, 4], [1, 5, 7, 3]);
+    } else if (type === "sphere") {
+      const L = 14, R = 10;
+      for (let i4 = 0; i4 <= R; i4++) {
+        const phi = Math.PI * i4 / R;
+        for (let j = 0; j < L; j++) {
+          const th = 2 * Math.PI * j / L;
+          V.push([Math.sin(phi) * Math.cos(th), Math.cos(phi), Math.sin(phi) * Math.sin(th)]);
         }
-        if (loaded && loaded.files) {
-          state.readOnly = !!loaded.readOnly;
-          setProject(loaded, loaded.projectName || "\u0418\u0437 \u0441\u0441\u044B\u043B\u043A\u0438");
-          toast(state.readOnly ? "\u041F\u0440\u043E\u0435\u043A\u0442 \u0437\u0430\u0433\u0440\u0443\u0436\u0435\u043D \u0438\u0437 \u0441\u0441\u044B\u043B\u043A\u0438 (\u0440\u0435\u0436\u0438\u043C \u0442\u043E\u043B\u044C\u043A\u043E \u0434\u043B\u044F \u0447\u0442\u0435\u043D\u0438\u044F)" : "\u041F\u0440\u043E\u0435\u043A\u0442 \u0437\u0430\u0433\u0440\u0443\u0436\u0435\u043D \u0438\u0437 \u0441\u0441\u044B\u043B\u043A\u0438", "ok", "\u0428\u0430\u0440\u0438\u043D\u0433");
-          emit("readOnly:changed", state.readOnly);
-          return true;
-        }
-        toast("\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u043E\u0442\u043A\u0440\u044B\u0442\u044C \u0441\u0441\u044B\u043B\u043A\u0443: " + (shareError?.message || "\u043F\u043E\u0432\u0440\u0435\u0436\u0434\u0451\u043D\u043D\u044B\u0435 \u0434\u0430\u043D\u043D\u044B\u0435"), "err", "\u0428\u0430\u0440\u0438\u043D\u0433");
-      } else toast("\u0421\u0441\u044B\u043B\u043A\u0430 \u043D\u0430 \u043F\u0440\u043E\u0435\u043A\u0442 \u0441\u043B\u0438\u0448\u043A\u043E\u043C \u0434\u043B\u0438\u043D\u043D\u0430\u044F", "err", "\u0428\u0430\u0440\u0438\u043D\u0433");
+      }
+      for (let i4 = 0; i4 < R; i4++) for (let j = 0; j < L; j++) {
+        const a = i4 * L + j, b = i4 * L + (j + 1) % L;
+        F.push([a, b, b + L, a + L]);
+      }
+    } else if (type === "cylinder" || type === "cone") {
+      const N = 16;
+      for (let i4 = 0; i4 < N; i4++) {
+        const a = 2 * Math.PI * i4 / N;
+        V.push([Math.cos(a), -1, Math.sin(a)], [type === "cone" ? 0 : Math.cos(a), 1, type === "cone" ? 0 : Math.sin(a)]);
+      }
+      const top2 = V.length, bot = V.length + 1;
+      V.push([0, 1, 0], [0, -1, 0]);
+      for (let i4 = 0; i4 < N; i4++) {
+        const a = 2 * i4, b = 2 * ((i4 + 1) % N);
+        F.push([a, b, b + 1, a + 1]);
+        if (type === "cylinder") F.push([top2, a + 1, b + 1]);
+        F.push([bot, b, a]);
+      }
+    } else if (type === "plane") {
+      V.push([-1, 0, -1], [1, 0, -1], [1, 0, 1], [-1, 0, 1]);
+      F.push([0, 1, 2, 3]);
+    } else if (type === "torus") {
+      const A = 14, B = 8, R = 0.75, r = 0.3;
+      for (let i4 = 0; i4 < A; i4++) for (let j = 0; j < B; j++) {
+        const u = 2 * Math.PI * i4 / A, v = 2 * Math.PI * j / B;
+        V.push([(R + r * Math.cos(v)) * Math.cos(u), r * Math.sin(v), (R + r * Math.cos(v)) * Math.sin(u)]);
+      }
+      for (let i4 = 0; i4 < A; i4++) for (let j = 0; j < B; j++) {
+        const a = i4 * B + j, b = i4 * B + (j + 1) % B, c = (i4 + 1) % A * B + j, d = (i4 + 1) % A * B + (j + 1) % B;
+        F.push([a, b, d, c]);
+      }
+    } else {
+      V.push([-1, -1, -1], [1, -1, -1], [1, -1, 1], [-1, -1, 1], [0, 1, 0]);
+      F.push([0, 1, 2, 3], [0, 1, 4], [1, 2, 4], [2, 3, 4], [3, 0, 4]);
     }
-    const rawSettings = localStorage.getItem(LS_SETTINGS);
-    if (rawSettings) {
-      try {
-        Object.assign(state.settings, sanitizeSettings(JSON.parse(rawSettings)));
-      } catch (e) {
+    return { V, F };
+  }
+  function geo(type) {
+    return CACHE[type] || (CACHE[type] = geometry(type));
+  }
+  function rot(p, r) {
+    let [x2, y, z] = p;
+    let c = Math.cos(r[0]), s = Math.sin(r[0]);
+    [y, z] = [y * c - z * s, y * s + z * c];
+    c = Math.cos(r[1]);
+    s = Math.sin(r[1]);
+    [x2, z] = [x2 * c + z * s, -x2 * s + z * c];
+    c = Math.cos(r[2]);
+    s = Math.sin(r[2]);
+    [x2, y] = [x2 * c - y * s, x2 * s + y * c];
+    return [x2, y, z];
+  }
+  function worldPoint(o, p) {
+    const q = rot([p[0] * o.scale[0], p[1] * o.scale[1], p[2] * o.scale[2]], o.rot);
+    return [q[0] + o.pos[0], q[1] + o.pos[1], q[2] + o.pos[2]];
+  }
+  function cameraPoint(p) {
+    const q = rot(p, [cam.pitch, cam.yaw, 0]);
+    return [q[0], q[1], q[2] + cam.dist];
+  }
+  function project(p, w, h) {
+    const c = cameraPoint(p), z = Math.max(0.15, c[2]);
+    const f = Math.min(w, h) * 0.92 / z;
+    return [w / 2 + c[0] * f, h / 2 - c[1] * f, c[2]];
+  }
+  function normal(a, b, c) {
+    const u = [b[0] - a[0], b[1] - a[1], b[2] - a[2]], v = [c[0] - a[0], c[1] - a[1], c[2] - a[2]];
+    const n = [u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]];
+    const l = Math.hypot(...n) || 1;
+    return [n[0] / l, n[1] / l, n[2] / l];
+  }
+  function shade(hex, k) {
+    const h = hex.replace("#", "");
+    const r = parseInt(h.slice(0, 2), 16), g2 = parseInt(h.slice(2, 4), 16), b = parseInt(h.slice(4, 6), 16);
+    return `rgb(${Math.round(Math.min(255, r * k))},${Math.round(Math.min(255, g2 * k))},${Math.round(Math.min(255, b * k))})`;
+  }
+  function render() {
+    if (!canvas || !g) return;
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    const w = canvas.clientWidth || 400, h = canvas.clientHeight || 300;
+    if (canvas.width !== Math.round(w * dpr) || canvas.height !== Math.round(h * dpr)) {
+      canvas.width = Math.round(w * dpr);
+      canvas.height = Math.round(h * dpr);
+    }
+    g.setTransform(dpr, 0, 0, dpr, 0, 0);
+    g.clearRect(0, 0, w, h);
+    g.fillStyle = "#0b0f16";
+    g.fillRect(0, 0, w, h);
+    if (showGrid) {
+      g.lineWidth = 1;
+      g.strokeStyle = "rgba(120,150,190,.16)";
+      for (let i4 = -5; i4 <= 5; i4++) {
+        drawLine3([i4, -1.6, -5], [i4, -1.6, 5], w, h);
+        drawLine3([-5, -1.6, i4], [5, -1.6, i4], w, h);
+      }
+      g.strokeStyle = "rgba(79,143,247,.55)";
+      drawLine3([-5.4, -1.59, 0], [5.4, -1.59, 0], w, h);
+      g.strokeStyle = "rgba(215,119,87,.55)";
+      drawLine3([0, -1.59, -5.4], [0, -1.59, 5.4], w, h);
+    }
+    const polys = [];
+    for (const o of objects) {
+      const gm = geo(o.type);
+      const pts = gm.V.map((p) => worldPoint(o, p));
+      for (const f of gm.F) {
+        const face = f.map((i4) => pts[i4]);
+        const cp = face.map((p) => cameraPoint(p));
+        const z = cp.reduce((n2, p) => n2 + p[2], 0) / cp.length;
+        const n = rot(normal(face[0], face[1], face[2]), [cam.pitch, cam.yaw, 0]);
+        const light = [0.35, 0.72, 0.6];
+        const dot2 = n[0] * light[0] + n[1] * light[1] + n[2] * light[2];
+        polys.push({ z, face, n, k: 0.24 + 0.78 * Math.max(0, dot2), o });
       }
     }
-    const raw = localStorage.getItem(LS_KEY);
-    if (raw) {
-      try {
-        const data3 = JSON.parse(raw);
-        setProject(data3, data3.projectName, true);
-        return false;
-      } catch (e) {
-        console.warn("session restore failed", e);
+    polys.sort((a, b) => b.z - a.z);
+    const L = [0.35, 0.72, 0.6];
+    for (const p of polys) {
+      const pr = p.face.map((v) => project(v, w, h));
+      if (pr.some((v) => v[2] <= 0.15)) continue;
+      g.beginPath();
+      g.moveTo(pr[0][0], pr[0][1]);
+      for (let i4 = 1; i4 < pr.length; i4++) g.lineTo(pr[i4][0], pr[i4][1]);
+      g.closePath();
+      const k = 0.2 + 0.8 * Math.max(0, p.k - 0.2);
+      g.fillStyle = wire ? "rgba(20,28,40,.35)" : shade(p.o.color, k);
+      g.fill();
+      g.lineWidth = selected === p.o.id ? 1.6 : 0.7;
+      g.strokeStyle = selected === p.o.id ? "#ffd479" : wire ? shade(p.o.color, 1.15) : "rgba(0,0,0,.28)";
+      g.stroke();
+    }
+    if (selected) {
+      const o = objects.find((x2) => x2.id === selected);
+      if (o) {
+        const pts = geo(o.type).V.map((p) => project(worldPoint(o, p), w, h));
+        const xs = pts.map((p) => p[0]), ys = pts.map((p) => p[1]);
+        const x0 = Math.min(...xs) - 5, y0 = Math.min(...ys) - 5, x1 = Math.max(...xs) + 5, y1 = Math.max(...ys) + 5;
+        g.strokeStyle = "rgba(255,212,121,.75)";
+        g.lineWidth = 1;
+        g.setLineDash([4, 3]);
+        g.strokeRect(x0, y0, x1 - x0, y1 - y0);
+        g.setLineDash([]);
       }
     }
-    resetProject();
-    loadFromIDB().then((d) => {
-      if (d && d.files && !localStorage.getItem(LS_KEY)) setProject(d, d.projectName, true);
-    });
-    return false;
+    dirty = false;
   }
-  function idbPut(key, val) {
-    return new Promise((res) => {
-      if (!db) return res(false);
-      try {
-        const tx = db.transaction("kv", "readwrite");
-        tx.objectStore("kv").put(val, key);
-        tx.oncomplete = () => res(true);
-        tx.onerror = () => res(false);
-      } catch (e) {
-        res(false);
-      }
-    });
+  function drawLine3(a, b, w, h) {
+    const p = project(a, w, h), q = project(b, w, h);
+    if (p[2] <= 0.15 || q[2] <= 0.15) return;
+    g.beginPath();
+    g.moveTo(p[0], p[1]);
+    g.lineTo(q[0], q[1]);
+    g.stroke();
   }
-  function idbGet(key) {
-    return new Promise((res) => {
-      if (!db) return setTimeout(() => idbGet(key).then(res), 250);
-      try {
-        const tx = db.transaction("kv", "readonly");
-        const r = tx.objectStore("kv").get(key);
-        r.onsuccess = () => res(r.result || null);
-        r.onerror = () => res(null);
-      } catch (e) {
-        res(null);
-      }
-    });
+  function invalidate() {
+    dirty = true;
   }
-  var loadFromIDB = () => idbGet("project");
-  var UNSAFE_KEYS = /* @__PURE__ */ new Set(["__proto__", "constructor", "prototype"]);
-  function safePathKey(p, maxLen = 300) {
-    if (typeof p !== "string" || !p || p.length > maxLen || p.includes("\0") || p.includes("\\") || p.startsWith("/") || /^[A-Za-z]:/.test(p) || UNSAFE_KEYS.has(p)) return null;
-    const parts = p.split("/");
-    if (parts.some((x2) => x2 === ".." || x2 === "." || x2 === "" || UNSAFE_KEYS.has(x2) || /^\s|\s$/.test(x2))) return null;
-    if (!/[\w.-]/.test(p) || /[<>:"|?*\x00-\x1f]/.test(p)) return null;
-    return p;
+  function loop() {
+    if (dirty) render();
+    requestAnimationFrame(loop);
   }
-  function setProject(data3, name2, restoreEditors = false) {
-    state.files = {};
-    for (const [p, f] of Object.entries(data3.files || {})) {
-      const key = safePathKey(p);
-      if (!key) continue;
-      state.files[key] = typeof f === "string" ? makeFile(f, key) : makeFile(String(f?.content ?? ""), key);
-    }
-    if (!Object.keys(state.files).length) resetProject();
-    state.entry = data3.entry || ("index.html" in state.files ? "index.html" : Object.keys(state.files)[0]);
-    state.projectName = name2 || data3.projectName || "\u041C\u043E\u0439 \u043F\u0440\u043E\u0435\u043A\u0442";
-    const mergedPanes = { ...state.panes, ...data3.panes || {} };
-    state.panes = Object.fromEntries(Object.entries(mergedPanes).map(([k, v]) => [k, ["html", "css", "js"].includes(k) && safePathKey(v) ? v : state.panes[k] || ""]));
-    state.deps = data3.deps || [];
-    state.layout = data3.layout || "columns";
-    state.snapshots = data3.snapshots || [];
-    state.userSnippets = data3.userSnippets || [];
-    state.progress = data3.progress || {};
-    if (data3.settings) Object.assign(state.settings, data3.settings);
-    const pn = $("#projectName");
-    if (pn) pn.value = state.projectName;
-    emit("project:loaded");
-    if (restoreEditors) emit("project:restoreEditors");
-  }
-  function resetProject() {
-    state.files = {};
-    for (const [p, c] of Object.entries(DEFAULT_FILES)) state.files[p] = makeFile(c, p);
-    state.entry = "index.html";
-    state.panes = { html: "index.html", css: "style.css", js: "script.js" };
-    state.deps = [];
-    state.snapshots = [];
-    state.dirty = false;
-    emit("project:loaded");
-    emit("project:restoreEditors");
-  }
-  function makeFile(content2, path = "") {
+  function makeObject(type, offset2 = 0) {
     return {
-      content: String(content2 ?? ""),
-      kind: isBinary(path) ? "binary" : "text",
-      mime: mimeOf(path),
-      size: String(content2 ?? "").length,
-      updated: Date.now()
+      id: "o" + Math.random().toString(36).slice(2, 8),
+      type,
+      name: (TYPES.find((t2) => t2.id === type)?.name || "\u041E\u0431\u044A\u0435\u043A\u0442") + " " + (objects.length + 1),
+      pos: [offset2, 0, 0],
+      rot: [0, 0, 0],
+      scale: [1, 1, 1],
+      color: DEFAULT_COLORS[objects.length % DEFAULT_COLORS.length],
+      wire: false
     };
   }
-  function mimeOf(p) {
-    const e = (p.split(".").pop() || "").toLowerCase();
-    return {
-      html: "text/html",
-      htm: "text/html",
-      css: "text/css",
-      js: "text/javascript",
-      mjs: "text/javascript",
-      ts: "text/typescript",
-      jsx: "text/jsx",
-      tsx: "text/tsx",
-      json: "application/json",
-      md: "text/markdown",
-      svg: "image/svg+xml",
-      png: "image/png",
-      jpg: "image/jpeg",
-      jpeg: "image/jpeg",
-      gif: "image/gif",
-      webp: "image/webp",
-      ico: "image/x-icon",
-      woff: "font/woff",
-      woff2: "font/woff2",
-      ttf: "font/ttf",
-      otf: "font/otf",
-      mp3: "audio/mpeg",
-      wav: "audio/wav",
-      mp4: "video/mp4",
-      webm: "video/webm",
-      txt: "text/plain",
-      scss: "text/x-scss",
-      pug: "text/x-pug",
-      vue: "text/x-vue",
-      xml: "application/xml"
-    }[e] || "application/octet-stream";
+  function addObject(type) {
+    const n = objects.length;
+    const o = makeObject(type, (n % 3 - 1) * 2.4);
+    objects.push(o);
+    selected = o.id;
+    invalidate();
+    renderList();
+    renderProps();
+    toast(`\u0414\u043E\u0431\u0430\u0432\u043B\u0435\u043D: ${o.name}`, "ok");
+    return o;
   }
-  function isBinary(p) {
-    return /^data:/.test(state.files[p]?.content || "") && !/^data:(text|application\/json|image\/svg)/.test(state.files[p]?.content || "");
+  function clearScene() {
+    objects = [];
+    selected = null;
+    invalidate();
+    renderList();
+    renderProps();
   }
-  function isImage(p) {
-    return /^image\//.test(mimeOf(p));
+  function getScene() {
+    return JSON.parse(JSON.stringify({ version: 1, objects }));
   }
-  function isText(p) {
-    return /\.(html?|css|js|mjs|cjs|ts|jsx|tsx|json|md|svg|txt|scss|less|pug|vue|xml|map)$/i.test(p);
+  function setScene(scene) {
+    objects = (scene?.objects || []).filter((o) => TYPES.some((t2) => t2.id === o.type)).map((o) => ({
+      id: o.id || makeObject(o.type).id,
+      type: o.type,
+      name: String(o.name || "\u041E\u0431\u044A\u0435\u043A\u0442").slice(0, 60),
+      pos: Array.isArray(o.pos) ? o.pos.slice(0, 3).map(Number) : [0, 0, 0],
+      rot: Array.isArray(o.rot) ? o.rot.slice(0, 3).map(Number) : [0, 0, 0],
+      scale: Array.isArray(o.scale) ? o.scale.slice(0, 3).map(Number) : [1, 1, 1],
+      color: /^#[0-9a-f]{6}$/i.test(o.color) ? o.color : "#4f8ff7",
+      wire: !!o.wire
+    }));
+    selected = objects[0]?.id || null;
+    invalidate();
+    renderList();
+    renderProps();
   }
-  function read(p) {
-    return state.files[p]?.content ?? "";
+  function current2() {
+    return objects.find((o) => o.id === selected);
   }
-  function exists(p) {
-    return Object.prototype.hasOwnProperty.call(state.files, p);
-  }
-  function write(p, content2, opts = {}) {
-    const key = safePathKey(p);
-    if (!key) {
-      if (!opts.quiet) toast("\u041D\u0435\u0434\u043E\u043F\u0443\u0441\u0442\u0438\u043C\u043E\u0435 \u0438\u043C\u044F \u0444\u0430\u0439\u043B\u0430 \u2014 \u043F\u0443\u0442\u044C \u043E\u0442\u043A\u043B\u043E\u043D\u0451\u043D", "err", "\u0411\u0435\u0437\u043E\u043F\u0430\u0441\u043D\u043E\u0441\u0442\u044C");
-      return null;
+  function initThreeD() {
+    host = $("#threePanel");
+    if (!host) return;
+    host.innerHTML = `<div class="td-wrap">
+    <div class="td-toolbar" id="tdToolbar"></div>
+    <div class="td-main">
+      <div class="td-view"><canvas class="td-canvas" id="tdCanvas"></canvas>
+        <div class="td-badge" id="tdBadge">\u043E\u0431\u044A\u0435\u043A\u0442\u043E\u0432: 0</div>
+        <div class="td-hint">\u0422\u044F\u043D\u0438\u0442\u0435 \u043C\u044B\u0448\u044C\u044E \u2014 \u0432\u0440\u0430\u0449\u0435\u043D\u0438\u0435 \xB7 \u043A\u043E\u043B\u0435\u0441\u043E \u2014 \u0437\u0443\u043C \xB7 \u043A\u043B\u0438\u043A \u2014 \u0432\u044B\u0431\u043E\u0440</div></div>
+      <div class="td-side">
+        <h4>\u041E\u0431\u044A\u0435\u043A\u0442\u044B</h4><div class="td-list" id="tdList"></div>
+        <div class="td-props" id="tdProps"></div>
+      </div>
+    </div>
+    <div class="td-actions">
+      <button class="mini-btn" id="tdGrid">\u0421\u0435\u0442\u043A\u0430</button>
+      <button class="mini-btn" id="tdWire">\u041A\u0430\u0440\u043A\u0430\u0441</button>
+      <button class="mini-btn" id="tdCamera">\u0421\u0431\u0440\u043E\u0441 \u043A\u0430\u043C\u0435\u0440\u044B</button>
+      <button class="mini-btn" id="tdExport">\u0412 \u043F\u0440\u043E\u0435\u043A\u0442</button>
+      <button class="mini-btn" id="tdWindow">\u0412 \u043E\u043A\u043D\u0435</button>
+    </div>
+  </div>`;
+    canvas = $("#tdCanvas");
+    g = canvas.getContext("2d");
+    panelRefs = { toolbar: $("#tdToolbar"), list: $("#tdList"), props: $("#tdProps"), badge: $("#tdBadge") };
+    for (const t2 of TYPES) {
+      const b = el("button", { class: "mini-btn", title: "\u0414\u043E\u0431\u0430\u0432\u0438\u0442\u044C: " + t2.name, onclick: () => addObject(t2.id) });
+      b.innerHTML = icon(t2.icon, 13) + `<span>${t2.name}</span>`;
+      panelRefs.toolbar.appendChild(b);
     }
-    p = key;
-    if (typeof content2 !== "string" || content2.length > 8 * 1024 * 1024) {
-      toast("\u0424\u0430\u0439\u043B \u0441\u043B\u0438\u0448\u043A\u043E\u043C \u0431\u043E\u043B\u044C\u0448\u043E\u0439 \u0438\u043B\u0438 \u043D\u0435 \u0442\u0435\u043A\u0441\u0442\u043E\u0432\u044B\u0439", "err");
-      return null;
-    }
-    const isNew = !exists(p);
-    state.files[p] = makeFile(content2, p);
-    if (opts.keepPane !== true) {
-      for (const [pane, file] of Object.entries(state.panes)) {
-        if (file === p && pane !== opts.fromPane) emit("file:externalChange", { path: p, pane, content: content2 });
-      }
-    }
-    markDirty(true);
-    emit("files:changed", { path: p, isNew });
-    emit("project:size");
-    schedulePersist();
-    return state.files[p];
-  }
-  function remove(p, opts = {}) {
-    const kids = Object.keys(state.files).filter((x2) => x2 === p || x2.startsWith(p + "/"));
-    for (const k of kids) delete state.files[k];
-    for (const [pane, file] of Object.entries(state.panes)) {
-      if (kids.includes(file)) {
-        const candidates = Object.keys(state.files).filter((x2) => paneOf(x2) === pane);
-        state.panes[pane] = candidates[0] || "";
-        emit("project:restoreEditors");
-      }
-    }
-    markDirty(true);
-    emit("files:changed", { path: p, removed: true });
-    emit("project:size");
-    schedulePersist();
-    if (!opts.silent) emit("toast", { msg: `\u0423\u0434\u0430\u043B\u0435\u043D\u043E: ${p}`, type: "ok" });
-  }
-  function rename(oldP, newP) {
-    const from = safePathKey(oldP), to = safePathKey(newP);
-    if (!from || !to || from === to || !exists(from)) return false;
-    oldP = from;
-    newP = to;
-    const kids = Object.keys(state.files).filter((x2) => x2 === oldP || x2.startsWith(oldP + "/"));
-    const oldBase = oldP.split("/").pop();
-    const newBase = newP.split("/").pop();
-    for (const [p, f] of Object.entries(state.files)) {
-      if (!isText(p)) continue;
-      let c = f.content;
-      c = c.split(`"${oldP}"`).join(`"${newP}"`).split(`'${oldP}'`).join(`'${newP}'`);
-      if (oldBase !== newBase) c = c.split(`"${oldBase}"`).join(`"${newBase}"`).split(`'${oldBase}'`).join(`'${newBase}'`);
-      f.content = c;
-      f.size = c.length;
-    }
-    for (const k of kids) {
-      const target = newP + k.slice(oldP.length);
-      state.files[target] = state.files[k];
-      state.files[target].mime = mimeOf(target);
-      delete state.files[k];
-      for (const [pane, file] of Object.entries(state.panes)) if (file === k) state.panes[pane] = target;
-    }
-    if (state.entry === oldP) state.entry = newP;
-    state.activeFile = newP;
-    markDirty(true);
-    emit("files:changed", { path: newP, renamed: true });
-    emit("project:restoreEditors");
-    schedulePersist();
-    return true;
-  }
-  function copyFile(p) {
-    const ext = p.includes(".") ? "." + p.split(".").pop() : "";
-    let n = p.replace(ext, "-copy" + ext), i4 = 2;
-    while (exists(n)) n = p.replace(ext, `-copy${i4++}${ext}`);
-    state.files[n] = { ...makeFile(read(p), n) };
-    markDirty(true);
-    emit("files:changed", { path: n });
-    schedulePersist();
-    return n;
-  }
-  function paneOf(path) {
-    const e = (path.split(".").pop() || "").toLowerCase();
-    if (["html", "htm", "pug", "vue", "svg"].includes(e)) return "html";
-    if (["css", "scss", "less", "sass"].includes(e)) return "css";
-    if (["js", "mjs", "cjs", "ts", "jsx", "tsx", "json"].includes(e)) return "js";
-    return null;
-  }
-  function listFiles() {
-    return Object.keys(state.files).sort();
-  }
-  function allTextFiles() {
-    const out = {};
-    for (const [p, f] of Object.entries(state.files)) if (isText(p)) out[p] = f.content;
-    return out;
-  }
-  function projectSize() {
-    return Object.values(state.files).reduce((n, f) => n + (f.content?.length || 0), 0);
-  }
-  function projectJSON() {
-    return JSON.stringify({
-      version: 2,
-      projectName: state.projectName,
-      entry: state.entry,
-      files: state.files,
-      panes: state.panes,
-      deps: state.deps,
-      layout: state.layout,
-      snapshots: state.snapshots,
-      userSnippets: state.userSnippets,
-      settings: state.settings,
-      progress: state.progress
-    }, null, 2);
-  }
-  var persistNow = () => {
-    try {
-      const data3 = {
-        projectName: state.projectName,
-        entry: state.entry,
-        files: state.files,
-        panes: state.panes,
-        deps: state.deps,
-        layout: state.layout,
-        snapshots: state.snapshots.slice(0, 20),
-        userSnippets: state.userSnippets,
-        progress: state.progress,
-        savedAt: Date.now()
-      };
-      localStorage.setItem(LS_KEY, JSON.stringify(data3));
-      localStorage.setItem(LS_SETTINGS, JSON.stringify(state.settings));
-      idbPut("project", data3);
-      if (projectSize() > 4.5 * 1024 * 1024) {
-        toast("\u041F\u0440\u043E\u0435\u043A\u0442 \u043F\u0440\u0438\u0431\u043B\u0438\u0437\u0438\u043B\u0441\u044F \u043A \u043B\u0438\u043C\u0438\u0442\u0443 \u0445\u0440\u0430\u043D\u0438\u043B\u0438\u0449\u0430 (>4.5 \u041C\u0411) \u2014 \u0432\u044B\u0433\u0440\u0443\u0437\u0438\u0442\u0435 \u0431\u043E\u043B\u044C\u0448\u0438\u0435 \u0430\u0441\u0441\u0435\u0442\u044B", "warn", "\u0425\u0440\u0430\u043D\u0438\u043B\u0438\u0449\u0435");
-      }
-      state.dirty = false;
-      emit("saved");
-      return true;
-    } catch (e) {
-      toast("\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u0441\u043E\u0445\u0440\u0430\u043D\u0438\u0442\u044C: " + e.message, "err", "\u0425\u0440\u0430\u043D\u0438\u043B\u0438\u0449\u0435");
-      return false;
-    }
-  };
-  var schedulePersist = debounce(() => {
-    if (state.settings.autoSave) persistNow();
-  }, 900);
-  function startAutoSave() {
-    setInterval(() => {
-      if (state.settings.autoSave && state.dirty) {
-        persistNow();
-        emit("webhook", "save");
-      }
-    }, Math.max(5, state.settings.autoSaveInterval) * 1e3);
-  }
-  function makeSnapshot(label = "\u0412\u0435\u0440\u0441\u0438\u044F") {
-    const snap = {
-      id: Date.now().toString(36),
-      label,
-      at: Date.now(),
-      files: Object.fromEntries(Object.entries(state.files).map(([p, f]) => [p, f.content])),
-      entry: state.entry,
-      panes: { ...state.panes }
+    $("#tdGrid").onclick = () => {
+      showGrid = !showGrid;
+      $("#tdGrid").classList.toggle("active", showGrid);
+      invalidate();
     };
-    state.snapshots.unshift(snap);
-    if (state.snapshots.length > 25) state.snapshots.length = 25;
-    schedulePersist();
-    emit("snapshots");
-    return snap;
-  }
-  function restoreSnapshot(id2) {
-    const s = state.snapshots.find((x2) => x2.id === id2);
-    if (!s) return false;
-    setProject({ files: s.files, entry: s.entry, panes: s.panes }, state.projectName, true);
-    return true;
-  }
-  function diffText(a, b) {
-    const A = a.split("\n"), B = b.split("\n");
-    const dp = Array.from({ length: A.length + 1 }, () => new Uint16Array(B.length + 1));
-    for (let i5 = A.length - 1; i5 >= 0; i5--)
-      for (let j2 = B.length - 1; j2 >= 0; j2--)
-        dp[i5][j2] = A[i5] === B[j2] ? dp[i5 + 1][j2 + 1] + 1 : Math.max(dp[i5 + 1][j2], dp[i5][j2 + 1]);
-    const out = [];
-    let i4 = 0, j = 0;
-    while (i4 < A.length && j < B.length) {
-      if (A[i4] === B[j]) {
-        out.push({ t: "=", v: A[i4] });
-        i4++;
-        j++;
-      } else if (dp[i4 + 1][j] >= dp[i4][j + 1]) {
-        out.push({ t: "-", v: A[i4++] });
-      } else {
-        out.push({ t: "+", v: B[j++] });
-      }
+    $("#tdWire").onclick = () => {
+      wire = !wire;
+      $("#tdWire").classList.toggle("active", wire);
+      invalidate();
+    };
+    $("#tdCamera").onclick = () => {
+      cam = { yaw: 0.7, pitch: 0.45, dist: 7.5 };
+      invalidate();
+    };
+    $("#tdExport").onclick = exportToProject;
+    $("#tdWindow").onclick = () => ctx.openThreeWindow?.();
+    $("#tdGrid").classList.toggle("active", showGrid);
+    canvas.addEventListener("pointerdown", (e) => {
+      const r = canvas.getBoundingClientRect();
+      drag = { x: e.clientX, y: e.clientY, yaw: cam.yaw, pitch: cam.pitch, moved: false };
+      canvas.setPointerCapture(e.pointerId);
+      pick(e.clientX - r.left, e.clientY - r.top);
+    });
+    canvas.addEventListener("pointermove", (e) => {
+      if (!drag) return;
+      const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+      if (Math.abs(dx) + Math.abs(dy) > 3) drag.moved = true;
+      cam.yaw = drag.yaw + dx * 8e-3;
+      cam.pitch = Math.max(-1.4, Math.min(1.4, drag.pitch + dy * 8e-3));
+      invalidate();
+    });
+    canvas.addEventListener("pointerup", () => {
+      drag = null;
+    });
+    canvas.addEventListener("wheel", (e) => {
+      e.preventDefault();
+      cam.dist = Math.max(3, Math.min(24, cam.dist + e.deltaY * 0.012));
+      invalidate();
+    }, { passive: false });
+    const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(() => invalidate()) : null;
+    ro?.observe(canvas.parentElement);
+    window.addEventListener("resize", invalidate);
+    if (!objects.length) {
+      addObject("cube");
+      const s = objects[0];
+      s.pos = [-1.6, 0, 0];
+      addObject("sphere");
+      objects[1].pos = [1.6, 0, 0];
+      objects[1].color = "#d97757";
+      selected = objects[0].id;
+      invalidate();
     }
-    while (i4 < A.length) out.push({ t: "-", v: A[i4++] });
-    while (j < B.length) out.push({ t: "+", v: B[j++] });
-    return out;
+    renderList();
+    renderProps();
+    loop();
+    emit("three:ready");
   }
-  var PRESETS = {
-    minimal: { label: "\u041C\u0438\u043D\u0438\u043C\u0430\u043B\u0438\u0437\u043C", patch: { fontSize: 13, density: "compact", minimap: false, showWhitespace: false, wrap: true, autoAnalyze: false, theme: "dark" } },
-    balanced: { label: "\u0411\u0430\u043B\u0430\u043D\u0441", patch: { fontSize: 13, density: "comfy", minimap: true, showWhitespace: false, wrap: false, autoAnalyze: true, autoRun: true } },
-    pro: { label: "Pro / \u043F\u043B\u043E\u0442\u043D\u044B\u0439", patch: { fontSize: 12, density: "compact", minimap: true, showWhitespace: true, wrap: false, tabSize: 2, showInvisibles: true, autoAnalyze: true, autoRunDelay: 350 } },
-    teacher: { label: "\u0414\u043B\u044F \u043E\u0431\u0443\u0447\u0435\u043D\u0438\u044F", patch: { fontSize: 16, density: "comfy", minimap: false, wrap: true, showWhitespace: true, theme: "light", autoAnalyze: true } }
-  };
-  function applyPreset(name2) {
-    const p = PRESETS[name2];
-    if (!p) return;
-    Object.assign(state.settings, p.patch);
-    state.settings.presets = name2;
-    applySettings();
-    toast("\u041F\u0440\u0438\u043C\u0435\u043D\u0451\u043D \u043F\u0440\u0435\u0441\u0435\u0442 \xAB" + p.label + "\xBB", "ok", "\u041D\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0438");
-  }
-  function applySettings() {
-    applyTheme();
-    applyLocale();
-    localStorage.setItem(LS_SETTINGS, JSON.stringify(state.settings));
-    emit("settings:changed");
-    schedulePersist();
-  }
-  function exportSettings() {
-    return JSON.stringify(state.settings, null, 2);
-  }
-  function sanitizeSettings(d) {
-    const out = {};
-    if (!d || typeof d !== "object" || Array.isArray(d)) return out;
-    const ref2 = DEFAULT_SETTINGS;
-    for (const [k, v] of Object.entries(d)) {
-      if (UNSAFE_KEYS.has(k) || !Object.prototype.hasOwnProperty.call(ref2, k)) continue;
-      const orig = ref2[k];
-      if (typeof orig === "boolean" && typeof v === "boolean") out[k] = v;
-      else if (typeof orig === "number" && typeof v === "number" && Math.abs(v) < 1e7) out[k] = v;
-      else if (typeof orig === "string" && typeof v === "string" && v.length < 200) out[k] = v;
-      else if (Array.isArray(orig) && Array.isArray(v)) out[k] = v.slice(0, 100);
-      else if (orig && typeof orig === "object" && !Array.isArray(orig) && v && typeof v === "object" && !Array.isArray(v)) {
-        const nested = {};
-        for (const [nk, nv] of Object.entries(v)) {
-          if (UNSAFE_KEYS.has(nk) || !Object.prototype.hasOwnProperty.call(orig, nk)) continue;
-          if (typeof orig[nk] === typeof nv && (typeof nv === "boolean" || typeof nv === "number" || typeof nv === "string" && nv.length < 200)) nested[nk] = nv;
+  function pick(x2, y) {
+    const o = current2();
+    let best = null, bestArea = Infinity;
+    for (const obj of objects) {
+      const pts = geo(obj.type).V.map((p) => project(worldPoint(obj, p), canvas.clientWidth, canvas.clientHeight));
+      const xs = pts.map((p) => p[0]), ys = pts.map((p) => p[1]);
+      const x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys);
+      if (x2 >= x0 && x2 <= x1 && y >= y0 && y <= y1) {
+        const area = (x1 - x0) * (y1 - y0);
+        if (area < bestArea) {
+          bestArea = area;
+          best = obj;
         }
-        out[k] = { ...orig, ...nested };
       }
     }
-    return out;
-  }
-  function importSettings(text) {
-    Object.assign(state.settings, sanitizeSettings(JSON.parse(text)));
-    applySettings();
-    return true;
-  }
-  function resetSettings() {
-    Object.assign(state.settings, JSON.parse(JSON.stringify(DEFAULT_SETTINGS)));
-    applySettings();
-    toast("\u041D\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0438 \u0441\u0431\u0440\u043E\u0448\u0435\u043D\u044B", "ok");
-  }
-  var MAX_SHARE_CODE = 2e6;
-  var MAX_SHARE_JSON = 4 * 1024 * 1024;
-  var SHARE_PBKDF2_ITER = 15e4;
-  function toB64u(bytes) {
-    let bin = "";
-    for (let i4 = 0; i4 < bytes.length; i4 += 32768) bin += String.fromCharCode(...bytes.subarray(i4, i4 + 32768));
-    return btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-  }
-  function fromB64u(code2) {
-    const b64 = code2.replace(/-/g, "+").replace(/_/g, "/");
-    const bin = atob(b64 + "===".slice((b64.length + 3) % 4));
-    return Uint8Array.from(bin, (c) => c.charCodeAt(0));
-  }
-  async function shareKey(password, salt) {
-    if (!globalThis.crypto?.subtle) throw new Error("Web Crypto \u043D\u0435\u0434\u043E\u0441\u0442\u0443\u043F\u0435\u043D \u2014 \u043F\u0430\u0440\u043E\u043B\u044C\u043D\u0430\u044F \u0441\u0441\u044B\u043B\u043A\u0430 \u043D\u0435 \u043F\u043E\u0434\u0434\u0435\u0440\u0436\u0438\u0432\u0430\u0435\u0442\u0441\u044F");
-    const base2 = await crypto.subtle.importKey("raw", new TextEncoder().encode(password), "PBKDF2", false, ["deriveKey"]);
-    return crypto.subtle.deriveKey(
-      { name: "PBKDF2", salt, iterations: SHARE_PBKDF2_ITER, hash: "SHA-256" },
-      base2,
-      { name: "AES-GCM", length: 256 },
-      false,
-      ["encrypt", "decrypt"]
-    );
-  }
-  function validateShared(p) {
-    if (!p || typeof p !== "object" || Array.isArray(p) || !p.files || typeof p.files !== "object" || Array.isArray(p.files))
-      throw new Error("\u041D\u0435\u043A\u043E\u0440\u0440\u0435\u043A\u0442\u043D\u044B\u0439 \u0444\u043E\u0440\u043C\u0430\u0442 \u043F\u0440\u043E\u0435\u043A\u0442\u0430");
-    const files = {};
-    let total = 0;
-    for (const [k, v] of Object.entries(p.files).slice(0, 200)) {
-      const key = safePathKey(k);
-      if (!key || typeof v !== "string") continue;
-      total += v.length;
-      if (total > MAX_SHARE_JSON) throw new Error("\u041F\u0440\u043E\u0435\u043A\u0442 \u0432 \u0441\u0441\u044B\u043B\u043A\u0435 \u0441\u043B\u0438\u0448\u043A\u043E\u043C \u0431\u043E\u043B\u044C\u0448\u043E\u0439");
-      files[key] = v.slice(0, 2 * 1024 * 1024);
+    if (best && best.id !== selected) {
+      selected = best.id;
+      renderList();
+      renderProps();
+      invalidate();
     }
-    if (!Object.keys(files).length) throw new Error("\u0412 \u0441\u0441\u044B\u043B\u043A\u0435 \u043D\u0435\u0442 \u0444\u0430\u0439\u043B\u043E\u0432");
-    return {
-      v: 3,
-      files,
-      entry: safePathKey(p.entry) || Object.keys(files)[0],
-      panes: { ...state.panes, ...p.panes && typeof p.panes === "object" ? Object.fromEntries(
-        Object.entries(p.panes).filter(([k, v]) => ["html", "css", "js"].includes(k) && typeof v === "string" && safePathKey(v))
-      ) : {} },
-      deps: Array.isArray(p.deps) ? p.deps.filter((d) => typeof d === "string" && d.length < 80).slice(0, 50) : [],
-      projectName: typeof p.projectName === "string" ? p.projectName.slice(0, 200) : "\u0418\u0437 \u0441\u0441\u044B\u043B\u043A\u0438",
-      readOnly: !!p.readOnly
+  }
+  function renderList() {
+    if (!panelRefs.list) return;
+    panelRefs.list.innerHTML = "";
+    panelRefs.badge.textContent = "\u043E\u0431\u044A\u0435\u043A\u0442\u043E\u0432: " + objects.length;
+    if (!objects.length) {
+      panelRefs.list.innerHTML = '<div class="td-empty">\u0421\u0446\u0435\u043D\u0430 \u043F\u0443\u0441\u0442\u0430. \u0414\u043E\u0431\u0430\u0432\u044C\u0442\u0435 \u043F\u0440\u0438\u043C\u0438\u0442\u0438\u0432 \u0441\u0432\u0435\u0440\u0445\u0443.</div>';
+      return;
+    }
+    for (const o of objects) {
+      const row = el("div", { class: "td-item" + (o.id === selected ? " active" : "") });
+      row.innerHTML = `<span class="td-swatch" style="background:${esc(o.color)}"></span><span class="grow">${esc(o.name)}</span>
+      <button class="mini-btn" data-del="${esc(o.id)}" title="\u0423\u0434\u0430\u043B\u0438\u0442\u044C" style="height:20px;padding:0 5px">${icon("trash", 11)}</button>`;
+      row.onclick = () => {
+        selected = o.id;
+        renderList();
+        renderProps();
+        invalidate();
+      };
+      row.querySelector("[data-del]").onclick = (e) => {
+        e.stopPropagation();
+        objects = objects.filter((x2) => x2.id !== o.id);
+        if (selected === o.id) selected = objects[0]?.id || null;
+        renderList();
+        renderProps();
+        invalidate();
+      };
+      panelRefs.list.appendChild(row);
+    }
+  }
+  function renderProps() {
+    if (!panelRefs.props) return;
+    const o = current2();
+    if (!o) {
+      panelRefs.props.innerHTML = '<div class="td-empty">\u0412\u044B\u0431\u0435\u0440\u0438\u0442\u0435 \u043E\u0431\u044A\u0435\u043A\u0442</div>';
+      return;
+    }
+    const inp = (label, key, i4, step2 = 0.1) => `<div><label>${label}</label>
+    <input type="number" step="${step2}" data-prop="${key}" data-i="${i4}" value="${Number(o[key][i4]).toFixed(2)}"></div>`;
+    panelRefs.props.innerHTML = `
+    <label>\u0418\u043C\u044F</label><input id="tdName" value="${esc(o.name)}" maxlength="60">
+    <label>\u0426\u0432\u0435\u0442</label><input type="color" id="tdColor" value="${esc(o.color)}" style="width:100%;height:28px;border:1px solid var(--border);border-radius:6px;background:var(--code-bg)">
+    <label>\u041F\u043E\u0437\u0438\u0446\u0438\u044F X / Y / Z</label><div class="td-triple">${inp("X", "pos", 0)}${inp("Y", "pos", 1)}${inp("Z", "pos", 2)}</div>
+    <label>\u041F\u043E\u0432\u043E\u0440\u043E\u0442 X / Y / Z (\u0433\u0440\u0430\u0434\u0443\u0441\u044B)</label><div class="td-triple">
+      ${["X", "Y", "Z"].map((l, i4) => `<div><input type="number" step="5" data-prop="rot" data-i="${i4}" value="${Math.round(o.rot[i4] * 180 / Math.PI)}"></div>`).join("")}</div>
+    <label>\u041C\u0430\u0441\u0448\u0442\u0430\u0431</label><div class="td-triple">${inp("X", "scale", 1)}${inp("Y", "scale", 1)}${inp("Z", "scale", 1)}</div>
+    <div class="rowflex mt8"><button class="mini-btn" id="tdDup">\u0414\u0443\u0431\u043B\u0438\u0440\u043E\u0432\u0430\u0442\u044C</button><button class="mini-btn" id="tdReset">\u0421\u0431\u0440\u043E\u0441\u0438\u0442\u044C</button></div>`;
+    $("#tdName").oninput = (e) => {
+      o.name = e.target.value.slice(0, 60);
+      renderList();
+    };
+    $("#tdColor").oninput = (e) => {
+      o.color = e.target.value;
+      renderList();
+      invalidate();
+    };
+    panelRefs.props.querySelectorAll("[data-prop]").forEach((inp2) => {
+      inp2.onchange = () => {
+        const key = inp2.dataset.prop, i4 = +inp2.dataset.i;
+        let v = parseFloat(inp2.value);
+        if (!isFinite(v)) return;
+        if (key === "rot") v = v * Math.PI / 180;
+        if (key === "scale") v = Math.max(0.05, Math.min(8, v));
+        o[key][i4] = v;
+        invalidate();
+      };
+    });
+    $("#tdDup").onclick = () => {
+      const c = JSON.parse(JSON.stringify(o));
+      c.id = makeObject(o.type).id;
+      c.name = o.name + " \u043A\u043E\u043F\u0438\u044F";
+      c.pos[0] += 1.2;
+      objects.push(c);
+      selected = c.id;
+      renderList();
+      renderProps();
+      invalidate();
+    };
+    $("#tdReset").onclick = () => {
+      o.pos = [0, 0, 0];
+      o.rot = [0, 0, 0];
+      o.scale = [1, 1, 1];
+      renderProps();
+      invalidate();
     };
   }
-  async function encodeShare(opts = {}) {
-    const payload = validateShared({
-      v: 3,
-      files: Object.fromEntries(Object.entries(state.files).map(([p, f]) => [p, f.content])),
-      entry: state.entry,
-      panes: state.panes,
-      deps: state.deps,
-      projectName: state.projectName,
-      readOnly: !!opts.readOnly
-    });
-    const bytes = deflateSync(strToU8(JSON.stringify(payload)), { level: 9 });
-    if (bytes.length > MAX_SHARE_JSON) throw new Error("\u041F\u0440\u043E\u0435\u043A\u0442 \u0441\u043B\u0438\u0448\u043A\u043E\u043C \u0431\u043E\u043B\u044C\u0448\u043E\u0439 \u0434\u043B\u044F \u0441\u0441\u044B\u043B\u043A\u0438");
-    if (opts.password) {
-      const salt = crypto.getRandomValues(new Uint8Array(16));
-      const iv = crypto.getRandomValues(new Uint8Array(12));
-      const key = await shareKey(String(opts.password).slice(0, 200), salt);
-      const cipher = new Uint8Array(await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, bytes));
-      const code2 = "E" + toB64u(salt) + "." + toB64u(iv) + "." + toB64u(cipher);
-      if (code2.length > MAX_SHARE_CODE) throw new Error("\u041F\u0440\u043E\u0435\u043A\u0442 \u0441\u043B\u0438\u0448\u043A\u043E\u043C \u0431\u043E\u043B\u044C\u0448\u043E\u0439 \u0434\u043B\u044F \u0441\u0441\u044B\u043B\u043A\u0438");
-      return code2;
+  function standaloneHtml(scene) {
+    const data3 = JSON.stringify(scene).replace(/</g, "\\u003c");
+    return `<!DOCTYPE html>
+<html lang="ru"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>3D \u0441\u0446\u0435\u043D\u0430 \u2014 Runlet</title>
+<style>html,body{margin:0;height:100%;background:#0b0f16;color:#9aa8ba;font-family:system-ui,sans-serif;overflow:hidden}
+canvas{display:block;width:100%;height:100%;cursor:grab}#hud{position:fixed;left:14px;bottom:12px;font-size:12px;opacity:.7}</style></head>
+<body><canvas id="c"></canvas><div id="hud">\u0422\u044F\u043D\u0438\u0442\u0435 \u2014 \u0432\u0440\u0430\u0449\u0435\u043D\u0438\u0435 \xB7 \u043A\u043E\u043B\u0435\u0441\u043E \u2014 \u0437\u0443\u043C \xB7 Runlet 3D</div>
+<script>
+const SCENE=${data3}, c=document.getElementById('c'), x=c.getContext('2d');
+let yaw=.7,pitch=.45,dist=8,drag=null,auto=true;
+function make(t){const V=[],F=[];
+ if(t==='cube'){for(let z=-1;z<=1;z+=2)for(let y=-1;y<=1;y+=2)for(let a=-1;a<=1;a+=2)V.push([a,y,z]);F.push([0,1,3,2],[4,6,7,5],[0,4,5,1],[2,3,7,6],[0,2,6,4],[1,5,7,3]);}
+ else if(t==='sphere'){const L=14,R=10;for(let i=0;i<=R;i++)for(let j=0;j<L;j++){const p=Math.PI*i/R,q=2*Math.PI*j/L;V.push([Math.sin(p)*Math.cos(q),Math.cos(p),Math.sin(p)*Math.sin(q)]);}for(let i=0;i<R;i++)for(let j=0;j<L;j++){const a=i*L+j,b=i*L+(j+1)%L;F.push([a,b,b+L,a+L]);}}
+ else if(t==='cylinder'||t==='cone'){const N=16;for(let i=0;i<N;i++){const a=2*Math.PI*i/N;V.push([Math.cos(a),-1,Math.sin(a)],[t==='cone'?0:Math.cos(a),1,t==='cone'?0:Math.sin(a)]);}const T=V.length,B=V.length+1;V.push([0,1,0],[0,-1,0]);for(let i=0;i<N;i++){const a=2*i,b=2*((i+1)%N);F.push([a,b,b+1,a+1]);if(t==='cylinder')F.push([T,a+1,b+1]);F.push([B,b,a]);}}
+ else if(t==='plane'){V.push([-1,0,-1],[1,0,-1],[1,0,1],[-1,0,1]);F.push([0,1,2,3]);}
+ else if(t==='torus'){const A=14,B=8,R=.75,r=.3;for(let i=0;i<A;i++)for(let j=0;j<B;j++){const u=2*Math.PI*i/A,v=2*Math.PI*j/B;V.push([(R+r*Math.cos(v))*Math.cos(u),r*Math.sin(v),(R+r*Math.cos(v))*Math.sin(u)]);}for(let i=0;i<A;i++)for(let j=0;j<B;j++){const a=i*B+j,b=i*B+(j+1)%B,d=((i+1)%A)*B+j,e=((i+1)%A)*B+(j+1)%B;F.push([a,b,e,d]);}}
+ else{V.push([-1,-1,-1],[1,-1,-1],[1,-1,1],[-1,-1,1],[0,1,0]);F.push([0,1,2,3],[0,1,4],[1,2,4],[2,3,4],[3,0,4]);}
+ return {V,F};}
+const C={};function G(t){return C[t]||(C[t]=make(t));}
+function rot(p,r){let[a,b,d]=p;let c=Math.cos(r[0]),s=Math.sin(r[0]);[b,d]=[b*c-d*s,b*s+d*c];c=Math.cos(r[1]);s=Math.sin(r[1]);[a,d]=[a*c+d*s,-a*s+d*c];c=Math.cos(r[2]);s=Math.sin(r[2]);[a,b]=[a*c-b*s,a*s+b*c];return[a,b,d];}
+function wp(o,p){const q=rot([p[0]*o.scale[0],p[1]*o.scale[1],p[2]*o.scale[2]],o.rot);return[q[0]+o.pos[0],q[1]+o.pos[1],q[2]+o.pos[2]];}
+function cp(p){const q=rot(p,[pitch,yaw,0]);return[q[0],q[1],q[2]+dist];}
+function pr(p,w,h){const q=cp(p),z=Math.max(.15,q[2]),f=Math.min(w,h)*.92/z;return[w/2+q[0]*f,h/2-q[1]*f,z];}
+function nrm(a,b,c){const u=[b[0]-a[0],b[1]-a[1],b[2]-a[2]],v=[c[0]-a[0],c[1]-a[1],c[2]-a[2]],n=[u[1]*v[2]-u[2]*v[1],u[2]*v[0]-u[0]*v[2],u[0]*v[1]-u[1]*v[0]],l=Math.hypot(...n)||1;return[n[0]/l,n[1]/l,n[2]/l];}
+function sh(h,k){const s=h.replace('#','');const r=parseInt(s.slice(0,2),16),g=parseInt(s.slice(2,4),16),b=parseInt(s.slice(4,6),16);return'rgb('+Math.min(255,r*k|0)+','+Math.min(255,g*k|0)+','+Math.min(255,b*k|0)+')';}
+function draw(){const d=Math.min(2,devicePixelRatio||1),w=c.clientWidth,h=c.clientHeight;c.width=w*d;c.height=h*d;x.setTransform(d,0,0,d,0,0);x.fillStyle='#0b0f16';x.fillRect(0,0,w,h);
+ x.strokeStyle='rgba(120,150,190,.16)';x.lineWidth=1;for(let i=-5;i<=5;i++){const a=pr([i,-1.6,-5],w,h),b=pr([i,-1.6,5],w,h),e=pr([-5,-1.6,i],w,h),f=pr([5,-1.6,i],w,h);x.beginPath();x.moveTo(a[0],a[1]);x.lineTo(b[0],b[1]);x.moveTo(e[0],e[1]);x.lineTo(f[0],f[1]);x.stroke();}
+ const P=[];for(const o of(SCENE.objects||[])){const gm=G(o.type),pts=gm.V.map(p=>wp(o,p));for(const F of gm.F){const face=F.map(i=>pts[i]);const z=face.reduce((n,p)=>n+cp(p)[2],0)/face.length;const n=rot(nrm(face[0],face[1],face[2]),[pitch,yaw,0]);const dot=n[0]*.35+n[1]*.72+n[2]*.6;P.push({z,face,k:.24+.78*Math.max(0,dot),o});}}
+ P.sort((a,b)=>b.z-a.z);for(const p of P){const q=p.face.map(v=>pr(v,w,h));x.beginPath();x.moveTo(q[0][0],q[0][1]);for(let i=1;i<q.length;i++)x.lineTo(q[i][0],q[i][1]);x.closePath();const k=.2+.8*Math.max(0,p.k-.2);x.fillStyle=sh(p.o.color,k);x.fill();x.strokeStyle='rgba(0,0,0,.28)';x.lineWidth=.7;x.stroke();}
+ if(auto&&!drag)yaw+=.0025;requestAnimationFrame(draw);}
+c.addEventListener('pointerdown',e=>{drag={x:e.clientX,y:e.clientY,yaw,pitch};auto=false;c.setPointerCapture(e.pointerId);});
+c.addEventListener('pointermove',e=>{if(!drag)return;yaw=drag.yaw+(e.clientX-drag.x)*.008;pitch=Math.max(-1.4,Math.min(1.4,drag.pitch+(e.clientY-drag.y)*.008));});
+c.addEventListener('pointerup',()=>drag=null);
+c.addEventListener('wheel',e=>{e.preventDefault();dist=Math.max(3,Math.min(24,dist+e.deltaY*.012));},{passive:false});
+draw();
+<\/script></body></html>`;
+  }
+  function exportToProject() {
+    const scene = getScene();
+    write("scene.json", JSON.stringify(scene, null, 2));
+    write("3d.html", standaloneHtml(scene));
+    emit("files:changed", { path: "3d.html" });
+    toast("\u0421\u0446\u0435\u043D\u0430 \u0441\u043E\u0445\u0440\u0430\u043D\u0435\u043D\u0430: scene.json \u0438 3d.html", "ok");
+    ctx.openFile?.("3d.html");
+  }
+  function openThreeDWindow() {
+    if (!host) return null;
+    ctx.selectRailTab?.("three");
+    return ctx.movePanelWindow?.(host, { id: "win-three", title: "3D-\u0440\u0435\u0434\u0430\u043A\u0442\u043E\u0440", icon: "cube", width: 800, height: 540 });
+  }
+  function threeDSummary() {
+    return { objects: objects.length, selected };
+  }
+  var TYPES, DEFAULT_COLORS, host, canvas, g, objects, selected, cam, showGrid, wire, dirty, drag, panelRefs, CACHE;
+  var init_threeD = __esm({
+    "app/src/core/threeD.js"() {
+      init_core();
+      init_state();
+      init_icons();
+      TYPES = [
+        { id: "cube", name: "\u041A\u0443\u0431", icon: "cube" },
+        { id: "sphere", name: "\u0421\u0444\u0435\u0440\u0430", icon: "globe" },
+        { id: "cylinder", name: "\u0426\u0438\u043B\u0438\u043D\u0434\u0440", icon: "database" },
+        { id: "cone", name: "\u041A\u043E\u043D\u0443\u0441", icon: "target" },
+        { id: "plane", name: "\u041F\u043B\u043E\u0441\u043A\u043E\u0441\u0442\u044C", icon: "layers" },
+        { id: "torus", name: "\u0422\u043E\u0440", icon: "refresh" }
+      ];
+      DEFAULT_COLORS = ["#4f8ff7", "#d97757", "#47a37c", "#d9b268", "#b48ce0", "#77b6d6"];
+      host = null;
+      canvas = null;
+      g = null;
+      objects = [];
+      selected = null;
+      cam = { yaw: 0.7, pitch: 0.45, dist: 7.5 };
+      showGrid = true;
+      wire = false;
+      dirty = true;
+      drag = null;
+      panelRefs = {};
+      CACHE = {};
     }
-    return toB64u(bytes);
-  }
-  async function decodeShare(code2, password = null) {
-    if (typeof code2 !== "string" || !code2 || code2.length > MAX_SHARE_CODE || !/^[A-Za-z0-9._-]+$/.test(code2))
-      throw new Error("\u041D\u0435\u043A\u043E\u0440\u0440\u0435\u043A\u0442\u043D\u0430\u044F \u0441\u0441\u044B\u043B\u043A\u0430");
-    let bytes;
-    if (code2.startsWith("E")) {
-      if (!password) {
-        const e = new Error("\u0422\u0440\u0435\u0431\u0443\u0435\u0442\u0441\u044F \u043F\u0430\u0440\u043E\u043B\u044C");
-        e.code = "PASSWORD_REQUIRED";
-        throw e;
-      }
-      const parts = code2.slice(1).split(".");
-      if (parts.length !== 3) throw new Error("\u041F\u043E\u0432\u0440\u0435\u0436\u0434\u0451\u043D\u043D\u0430\u044F \u0441\u0441\u044B\u043B\u043A\u0430");
-      const salt = fromB64u(parts[0]), iv = fromB64u(parts[1]), cipher = fromB64u(parts[2]);
-      if (salt.length !== 16 || iv.length !== 12 || cipher.length > MAX_SHARE_JSON) throw new Error("\u041F\u043E\u0432\u0440\u0435\u0436\u0434\u0451\u043D\u043D\u0430\u044F \u0441\u0441\u044B\u043B\u043A\u0430");
-      const key = await shareKey(String(password).slice(0, 200), salt);
-      try {
-        bytes = new Uint8Array(await crypto.subtle.decrypt({ name: "AES-GCM", iv }, key, cipher));
-      } catch (_) {
-        throw new Error("\u041D\u0435\u0432\u0435\u0440\u043D\u044B\u0439 \u043F\u0430\u0440\u043E\u043B\u044C");
-      }
-    } else bytes = fromB64u(code2);
-    if (bytes.length > MAX_SHARE_JSON) throw new Error("\u0421\u0441\u044B\u043B\u043A\u0430 \u0441\u043B\u0438\u0448\u043A\u043E\u043C \u0431\u043E\u043B\u044C\u0448\u0430\u044F");
-    const out = inflateSync(bytes, { out: new Uint8Array(MAX_SHARE_JSON) });
-    const json2 = strFromU8(out);
-    if (json2.length > MAX_SHARE_JSON) throw new Error("\u041F\u0440\u043E\u0435\u043A\u0442 \u0441\u043B\u0438\u0448\u043A\u043E\u043C \u0431\u043E\u043B\u044C\u0448\u043E\u0439");
-    return validateShared(JSON.parse(json2));
-  }
-  function askPassword() {
-    return new Promise((resolve) => {
-      const overlay = document.createElement("div");
-      overlay.style.cssText = "position:fixed;inset:0;z-index:99999;display:grid;place-items:center;background:rgba(4,5,14,.88);font:14px system-ui;color:#fff";
-      const card = document.createElement("div");
-      card.style.cssText = "background:#181b2c;border:1px solid #ffffff22;border-radius:20px;padding:24px;width:min(380px,92vw);box-shadow:0 20px 60px #0008";
-      const h = document.createElement("h2");
-      h.textContent = "\u{1F512} \u041F\u0440\u043E\u0435\u043A\u0442 \u0437\u0430\u0449\u0438\u0449\u0451\u043D \u043F\u0430\u0440\u043E\u043B\u0435\u043C";
-      h.style.cssText = "margin:0 0 8px;font-size:18px";
-      const p = document.createElement("p");
-      p.textContent = "\u0421\u0441\u044B\u043B\u043A\u0430 \u0437\u0430\u0448\u0438\u0444\u0440\u043E\u0432\u0430\u043D\u0430 AES-GCM. \u0412\u0432\u0435\u0434\u0438\u0442\u0435 \u043F\u0430\u0440\u043E\u043B\u044C, \u0447\u0442\u043E\u0431\u044B \u043E\u0442\u043A\u0440\u044B\u0442\u044C \u043F\u0440\u043E\u0435\u043A\u0442.";
-      p.style.cssText = "color:#979cb9;font-size:12px;line-height:1.5";
-      const input = document.createElement("input");
-      input.type = "password";
-      input.placeholder = "\u041F\u0430\u0440\u043E\u043B\u044C";
-      input.style.cssText = "width:100%;height:38px;border-radius:11px;border:1px solid #ffffff33;background:#121424;color:#fff;padding:0 12px;outline:0";
-      const row = document.createElement("div");
-      row.style.cssText = "display:flex;gap:8px;margin-top:12px";
-      const ok = document.createElement("button");
-      ok.textContent = "\u041E\u0442\u043A\u0440\u044B\u0442\u044C";
-      ok.style.cssText = "flex:1;height:36px;border:0;border-radius:11px;background:#7c6cf6;color:#fff;font-weight:700";
-      const cancel = document.createElement("button");
-      cancel.textContent = "\u041E\u0442\u043C\u0435\u043D\u0430";
-      cancel.style.cssText = "height:36px;padding:0 14px;border:1px solid #ffffff33;border-radius:11px;background:transparent;color:#ccc";
-      const finish = (v) => {
-        overlay.remove();
-        resolve(v);
-      };
-      ok.onclick = () => finish(input.value);
-      cancel.onclick = () => finish("");
-      input.onkeydown = (e) => {
-        if (e.key === "Enter") finish(input.value);
-        if (e.key === "Escape") finish("");
-      };
-      row.append(ok, cancel);
-      card.append(h, p, input, row);
-      overlay.appendChild(card);
-      document.body.appendChild(overlay);
-      input.focus();
-    });
-  }
-  function setReadOnly(v) {
-    state.readOnly = !!v;
-    emit("readOnly:changed", state.readOnly);
-  }
+  });
+
+  // app/src/main.js
+  init_core();
+  init_state();
 
   // node_modules/@marijn/find-cluster-break/src/index.js
   var rangeFrom = [];
@@ -8258,11 +8940,11 @@ reset.addEventListener('click', () => {
     if (addr & 1)
       return 2;
     let idx = addr >> 1;
-    let status = state2.status[idx];
-    if (status == 4)
+    let status2 = state2.status[idx];
+    if (status2 == 4)
       throw new Error("Cyclic dependency between fields and/or facets");
-    if (status & 2)
-      return status;
+    if (status2 & 2)
+      return status2;
     state2.status[idx] = 4;
     let changed = state2.computeSlot(state2, state2.config.dynamicSlots[idx]);
     return state2.status[idx] = 2 | changed;
@@ -8952,12 +9634,12 @@ reset.addEventListener('click', () => {
     let result = {};
     for (let config2 of configs)
       for (let key of Object.keys(config2)) {
-        let value = config2[key], current2 = result[key];
-        if (current2 === void 0)
+        let value = config2[key], current3 = result[key];
+        if (current3 === void 0)
           result[key] = value;
-        else if (current2 === value || value === void 0) ;
+        else if (current3 === value || value === void 0) ;
         else if (Object.hasOwnProperty.call(combine, key))
-          result[key] = combine[key](current2, value);
+          result[key] = combine[key](current3, value);
         else
           throw new Error("Config merge conflict for field " + key);
       }
@@ -9320,8 +10002,8 @@ reset.addEventListener('click', () => {
         return _RangeSet.empty;
       let result = last(sets);
       for (let i4 = sets.length - 2; i4 >= 0; i4--) {
-        for (let layer2 = sets[i4]; layer2 != _RangeSet.empty; layer2 = layer2.nextLayer)
-          result = new _RangeSet(layer2.chunkPos, layer2.chunk, result, Math.max(layer2.maxPoint, result.maxPoint));
+        for (let layer3 = sets[i4]; layer3 != _RangeSet.empty; layer3 = layer3.nextLayer)
+          result = new _RangeSet(layer3.chunkPos, layer3.chunk, result, Math.max(layer3.maxPoint, result.maxPoint));
       }
       return result;
     }
@@ -9461,8 +10143,8 @@ reset.addEventListener('click', () => {
     return shared;
   }
   var LayerCursor = class {
-    constructor(layer2, skip, minPoint, rank = 0) {
-      this.layer = layer2;
+    constructor(layer3, skip, minPoint, rank = 0) {
+      this.layer = layer3;
       this.skip = skip;
       this.minPoint = minPoint;
       this.rank = rank;
@@ -14881,10 +15563,10 @@ reset.addEventListener('click', () => {
     }
   };
   var isFocusChange = /* @__PURE__ */ Annotation.define();
-  function focusChangeTransaction(state2, focus) {
+  function focusChangeTransaction(state2, focus2) {
     let effects = [];
     for (let getEffect of state2.facet(focusChangeEffect)) {
-      let effect = getEffect(state2, focus);
+      let effect = getEffect(state2, focus2);
       if (effect)
         effects.push(effect);
     }
@@ -14892,9 +15574,9 @@ reset.addEventListener('click', () => {
   }
   function updateForFocusChange(view) {
     setTimeout(() => {
-      let focus = view.hasFocus;
-      if (focus != view.inputState.notifiedFocused) {
-        let tr = focusChangeTransaction(view.state, focus);
+      let focus2 = view.hasFocus;
+      if (focus2 != view.inputState.notifiedFocused) {
+        let tr = focusChangeTransaction(view.state, focus2);
         if (tr)
           view.dispatch(tr);
         else
@@ -16073,7 +16755,7 @@ reset.addEventListener('click', () => {
     // since actual DOM coordinates aren't always available and
     // predictable. Relies on generous margins (see LG.Margin) to hide
     // the artifacts this might produce from the user.
-    ensureLineGaps(current2, mayMeasure) {
+    ensureLineGaps(current3, mayMeasure) {
       let wrapping = this.heightOracle.lineWrapping;
       let margin = wrapping ? 1e4 : 2e3, halfMargin = margin >> 1, doubleMargin = margin << 1;
       if (this.defaultTextDirection != Direction.LTR && !wrapping)
@@ -16092,7 +16774,7 @@ reset.addEventListener('click', () => {
             return;
           }
         }
-        let gap = find(current2, (gap2) => gap2.from >= line.from && gap2.to <= line.to && Math.abs(gap2.from - from) < halfMargin && Math.abs(gap2.to - to) < halfMargin && !avoid.some((pos) => gap2.from < pos && gap2.to > pos));
+        let gap = find(current3, (gap2) => gap2.from >= line.from && gap2.to <= line.to && Math.abs(gap2.from - from) < halfMargin && Math.abs(gap2.to - to) < halfMargin && !avoid.some((pos) => gap2.from < pos && gap2.to > pos));
         if (!gap) {
           if (to < line.to && mayMeasure && wrapping && mayMeasure.visibleRanges.some((r) => r.from <= to && r.to >= to)) {
             let lineStart = mayMeasure.moveToLineBoundary(EditorSelection.cursor(to), false, true).head;
@@ -16132,7 +16814,7 @@ reset.addEventListener('click', () => {
           let marginWidth = margin * this.heightOracle.charWidth;
           let horizOffset = 0;
           if (totalWidth > 2e6)
-            for (let old of current2) {
+            for (let old of current3) {
               if (old.from >= line.from && old.from < line.to && old.size != old.displaySize && old.from * this.heightOracle.charWidth + horizOffset < this.pixelViewport.left)
                 horizOffset = old.size - old.displaySize;
             }
@@ -16785,7 +17467,7 @@ reset.addEventListener('click', () => {
       }, 500);
     }
     updateGaps(gaps) {
-      if (this.gapIntersection && (gaps.length != this.gaps.length || this.gaps.some((g, i4) => g != gaps[i4]))) {
+      if (this.gapIntersection && (gaps.length != this.gaps.length || this.gaps.some((g2, i4) => g2 != gaps[i4]))) {
         this.gapIntersection.disconnect();
         for (let gap of gaps)
           this.gapIntersection.observe(gap);
@@ -17455,13 +18137,13 @@ reset.addEventListener('click', () => {
         this.viewState.state = state2;
         return;
       }
-      let focus = this.hasFocus, focusFlag = 0, dispatchFocus = null;
+      let focus2 = this.hasFocus, focusFlag = 0, dispatchFocus = null;
       if (transactions.some((tr) => tr.annotation(isFocusChange))) {
-        this.inputState.notifiedFocused = focus;
+        this.inputState.notifiedFocused = focus2;
         focusFlag = 1;
-      } else if (focus != this.inputState.notifiedFocused) {
-        this.inputState.notifiedFocused = focus;
-        dispatchFocus = focusChangeTransaction(state2, focus);
+      } else if (focus2 != this.inputState.notifiedFocused) {
+        this.inputState.notifiedFocused = focus2;
+        dispatchFocus = focusChangeTransaction(state2, focus2);
         if (!dispatchFocus)
           focusFlag = 1;
       }
@@ -18390,10 +19072,10 @@ reset.addEventListener('click', () => {
     let bound = /* @__PURE__ */ Object.create(null);
     let isPrefix = /* @__PURE__ */ Object.create(null);
     let checkPrefix = (name2, is) => {
-      let current2 = isPrefix[name2];
-      if (current2 == null)
+      let current3 = isPrefix[name2];
+      if (current3 == null)
         isPrefix[name2] = is;
-      else if (current2 != is)
+      else if (current3 != is)
         throw new Error("Key binding " + name2 + " is used both as a regular binding and as a multi-stroke prefix");
     };
     let add2 = (scope, key, command2, preventDefault, stopPropagation) => {
@@ -18662,25 +19344,25 @@ reset.addEventListener('click', () => {
     return a.constructor == b.constructor && a.eq(b);
   }
   var LayerView = class {
-    constructor(view, layer2) {
+    constructor(view, layer3) {
       this.view = view;
-      this.layer = layer2;
+      this.layer = layer3;
       this.drawn = [];
       this.scaleX = 1;
       this.scaleY = 1;
       this.measureReq = { read: this.measure.bind(this), write: this.draw.bind(this) };
       this.dom = view.scrollDOM.appendChild(document.createElement("div"));
       this.dom.classList.add("cm-layer");
-      if (layer2.above)
+      if (layer3.above)
         this.dom.classList.add("cm-layer-above");
-      if (layer2.class)
-        this.dom.classList.add(layer2.class);
+      if (layer3.class)
+        this.dom.classList.add(layer3.class);
       this.scale();
       this.dom.setAttribute("aria-hidden", "true");
       this.setOrder(view.state);
       view.requestMeasure(this.measureReq);
-      if (layer2.mount)
-        layer2.mount(this.dom, view);
+      if (layer3.mount)
+        layer3.mount(this.dom, view);
     }
     update(update) {
       if (update.startState.facet(layerOrder) != update.state.facet(layerOrder))
@@ -19651,8 +20333,8 @@ reset.addEventListener('click', () => {
     }
   });
   function setLeftStyle(elt2, value) {
-    let current2 = parseInt(elt2.style.left, 10);
-    if (isNaN(current2) || Math.abs(value - current2) > 1)
+    let current3 = parseInt(elt2.style.left, 10);
+    if (isNaN(current3) || Math.abs(value - current3) > 1)
       elt2.style.left = value + "px";
   }
   var baseTheme = /* @__PURE__ */ EditorView.baseTheme({
@@ -20275,7 +20957,7 @@ reset.addEventListener('click', () => {
     if (config2.class)
       panel.className = config2.class;
     panel.classList.add("cm-dialog");
-    let focus = typeof config2.focus == "string" ? content2.querySelector(config2.focus) : config2.focus ? content2.querySelector("input") || content2.querySelector("button") : null;
+    let focus2 = typeof config2.focus == "string" ? content2.querySelector(config2.focus) : config2.focus ? content2.querySelector("input") || content2.querySelector("button") : null;
     function done(form) {
       if (panel.contains(panel.ownerDocument.activeElement))
         view.focus();
@@ -20285,11 +20967,11 @@ reset.addEventListener('click', () => {
       dom: panel,
       top: config2.top,
       mount: () => {
-        if (focus) {
-          if ("select" in focus)
-            focus.select();
-          else if ("focus" in focus)
-            focus.focus();
+        if (focus2) {
+          if ("select" in focus2)
+            focus2.select();
+          else if ("focus" in focus2)
+            focus2.focus();
         }
       },
       destroy: () => result(null)
@@ -20466,16 +21148,16 @@ reset.addEventListener('click', () => {
             gutters2.push(this.gutters[known]);
           }
         }
-        for (let g of this.gutters) {
-          g.dom.remove();
-          if (gutters2.indexOf(g) < 0)
-            g.destroy();
+        for (let g2 of this.gutters) {
+          g2.dom.remove();
+          if (gutters2.indexOf(g2) < 0)
+            g2.destroy();
         }
-        for (let g of gutters2) {
-          if (g.config.side == "after")
-            this.getDOMAfter().appendChild(g.dom);
+        for (let g2 of gutters2) {
+          if (g2.config.side == "after")
+            this.getDOMAfter().appendChild(g2.dom);
           else
-            this.dom.appendChild(g.dom);
+            this.dom.appendChild(g2.dom);
         }
         this.gutters = gutters2;
       }
@@ -21245,15 +21927,15 @@ reset.addEventListener('click', () => {
     @internal
     */
     findChild(startIndex, endIndex, dir, pos, side) {
-      let { buffer } = this, pick = -1;
+      let { buffer } = this, pick2 = -1;
       for (let i4 = startIndex; i4 != endIndex; i4 = buffer[i4 + 3]) {
         if (checkSide(side, pos, buffer[i4 + 1], buffer[i4 + 2])) {
-          pick = i4;
+          pick2 = i4;
           if (dir > 0)
             break;
         }
       }
-      return pick;
+      return pick2;
     }
     /**
     @internal
@@ -21648,20 +22330,20 @@ reset.addEventListener('click', () => {
   function iterStack(heads) {
     if (!heads.length)
       return null;
-    let pick = 0, picked = heads[0];
+    let pick2 = 0, picked = heads[0];
     for (let i4 = 1; i4 < heads.length; i4++) {
       let node = heads[i4];
       if (node.from > picked.from || node.to < picked.to) {
         picked = node;
-        pick = i4;
+        pick2 = i4;
       }
     }
     let next = picked instanceof TreeNode && picked.index < 0 ? null : picked.parent;
     let newHeads = heads.slice();
     if (next)
-      newHeads[pick] = next;
+      newHeads[pick2] = next;
     else
-      newHeads.splice(pick, 1);
+      newHeads.splice(pick2, 1);
     return new StackIterator(newHeads, picked);
   }
   var StackIterator = class {
@@ -22763,17 +23445,17 @@ reset.addEventListener('click', () => {
     }
   };
   function punchRanges(outer, ranges) {
-    let copy2 = null, current2 = ranges;
+    let copy2 = null, current3 = ranges;
     for (let i4 = 1, j = 0; i4 < outer.length; i4++) {
       let gapFrom = outer[i4 - 1].to, gapTo = outer[i4].from;
-      for (; j < current2.length; j++) {
-        let r = current2[j];
+      for (; j < current3.length; j++) {
+        let r = current3[j];
         if (r.from >= gapTo)
           break;
         if (r.to <= gapFrom)
           continue;
         if (!copy2)
-          current2 = copy2 = ranges.slice();
+          current3 = copy2 = ranges.slice();
         if (r.from < gapFrom) {
           copy2[j] = new Range2(r.from, gapFrom);
           if (r.to > gapTo)
@@ -22785,7 +23467,7 @@ reset.addEventListener('click', () => {
         }
       }
     }
-    return current2;
+    return current3;
   }
   function findCoverChanges(a, b, from, to) {
     let iA = 0, iB = 0, inA = false, inB = false, pos = -1e9;
@@ -24125,13 +24807,13 @@ reset.addEventListener('click', () => {
     Create a language description.
     */
     static of(spec) {
-      let { load, support } = spec;
-      if (!load) {
+      let { load: load2, support } = spec;
+      if (!load2) {
         if (!support)
           throw new RangeError("Must pass either 'load' or 'support' to LanguageDescription.of");
-        load = () => Promise.resolve(support);
+        load2 = () => Promise.resolve(support);
       }
-      return new _LanguageDescription(spec.name, (spec.alias || []).concat(spec.name).map((s) => s.toLowerCase()), spec.extensions || [], spec.filename, load, support);
+      return new _LanguageDescription(spec.name, (spec.alias || []).concat(spec.name).map((s) => s.toLowerCase()), spec.extensions || [], spec.filename, load2, support);
     }
     /**
     Look for a language in the given array of descriptions that
@@ -27047,8 +27729,8 @@ reset.addEventListener('click', () => {
         while (i4 < l - 1 && to > ranges[i4 + 1].from - 2 * 250)
           to = ranges[++i4].to;
         query.highlight(view.state, from, to, (from2, to2) => {
-          let selected = view.state.selection.ranges.some((r) => r.from == from2 && r.to == to2);
-          builder.add(from2, to2, selected ? selectedMatchMark : matchMark);
+          let selected2 = view.state.selection.ranges.some((r) => r.from == from2 && r.to == to2);
+          builder.add(from2, to2, selected2 ? selectedMatchMark : matchMark);
         });
       }
       return builder.finish();
@@ -27782,12 +28464,12 @@ reset.addEventListener('click', () => {
     if (config2.icons)
       content2.push({
         render(completion) {
-          let icon = document.createElement("div");
-          icon.classList.add("cm-completionIcon");
+          let icon2 = document.createElement("div");
+          icon2.classList.add("cm-completionIcon");
           if (completion.type)
-            icon.classList.add(...completion.type.split(/\s+/g).map((cls) => "cm-completionIcon-" + cls));
-          icon.setAttribute("aria-hidden", "true");
-          return icon;
+            icon2.classList.add(...completion.type.split(/\s+/g).map((cls) => "cm-completionIcon-" + cls));
+          icon2.setAttribute("aria-hidden", "true");
+          return icon2;
         },
         position: 20
       });
@@ -27823,16 +28505,16 @@ reset.addEventListener('click', () => {
     });
     return content2.sort((a, b) => a.position - b.position).map((a) => a.render);
   }
-  function rangeAroundSelected(total, selected, max2) {
+  function rangeAroundSelected(total, selected2, max2) {
     if (total <= max2)
       return { from: 0, to: total };
-    if (selected < 0)
-      selected = 0;
-    if (selected <= total >> 1) {
-      let off3 = Math.floor(selected / max2);
+    if (selected2 < 0)
+      selected2 = 0;
+    if (selected2 <= total >> 1) {
+      let off3 = Math.floor(selected2 / max2);
       return { from: off3 * max2, to: (off3 + 1) * max2 };
     }
-    let off2 = Math.ceil((total - selected) / max2);
+    let off2 = Math.ceil((total - selected2) / max2);
     return { from: total - off2 * max2, to: total - (off2 - 1) * max2 };
   }
   var CompletionTooltip = class {
@@ -27850,12 +28532,12 @@ reset.addEventListener('click', () => {
       this.space = null;
       this.currentClass = "";
       let cState = view.state.field(stateField);
-      let { options, selected } = cState.open;
+      let { options, selected: selected2 } = cState.open;
       let config2 = view.state.facet(completionConfig);
       this.optionContent = optionContent(config2);
       this.optionClass = config2.optionClass;
       this.tooltipClass = config2.tooltipClass;
-      this.range = rangeAroundSelected(options.length, selected, config2.maxRenderedOptions);
+      this.range = rangeAroundSelected(options.length, selected2, config2.maxRenderedOptions);
       this.dom = document.createElement("div");
       this.dom.className = "cm-tooltip-autocomplete";
       this.updateTooltipClass(view.state);
@@ -27901,9 +28583,9 @@ reset.addEventListener('click', () => {
       let prevState = update.startState.field(this.stateField);
       this.updateTooltipClass(update.state);
       if (cState != prevState) {
-        let { options, selected, disabled } = cState.open;
+        let { options, selected: selected2, disabled } = cState.open;
         if (!prevState.open || prevState.open.options != options) {
-          this.range = rangeAroundSelected(options.length, selected, update.state.facet(completionConfig).maxRenderedOptions);
+          this.range = rangeAroundSelected(options.length, selected2, update.state.facet(completionConfig).maxRenderedOptions);
           this.showOptions(options, cState.id);
         }
         this.updateSel();
@@ -27971,12 +28653,12 @@ reset.addEventListener('click', () => {
       this.dom.appendChild(wrap2);
       this.view.requestMeasure(this.placeInfoReq);
     }
-    updateSelectedOption(selected) {
+    updateSelectedOption(selected2) {
       let set = null;
       for (let opt = this.list.firstChild, i4 = this.range.from; opt; opt = opt.nextSibling, i4++) {
         if (opt.nodeName != "LI" || !opt.id) {
           i4--;
-        } else if (i4 == selected) {
+        } else if (i4 == selected2) {
           if (!opt.hasAttribute("aria-selected")) {
             opt.setAttribute("aria-selected", "true");
             set = opt;
@@ -28156,16 +28838,16 @@ reset.addEventListener('click', () => {
     return result;
   }
   var CompletionDialog = class _CompletionDialog {
-    constructor(options, attrs, tooltip, timestamp, selected, disabled) {
+    constructor(options, attrs, tooltip, timestamp, selected2, disabled) {
       this.options = options;
       this.attrs = attrs;
       this.tooltip = tooltip;
       this.timestamp = timestamp;
-      this.selected = selected;
+      this.selected = selected2;
       this.disabled = disabled;
     }
-    setSelected(selected, id2) {
-      return selected == this.selected || selected >= this.options.length ? this : new _CompletionDialog(this.options, makeAttrs(id2, selected), this.tooltip, this.timestamp, selected, this.disabled);
+    setSelected(selected2, id2) {
+      return selected2 == this.selected || selected2 >= this.options.length ? this : new _CompletionDialog(this.options, makeAttrs(id2, selected2), this.tooltip, this.timestamp, selected2, this.disabled);
     }
     static build(active, state2, id2, prev, conf, didSetActive) {
       if (prev && !didSetActive && active.some((s) => s.isPending))
@@ -28173,20 +28855,20 @@ reset.addEventListener('click', () => {
       let options = sortOptions(active, state2);
       if (!options.length)
         return prev && active.some((a) => a.isPending) ? prev.setDisabled() : null;
-      let selected = state2.facet(completionConfig).selectOnOpen ? 0 : -1;
-      if (prev && prev.selected != selected && prev.selected != -1) {
+      let selected2 = state2.facet(completionConfig).selectOnOpen ? 0 : -1;
+      if (prev && prev.selected != selected2 && prev.selected != -1) {
         let selectedValue = prev.options[prev.selected].completion;
         for (let i4 = 0; i4 < options.length; i4++)
           if (options[i4].completion == selectedValue) {
-            selected = i4;
+            selected2 = i4;
             break;
           }
       }
-      return new _CompletionDialog(options, makeAttrs(id2, selected), {
+      return new _CompletionDialog(options, makeAttrs(id2, selected2), {
         pos: active.reduce((a, b) => b.hasResult() ? Math.min(a, b.from) : a, 1e8),
         create: createTooltip,
         above: conf.aboveCursor
-      }, prev ? prev.timestamp : Date.now(), selected, false);
+      }, prev ? prev.timestamp : Date.now(), selected2, false);
     }
     map(changes) {
       return new _CompletionDialog(this.options, this.attrs, { ...this.tooltip, pos: changes.mapPos(this.tooltip.pos) }, this.timestamp, this.selected, this.disabled);
@@ -28264,14 +28946,14 @@ reset.addEventListener('click', () => {
     "aria-autocomplete": "list"
   };
   var noAttrs2 = {};
-  function makeAttrs(id2, selected) {
+  function makeAttrs(id2, selected2) {
     let result = {
       "aria-autocomplete": "list",
       "aria-haspopup": "listbox",
       "aria-controls": id2
     };
-    if (selected > -1)
-      result["aria-activedescendant"] = id2 + "-" + selected;
+    if (selected2 > -1)
+      result["aria-activedescendant"] = id2 + "-" + selected2;
     return result;
   }
   var none3 = [];
@@ -28434,12 +29116,12 @@ reset.addEventListener('click', () => {
       if (by == "page" && (tooltip = getTooltip(view, cState.open.tooltip)))
         step2 = Math.max(2, Math.floor(tooltip.dom.offsetHeight / tooltip.dom.querySelector("li").offsetHeight) - 1);
       let { length } = cState.open.options;
-      let selected = cState.open.selected > -1 ? cState.open.selected + step2 * (forward ? 1 : -1) : forward ? 0 : length - 1;
-      if (selected < 0)
-        selected = by == "page" ? 0 : length - 1;
-      else if (selected >= length)
-        selected = by == "page" ? length - 1 : 0;
-      view.dispatch({ effects: setSelectedEffect.of(selected) });
+      let selected2 = cState.open.selected > -1 ? cState.open.selected + step2 * (forward ? 1 : -1) : forward ? 0 : length - 1;
+      if (selected2 < 0)
+        selected2 = by == "page" ? 0 : length - 1;
+      else if (selected2 >= length)
+        selected2 = by == "page" ? length - 1 : 0;
+      view.dispatch({ effects: setSelectedEffect.of(selected2) });
       return true;
     };
   }
@@ -28519,7 +29201,7 @@ reset.addEventListener('click', () => {
       if (update.transactions.some((tr) => tr.effects.some((e) => e.is(startCompletionEffect))))
         this.pendingStart = true;
       let delay = this.pendingStart ? 50 : conf.activateOnTypingDelay;
-      this.debounceUpdate = cState.active.some((a) => a.isPending && !this.running.some((q2) => q2.active.source == a.source)) ? setTimeout(() => this.startUpdate(), delay) : -1;
+      this.debounceUpdate = cState.active.some((a) => a.isPending && !this.running.some((q) => q.active.source == a.source)) ? setTimeout(() => this.startUpdate(), delay) : -1;
       if (this.composing != 0)
         for (let tr of update.transactions) {
           if (tr.isUserEvent("input.type"))
@@ -28555,7 +29237,7 @@ reset.addEventListener('click', () => {
       });
     }
     scheduleAccept() {
-      if (this.running.every((q2) => q2.done !== void 0))
+      if (this.running.every((q) => q.done !== void 0))
         this.accept();
       else if (this.debounceAccept < 0)
         this.debounceAccept = setTimeout(() => this.accept(), this.view.state.facet(completionConfig).updateSyncTime);
@@ -28585,8 +29267,8 @@ reset.addEventListener('click', () => {
             continue;
           }
         }
-        let current2 = cState.active.find((a) => a.source == query.active.source);
-        if (current2 && current2.isPending) {
+        let current3 = cState.active.find((a) => a.source == query.active.source);
+        if (current3 && current3.isPending) {
           if (query.done == null) {
             let active = new ActiveSource(
               query.active.source,
@@ -28598,7 +29280,7 @@ reset.addEventListener('click', () => {
             if (!active.isPending)
               updated.push(active);
           } else {
-            this.startQuery(current2);
+            this.startQuery(current3);
           }
         }
       }
@@ -29245,10 +29927,10 @@ reset.addEventListener('click', () => {
     }
   };
   var LintState = class _LintState {
-    constructor(diagnostics, panel, selected) {
+    constructor(diagnostics, panel, selected2) {
       this.diagnostics = diagnostics;
       this.panel = panel;
-      this.selected = selected;
+      this.selected = selected2;
     }
     static init(diagnostics, panel, state2) {
       let diagnosticFilter = state2.facet(lintConfig).markerFilter;
@@ -29371,14 +30053,14 @@ reset.addEventListener('click', () => {
     },
     update(value, tr) {
       if (tr.docChanged && value.diagnostics.size) {
-        let mapped = value.diagnostics.map(tr.changes), selected = null, panel = value.panel;
+        let mapped = value.diagnostics.map(tr.changes), selected2 = null, panel = value.panel;
         if (value.selected) {
           let selPos = tr.changes.mapPos(value.selected.from, 1);
-          selected = findDiagnostic(mapped, value.selected.diagnostic, selPos) || findDiagnostic(mapped, null, selPos);
+          selected2 = findDiagnostic(mapped, value.selected.diagnostic, selPos) || findDiagnostic(mapped, null, selPos);
         }
         if (!mapped.size && panel && tr.state.facet(lintConfig).autoPanel)
           panel = null;
-        value = new LintState(mapped, panel, selected);
+        value = new LintState(mapped, panel, selected2);
       }
       for (let effect of tr.effects) {
         if (effect.is(setDiagnosticsEffect)) {
@@ -29678,16 +30360,16 @@ reset.addEventListener('click', () => {
       this.update();
     }
     get selectedIndex() {
-      let selected = this.view.state.field(lintState).selected;
-      if (!selected)
+      let selected2 = this.view.state.field(lintState).selected;
+      if (!selected2)
         return -1;
       for (let i4 = 0; i4 < this.items.length; i4++)
-        if (this.items[i4].diagnostic == selected.diagnostic)
+        if (this.items[i4].diagnostic == selected2.diagnostic)
           return i4;
       return -1;
     }
     update() {
-      let { diagnostics, selected } = this.view.state.field(lintState);
+      let { diagnostics, selected: selected2 } = this.view.state.field(lintState);
       let i4 = 0, needsSync = false, newSelectedItem = null;
       let seen = /* @__PURE__ */ new Set();
       diagnostics.between(0, this.view.state.doc.length, (_start, _end, { spec }) => {
@@ -29712,7 +30394,7 @@ reset.addEventListener('click', () => {
               needsSync = true;
             }
           }
-          if (selected && item.diagnostic == selected.diagnostic) {
+          if (selected2 && item.diagnostic == selected2.diagnostic) {
             if (!item.dom.hasAttribute("aria-selected")) {
               item.dom.setAttribute("aria-selected", "true");
               newSelectedItem = item;
@@ -30051,9 +30733,9 @@ reset.addEventListener('click', () => {
   var lintExtensions = [
     lintState,
     /* @__PURE__ */ EditorView.decorations.compute([lintState], (state2) => {
-      let { selected, panel } = state2.field(lintState);
-      return !selected || !panel || selected.from == selected.to ? Decoration.none : Decoration.set([
-        activeMark.range(selected.from, selected.to)
+      let { selected: selected2, panel } = state2.field(lintState);
+      return !selected2 || !panel || selected2.from == selected2.to ? Decoration.none : Decoration.set([
+        activeMark.range(selected2.from, selected2.to)
       ]);
     }),
     lintHover,
@@ -40733,8 +41415,8 @@ reset.addEventListener('click', () => {
     var pos = this.pos;
     for (var i4 = 0, list2 = chs; i4 < list2.length; i4 += 1) {
       var ch = list2[i4];
-      var current2 = this.at(pos, forceU);
-      if (current2 === -1 || current2 !== ch) {
+      var current3 = this.at(pos, forceU);
+      if (current3 === -1 || current3 !== ch) {
         return false;
       }
       pos = this.nextIndex(pos, forceU);
@@ -42795,6 +43477,8 @@ reset.addEventListener('click', () => {
 
   // app/src/core/editor.js
   var import_js_beautify = __toESM(require_js());
+  init_core();
+  init_state();
 
   // app/src/core/data.js
   var FEATURES = [
@@ -43205,7 +43889,7 @@ reset.addEventListener('click', () => {
       "\u0420\u0435\u0436\u0438\u043C \u043F\u0440\u0435\u043F\u043E\u0434\u0430\u0432\u0430\u0442\u0435\u043B\u044F",
       "\u0417\u0430\u043F\u0438\u0441\u044C \u0438 \u0432\u043E\u0441\u043F\u0440\u043E\u0438\u0437\u0432\u0435\u0434\u0435\u043D\u0438\u0435"
     ] },
-    { name: "XII. AI \u0438 \u0430\u0432\u0442\u043E\u043C\u0430\u0442\u0438\u0437\u0430\u0446\u0438\u044F", from: 386, items: [
+    { name: "XII. \u0410\u0432\u0442\u043E\u043C\u0430\u0442\u0438\u0437\u0430\u0446\u0438\u044F", from: 386, items: [
       "\u041A\u043E\u0434 \u043F\u043E \u043E\u043F\u0438\u0441\u0430\u043D\u0438\u044E",
       "HTML \u043F\u043E \u0441\u043A\u0440\u0438\u043D\u0448\u043E\u0442\u0443",
       "\u041E\u0431\u044A\u044F\u0441\u043D\u0435\u043D\u0438\u0435 \u0432\u044B\u0434\u0435\u043B\u0435\u043D\u043D\u043E\u0433\u043E \u043A\u043E\u0434\u0430",
@@ -43450,7 +44134,7 @@ reset.addEventListener('click', () => {
 </section>` },
     { id: "modal", cat: "html", name: "\u041C\u043E\u0434\u0430\u043B\u044C\u043D\u043E\u0435 \u043E\u043A\u043D\u043E", desc: "dialog + CSS + JS", code: `<button id="openModal">\u041E\u0442\u043A\u0440\u044B\u0442\u044C \u043C\u043E\u0434\u0430\u043B\u043A\u0443</button>
 <dialog id="modal" class="modal">
-  <form method="dialog"><button class="x" aria-label="\u0417\u0430\u043A\u0440\u044B\u0442\u044C">\u2715</button></form>
+  <form method="dialog"><button class="x" aria-label="\u0417\u0430\u043A\u0440\u044B\u0442\u044C"></button></form>
   <h2>\u0414\u0438\u0430\u043B\u043E\u0433</h2><p>\u041B\u044E\u0431\u043E\u0435 \u0441\u043E\u0434\u0435\u0440\u0436\u0438\u043C\u043E\u0435.</p>
 </dialog>
 <script>
@@ -43483,7 +44167,7 @@ reset.addEventListener('click', () => {
 <script>
   function notify(text){ const t = document.getElementById('toast');
     t.textContent = text; t.hidden = false; setTimeout(() => t.hidden = true, 2500); }
-  notify('\u041F\u0440\u0438\u0432\u0435\u0442 \u0438\u0437 Runlet \u{1F44B}');
+  notify('\u041F\u0440\u0438\u0432\u0435\u0442 \u0438\u0437 Runlet ');
 <\/script>` },
     { id: "skip", cat: "html", name: "\u0421\u043A\u0438\u043F-\u0441\u0441\u044B\u043B\u043A\u0430", desc: "\u0414\u043E\u0441\u0442\u0443\u043F\u043D\u043E\u0441\u0442\u044C: \u043F\u0440\u043E\u043F\u0443\u0441\u0442\u0438\u0442\u044C \u043A \u043A\u043E\u043D\u0442\u0435\u043D\u0442\u0443", code: `<a class="skip-link" href="#main">\u041F\u0435\u0440\u0435\u0439\u0442\u0438 \u043A \u0441\u043E\u0434\u0435\u0440\u0436\u0438\u043C\u043E\u043C\u0443</a>
 <main id="main" tabindex="-1">\u2026</main>
@@ -43660,8 +44344,8 @@ const users = Array.from({ length: 5 }, (_, i) => ({
 }));
 console.table(users);` },
     { id: "test", cat: "js", name: "\u041C\u0438\u043D\u0438-\u0442\u0435\u0441\u0442 \u0444\u0443\u043D\u043A\u0446\u0438\u0438", desc: "assert \u0431\u0435\u0437 \u0431\u0438\u0431\u043B\u0438\u043E\u0442\u0435\u043A", code: `function assert(condition, message) {
-  if (!condition) throw new Error('\u274C ' + message);
-  console.log('\u2705 ' + message);
+  if (!condition) throw new Error(' ' + message);
+  console.log(' ' + message);
 }
 assert(add(2, 3) === 5, '2 + 3 = 5');` }
   ];
@@ -43767,11 +44451,10 @@ assert(add(2, 3) === 5, '2 + 3 = 5');` }
     return "https://developer.mozilla.org/ru/docs/" + path;
   }
   var DEVICES = {
-    desktop: { w: 1e3, h: 600, label: "Desktop" },
-    iphone: { w: 390, h: 844, label: "iPhone 14" },
-    ipad: { w: 820, h: 1180, label: "iPad" },
-    android: { w: 412, h: 915, label: "Pixel 8" },
-    custom: { w: 1e3, h: 600, label: "\u0421\u0432\u043E\u044F \u0448\u0438\u0440\u0438\u043D\u0430" }
+    desktop: { w: 1280, h: 800, label: "\u0414\u0435\u0441\u043A\u0442\u043E\u043F", hint: "\u041E\u0431\u044B\u0447\u043D\u043E\u0435 \u043E\u043A\u043D\u043E \u041F\u041A" },
+    tablet: { w: 820, h: 1180, label: "\u041F\u043B\u0430\u043D\u0448\u0435\u0442", hint: "\u0412\u0435\u0440\u0442\u0438\u043A\u0430\u043B\u044C\u043D\u044B\u0439 \u043F\u043B\u0430\u043D\u0448\u0435\u0442" },
+    phone: { w: 390, h: 844, label: "\u0422\u0435\u043B\u0435\u0444\u043E\u043D", hint: "\u0412\u0435\u0440\u0442\u0438\u043A\u0430\u043B\u044C\u043D\u044B\u0439 \u0441\u043C\u0430\u0440\u0442\u0444\u043E\u043D" },
+    custom: { w: 1e3, h: 600, label: "\u0421\u0432\u043E\u0439 \u0440\u0430\u0437\u043C\u0435\u0440", hint: "\u0423\u043A\u0430\u0436\u0438\u0442\u0435 \u0448\u0438\u0440\u0438\u043D\u0443 \u0438 \u0432\u044B\u0441\u043E\u0442\u0443" }
   };
   var LESSONS = [
     { id: "h1", lang: "HTML", title: "\u041F\u0435\u0440\u0432\u044B\u0439 \u0437\u0430\u0433\u043E\u043B\u043E\u0432\u043E\u043A", theory: "\u0417\u0430\u0433\u043E\u043B\u043E\u0432\u043A\u0438 \u0437\u0430\u0434\u0430\u044E\u0442\u0441\u044F \u0442\u0435\u0433\u0430\u043C\u0438 <h1>\u2026<h6>. h1 \u2014 \u0433\u043B\u0430\u0432\u043D\u044B\u0439, \u043D\u0430 \u0441\u0442\u0440\u0430\u043D\u0438\u0446\u0435 \u043E\u0431\u044B\u0447\u043D\u043E \u043E\u0434\u0438\u043D. \u041F\u043E\u0438\u0441\u043A\u043E\u0432\u0438\u043A\u0438 \u0438 \u0441\u043A\u0440\u0438\u043D\u0440\u0438\u0434\u0435\u0440\u044B \u0447\u0438\u0442\u0430\u044E\u0442 \u0438\u0445 \u0432 \u043F\u0435\u0440\u0432\u0443\u044E \u043E\u0447\u0435\u0440\u0435\u0434\u044C.", task: "\u0421\u043E\u0437\u0434\u0430\u0439\u0442\u0435 \u0437\u0430\u0433\u043E\u043B\u043E\u0432\u043E\u043A <h1> \u0441 \u0442\u0435\u043A\u0441\u0442\u043E\u043C \xAB\u041F\u0440\u0438\u0432\u0435\u0442\xBB \u0438 \u043F\u0430\u0440\u0430\u0433\u0440\u0430\u0444 <p> \u0441 \u043B\u044E\u0431\u044B\u043C \u0442\u0435\u043A\u0441\u0442\u043E\u043C.", starter: '<!DOCTYPE html>\n<html lang="ru">\n<body>\n  <!-- \u043D\u0430\u043F\u0438\u0448\u0438\u0442\u0435 \u043A\u043E\u0434 \u0437\u0434\u0435\u0441\u044C -->\n</body>\n</html>', check: (c) => /<h1[^>]*>\s*Привет\s*<\/h1>/i.test(c) && /<p[^>]*>[\s\S]+<\/p>/i.test(c), hint: "\u0418\u0441\u043F\u043E\u043B\u044C\u0437\u0443\u0439\u0442\u0435 <h1>\u041F\u0440\u0438\u0432\u0435\u0442</h1> \u0438 <p>\u0422\u0435\u043A\u0441\u0442</p>." },
@@ -43802,14 +44485,14 @@ assert(add(2, 3) === 5, '2 + 3 = 5');` }
     { t: "\u041A\u0430\u043A \u0443\u0437\u043D\u0430\u0442\u044C \u043A\u043E\u043D\u0442\u0440\u0430\u0441\u0442 \u0446\u0432\u0435\u0442\u043E\u0432?", a: "\u041E\u0442\u043A\u0440\u043E\u0439\u0442\u0435 \xAB\u0410\u043D\u0430\u043B\u0438\u0437\xBB \u2192 \u0434\u0432\u0438\u0436\u043E\u043A \u043F\u043E\u0441\u0447\u0438\u0442\u0430\u0435\u0442 \u043A\u043E\u044D\u0444\u0444\u0438\u0446\u0438\u0435\u043D\u0442 WCAG." }
   ];
   var PLUGIN_CATALOG = [
-    { id: "terminal", name: "\u0422\u0435\u0440\u043C\u0438\u043D\u0430\u043B", icon: "\u25B8", desc: "\u041C\u0438\u043D\u0438-\u043A\u043E\u043D\u0441\u043E\u043B\u044C \u043A\u043E\u043C\u0430\u043D\u0434 \u0440\u0435\u0434\u0430\u043A\u0442\u043E\u0440\u0430" },
-    { id: "calc", name: "\u041A\u0430\u043B\u044C\u043A\u0443\u043B\u044F\u0442\u043E\u0440", icon: "\u{1F9EE}", desc: "\u0412\u044B\u0440\u0430\u0436\u0435\u043D\u0438\u044F \u0438 px\u2194rem" },
-    { id: "regex", name: "\u0413\u0435\u043D\u0435\u0440\u0430\u0442\u043E\u0440 regex", icon: ".*", desc: "\u041F\u043E\u0434\u0441\u043A\u0430\u0437\u043A\u0438 \u043F\u043E \u0440\u0435\u0433\u0443\u043B\u044F\u0440\u043A\u0430\u043C" },
-    { id: "units", name: "\u041A\u043E\u043D\u0432\u0435\u0440\u0442\u0435\u0440 \u0435\u0434\u0438\u043D\u0438\u0446", icon: "\u21C4", desc: "px, rem, em, %, ms, deg" },
-    { id: "notes", name: "\u0417\u0430\u043C\u0435\u0442\u043A\u0438", icon: "\u{1F4DD}", desc: "\u041B\u0438\u0447\u043D\u044B\u0435 \u0437\u0430\u043C\u0435\u0442\u043A\u0438 \u043A \u043F\u0440\u043E\u0435\u043A\u0442\u0443" },
-    { id: "pomodoro", name: "\u041F\u043E\u043C\u043E\u0434\u043E\u0440\u043E", icon: "\u{1F345}", desc: "\u0422\u0430\u0439\u043C\u0435\u0440 25/5 \u043C\u0438\u043D\u0443\u0442" },
-    { id: "themes", name: "\u0413\u0435\u043D\u0435\u0440\u0430\u0442\u043E\u0440 \u0442\u0435\u043C", icon: "\u{1F3A8}", desc: "\u041F\u0430\u043B\u0438\u0442\u0440\u0430 \u0438\u0437 \u043E\u0434\u043D\u043E\u0433\u043E \u0446\u0432\u0435\u0442\u0430" },
-    { id: "diagram", name: "\u0414\u0438\u0430\u0433\u0440\u0430\u043C\u043C\u044B", icon: "\u25EB", desc: "Mermaid-\u043F\u043E\u0434\u043E\u0431\u043D\u044B\u0435 \u0441\u0445\u0435\u043C\u044B" }
+    { id: "terminal", name: "\u0422\u0435\u0440\u043C\u0438\u043D\u0430\u043B", icon: "terminal", desc: "\u041C\u0438\u043D\u0438-\u043A\u043E\u043D\u0441\u043E\u043B\u044C \u043A\u043E\u043C\u0430\u043D\u0434 \u0440\u0435\u0434\u0430\u043A\u0442\u043E\u0440\u0430" },
+    { id: "calc", name: "\u041A\u0430\u043B\u044C\u043A\u0443\u043B\u044F\u0442\u043E\u0440", icon: "sliders", desc: "\u0412\u044B\u0440\u0430\u0436\u0435\u043D\u0438\u044F \u0438 px\u2194rem" },
+    { id: "regex", name: "\u0413\u0435\u043D\u0435\u0440\u0430\u0442\u043E\u0440 regex", icon: "brackets", desc: "\u041F\u043E\u0434\u0441\u043A\u0430\u0437\u043A\u0438 \u043F\u043E \u0440\u0435\u0433\u0443\u043B\u044F\u0440\u043A\u0430\u043C" },
+    { id: "units", name: "\u041A\u043E\u043D\u0432\u0435\u0440\u0442\u0435\u0440 \u0435\u0434\u0438\u043D\u0438\u0446", icon: "resize", desc: "px, rem, em, %, ms, deg" },
+    { id: "notes", name: "\u0417\u0430\u043C\u0435\u0442\u043A\u0438", icon: "journal", desc: "\u041B\u0438\u0447\u043D\u044B\u0435 \u0437\u0430\u043C\u0435\u0442\u043A\u0438 \u043A \u043F\u0440\u043E\u0435\u043A\u0442\u0443" },
+    { id: "pomodoro", name: "\u041F\u043E\u043C\u043E\u0434\u043E\u0440\u043E", icon: "clock", desc: "\u0422\u0430\u0439\u043C\u0435\u0440 25/5 \u043C\u0438\u043D\u0443\u0442" },
+    { id: "themes", name: "\u0413\u0435\u043D\u0435\u0440\u0430\u0442\u043E\u0440 \u0442\u0435\u043C", icon: "palette", desc: "\u041F\u0430\u043B\u0438\u0442\u0440\u0430 \u0438\u0437 \u043E\u0434\u043D\u043E\u0433\u043E \u0446\u0432\u0435\u0442\u0430" },
+    { id: "diagram", name: "\u0414\u0438\u0430\u0433\u0440\u0430\u043C\u043C\u044B", icon: "network", desc: "\u041F\u0440\u043E\u0441\u0442\u044B\u0435 \u0441\u0445\u0435\u043C\u044B" }
   ];
 
   // app/src/core/editor.js
@@ -43921,20 +44604,20 @@ assert(add(2, 3) === 5, '2 + 3 = 5');` }
         label: k,
         type: /^[A-Z]/.test(k) ? "class" : "variable",
         info: DOCS[k]?.[0] || "",
-        detail: DOCS[k] ? "\u{1F4D6} MDN" : "\u0433\u043B\u043E\u0431\u0430\u043B"
+        detail: DOCS[k] ? " MDN" : "\u0433\u043B\u043E\u0431\u0430\u043B"
       }));
-      for (const [k, v] of Object.entries(DOCS)) options.push({ label: k, type: "property", info: v[0], detail: "\u{1F4D6}" });
+      for (const [k, v] of Object.entries(DOCS)) options.push({ label: k, type: "property", info: v[0], detail: "" });
     }
     for (const s of SNIPPETS.filter((x2) => x2.cat === pane).slice(0, 40)) {
       options.push(snippetCompletion(escapeSnippet(s.code), {
-        label: "\u2726 " + s.name,
+        label: " " + s.name,
         detail: s.desc,
         type: "text",
         boost: 2
       }));
     }
     for (const s of state.userSnippets.filter((x2) => x2.cat === pane)) {
-      options.push(snippetCompletion(escapeSnippet(s.code), { label: "\u2605 " + s.name, detail: "\u043C\u043E\u0439 \u0441\u043D\u0438\u043F\u043F\u0435\u0442", type: "text", boost: 3 }));
+      options.push(snippetCompletion(escapeSnippet(s.code), { label: " " + s.name, detail: "\u043C\u043E\u0439 \u0441\u043D\u0438\u043F\u043F\u0435\u0442", type: "text", boost: 3 }));
     }
     const words = new Set((doc2.match(/[A-Za-z_$][\w$]{2,}/g) || []).slice(-400));
     for (const w of words) if (!options.some((o) => o.label === w)) options.push({ label: w, type: "text", detail: "\u0441\u043B\u043E\u0432\u043E" });
@@ -43958,7 +44641,7 @@ assert(add(2, 3) === 5, '2 + 3 = 5');` }
       create() {
         const box = document.createElement("div");
         box.style.cssText = "padding:10px 12px;max-width:330px;font:12px var(--sans);line-height:1.5";
-        box.innerHTML = '<b style="color:var(--accent)">' + esc(word) + '</b><div style="margin:5px 0;color:var(--muted)">' + esc(info[0]) + '</div><a href="' + mdnLink(word) + '" target="_blank" style="color:var(--info);font-size:11px">\u{1F4D6} \u041E\u0442\u043A\u0440\u044B\u0442\u044C MDN \u2197</a>';
+        box.innerHTML = '<b style="color:var(--accent)">' + esc(word) + '</b><div style="margin:5px 0;color:var(--muted)">' + esc(info[0]) + '</div><a href="' + mdnLink(word) + '" target="_blank" style="color:var(--info);font-size:11px"> \u041E\u0442\u043A\u0440\u044B\u0442\u044C MDN \u2197</a>';
         return box;
       }
     };
@@ -44065,27 +44748,27 @@ assert(add(2, 3) === 5, '2 + 3 = 5');` }
   }
   var minimapTimers = {};
   function updateMinimap(pane) {
-    const host = $(`[data-minimap="${pane}"]`);
+    const host2 = $(`[data-minimap="${pane}"]`);
     const view = editors[pane];
-    if (!host || !view || !state.settings.minimap) return;
+    if (!host2 || !view || !state.settings.minimap) return;
     clearTimeout(minimapTimers[pane]);
     minimapTimers[pane] = setTimeout(() => {
-      let canvas = host.querySelector("canvas");
-      if (!canvas) {
-        canvas = document.createElement("canvas");
-        host.appendChild(canvas);
-        host.addEventListener("mousedown", (e) => {
-          const rect = host.getBoundingClientRect();
-          const ratio = (e.clientY - rect.top + host.scrollTop) / (canvas.height || 1);
+      let canvas2 = host2.querySelector("canvas");
+      if (!canvas2) {
+        canvas2 = document.createElement("canvas");
+        host2.appendChild(canvas2);
+        host2.addEventListener("mousedown", (e) => {
+          const rect = host2.getBoundingClientRect();
+          const ratio = (e.clientY - rect.top + host2.scrollTop) / (canvas2.height || 1);
           view.scrollDOM.scrollTop = ratio * Math.max(1, view.scrollDOM.scrollHeight - view.scrollDOM.clientHeight);
         });
       }
       const lines = view.state.doc.lines;
       const scale = 2;
-      canvas.width = 46;
-      canvas.height = Math.min(lines * scale + 4, 12e3);
-      const c = canvas.getContext("2d");
-      c.clearRect(0, 0, canvas.width, canvas.height);
+      canvas2.width = 46;
+      canvas2.height = Math.min(lines * scale + 4, 12e3);
+      const c = canvas2.getContext("2d");
+      c.clearRect(0, 0, canvas2.width, canvas2.height);
       const css2 = getComputedStyle(document.documentElement);
       c.fillStyle = css2.getPropertyValue("--muted") || "#888";
       const text = view.state.doc.toString();
@@ -44142,8 +44825,8 @@ assert(add(2, 3) === 5, '2 + 3 = 5');` }
   }
   function initEditors() {
     for (const pane of PANES) {
-      const host = $(`[data-cm="${pane}"]`);
-      if (!host) continue;
+      const host2 = $(`[data-cm="${pane}"]`);
+      if (!host2) continue;
       langComp[pane] = new Compartment();
       prefComp[pane] = new Compartment();
       readComp[pane] = new Compartment();
@@ -44206,7 +44889,7 @@ assert(add(2, 3) === 5, '2 + 3 = 5');` }
             })
           ]
         }),
-        parent: host
+        parent: host2
       });
       view.dom.dataset.pane = pane;
       view.dom.addEventListener("runlet-color", (e) => openColorPicker(pane, e.detail));
@@ -44439,15 +45122,15 @@ assert(add(2, 3) === 5, '2 + 3 = 5');` }
     function expand(str) {
       let parts = str.split(/(?=[>+])/);
       let out = "", children = "";
-      let current2 = "";
+      let current3 = "";
       for (const p of parts) {
         if (p.startsWith(">")) {
           children += expand(p.slice(1));
         } else if (p.startsWith("+")) {
           out += "\n" + parseOne(p.slice(1));
-        } else current2 = p;
+        } else current3 = p;
       }
-      const base2 = current2 ? parseOne(current2) : "";
+      const base2 = current3 ? parseOne(current3) : "";
       if (children) {
         const inner = expand(children);
         out = base2.replace(/\$\{1\}/, inner).replace(/><\//, ">" + inner + "</");
@@ -44585,6 +45268,10 @@ assert(add(2, 3) === 5, '2 + 3 = 5');` }
       if (n) n.textContent = state.panes[p] || "\u2014";
     }
   }
+
+  // app/src/core/preview.js
+  init_core();
+  init_state();
 
   // app/src/core/bridge.js
   function bridgeMain() {
@@ -44944,14 +45631,14 @@ assert(add(2, 3) === 5, '2 + 3 = 5');` }
       }
     };
     var nativeMM = window.matchMedia;
-    window.matchMedia = function(q2) {
+    window.matchMedia = function(q) {
       var override = null;
-      if (/prefers-color-scheme:\s*dark/.test(q2) && cfg.scheme === "dark") override = true;
-      if (/prefers-color-scheme:\s*light/.test(q2) && cfg.scheme === "light") override = true;
-      if (/prefers-color-scheme:\s*dark/.test(q2) && cfg.scheme === "light") override = false;
-      if (/prefers-color-scheme:\s*light/.test(q2) && cfg.scheme === "dark") override = false;
-      if (/prefers-reduced-motion:\s*reduce/.test(q2) && cfg.motion === "reduce") override = true;
-      var mql = nativeMM.call(window, q2);
+      if (/prefers-color-scheme:\s*dark/.test(q) && cfg.scheme === "dark") override = true;
+      if (/prefers-color-scheme:\s*light/.test(q) && cfg.scheme === "light") override = true;
+      if (/prefers-color-scheme:\s*dark/.test(q) && cfg.scheme === "light") override = false;
+      if (/prefers-color-scheme:\s*light/.test(q) && cfg.scheme === "dark") override = false;
+      if (/prefers-reduced-motion:\s*reduce/.test(q) && cfg.motion === "reduce") override = true;
+      var mql = nativeMM.call(window, q);
       if (override !== null) {
         try {
           var wrapped = Object.create(mql);
@@ -45346,26 +46033,20 @@ assert(add(2, 3) === 5, '2 + 3 = 5');` }
     window.addEventListener("message", onFrameMessage);
     applySandbox();
     frame.addEventListener("load", () => emit("preview:load"));
-    const dev = $("#deviceSelect");
-    dev?.addEventListener("change", () => {
-      state.device = dev.value;
-      const d = DEVICES[dev.value];
-      state.deviceSize = { w: d.w, h: d.h };
-      $("#viewportWidth").value = d.w;
-      $("#viewportHeight").value = d.h;
-      applyDevice();
-      emit("device:changed");
+    $$("#deviceSwitch [data-device]").forEach((btn) => {
+      btn.addEventListener("click", () => setDevice(btn.dataset.device));
     });
     $("#viewportWidth")?.addEventListener("change", (e) => {
-      state.deviceSize.w = +e.target.value || 400;
-      $("#deviceSelect").value = "custom";
+      state.deviceSize.w = Math.max(240, Math.min(2400, +e.target.value || 400));
+      setDeviceButtons("custom");
       applyDevice();
     });
     $("#viewportHeight")?.addEventListener("change", (e) => {
-      state.deviceSize.h = +e.target.value || 400;
-      $("#deviceSelect").value = "custom";
+      state.deviceSize.h = Math.max(200, Math.min(3e3, +e.target.value || 400));
+      setDeviceButtons("custom");
       applyDevice();
     });
+    setDevice(state.device || "desktop");
     $("#zoomSelect")?.addEventListener("change", (e) => {
       state.zoom = e.target.value === "fit" ? "fit" : +e.target.value;
       applyDevice();
@@ -45428,6 +46109,23 @@ assert(add(2, 3) === 5, '2 + 3 = 5');` }
     });
     applyDevice();
     setTimeout(() => run("full"), 100);
+  }
+  function setDeviceButtons(name2) {
+    $$("#deviceSwitch [data-device]").forEach((b) => b.classList.toggle("active", b.dataset.device === name2));
+    const d = DEVICES[name2];
+    const hint = $("#previewHint");
+    if (hint && d) hint.textContent = `${d.label} \xB7 ${d.hint} \xB7 ${state.deviceSize.w}\xD7${state.deviceSize.h}`;
+  }
+  function setDevice(name2) {
+    const d = DEVICES[name2] || DEVICES.desktop;
+    state.device = name2;
+    state.deviceSize = { w: d.w, h: d.h };
+    const w = $("#viewportWidth"), h = $("#viewportHeight");
+    if (w) w.value = d.w;
+    if (h) h.value = d.h;
+    setDeviceButtons(name2);
+    applyDevice();
+    emit("device:changed", name2);
   }
   var runTimer = null;
   function scheduleRun(reason) {
@@ -45867,10 +46565,10 @@ ${escapeScript(code2)}
       if (/\.svg$/i.test(p) && attr === "src") return `${attr}="${asDataUri(p)}"`;
       return `${attr}="${esc(asDataUri(p))}"`;
     });
-    html2 = html2.replace(/\bsrcset=(["'])([^"']+)\1/gi, (m, q2, val) => "srcset=" + q2 + val.replace(/([^\s,]+)(\s+\d+[wx])?/g, (mm, ref2, size) => {
+    html2 = html2.replace(/\bsrcset=(["'])([^"']+)\1/gi, (m, q, val) => "srcset=" + q + val.replace(/([^\s,]+)(\s+\d+[wx])?/g, (mm, ref2, size) => {
       const p = lookup(entry, ref2);
       return p ? asDataUri(p) + (size || "") : mm;
-    }) + q2);
+    }) + q);
     html2 = html2.replace(/<style\b([^>]*)>([\s\S]*?)<\/style>/gi, (m, attrs, css2) => `<style${attrs}>${inlineCss(css2, entry)}</style>`);
     html2 = html2.replace(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi, (m, attrs, code2) => {
       if (/type=["']application\/(ld\+)?json["']/i.test(attrs) || /src=/.test(attrs)) return m;
@@ -46089,26 +46787,33 @@ ${code2}
     emit("breakpoints", state.breakpoints);
   }
 
+  // app/src/core/files.js
+  init_core();
+  init_state();
+  init_state();
+
   // app/src/core/tools.js
+  init_core();
+  init_state();
   function hexToRgb(hex) {
     let h = String(hex || "").replace("#", "").trim();
     if (/^[0-9a-f]{3,4}$/i.test(h)) h = h.split("").slice(0, 3).map((c) => c + c).join("");
     if (!/^[0-9a-f]{6}$/i.test(h)) return null;
     return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)];
   }
-  function rgbToHex(r, g, b) {
-    return "#" + [r, g, b].map((v) => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, "0")).join("");
+  function rgbToHex(r, g2, b) {
+    return "#" + [r, g2, b].map((v) => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, "0")).join("");
   }
   function hexToHsl(hex) {
     const c = hexToRgb(hex);
     if (!c) return null;
-    let [r, g, b] = c.map((v) => v / 255);
-    const max2 = Math.max(r, g, b), min = Math.min(r, g, b), l = (max2 + min) / 2;
+    let [r, g2, b] = c.map((v) => v / 255);
+    const max2 = Math.max(r, g2, b), min = Math.min(r, g2, b), l = (max2 + min) / 2;
     let h = 0, s = 0;
     if (max2 !== min) {
       const d = max2 - min;
       s = l > 0.5 ? d / (2 - max2 - min) : d / (max2 + min);
-      h = max2 === r ? (g - b) / d + (g < b ? 6 : 0) : max2 === g ? (b - r) / d + 2 : (r - g) / d + 4;
+      h = max2 === r ? (g2 - b) / d + (g2 < b ? 6 : 0) : max2 === g2 ? (b - r) / d + 2 : (r - g2) / d + 4;
       h *= 60;
     }
     return { h: Math.round(h), s: Math.round(s * 100), l: Math.round(l * 100) };
@@ -46117,14 +46822,14 @@ ${code2}
     s /= 100;
     l /= 100;
     const c = (1 - Math.abs(2 * l - 1)) * s, x2 = c * (1 - Math.abs(h / 60 % 2 - 1)), m = l - c / 2;
-    let r = 0, g = 0, b = 0;
-    if (h < 60) [r, g, b] = [c, x2, 0];
-    else if (h < 120) [r, g, b] = [x2, c, 0];
-    else if (h < 180) [r, g, b] = [0, c, x2];
-    else if (h < 240) [r, g, b] = [0, x2, c];
-    else if (h < 300) [r, g, b] = [x2, 0, c];
-    else [r, g, b] = [c, 0, x2];
-    return [(r + m) * 255, (g + m) * 255, (b + m) * 255].map(Math.round);
+    let r = 0, g2 = 0, b = 0;
+    if (h < 60) [r, g2, b] = [c, x2, 0];
+    else if (h < 120) [r, g2, b] = [x2, c, 0];
+    else if (h < 180) [r, g2, b] = [0, c, x2];
+    else if (h < 240) [r, g2, b] = [0, x2, c];
+    else if (h < 300) [r, g2, b] = [x2, 0, c];
+    else [r, g2, b] = [c, 0, x2];
+    return [(r + m) * 255, (g2 + m) * 255, (b + m) * 255].map(Math.round);
   }
   function hslToHex(h, s, l) {
     return rgbToHex(...hslToRgb(h, s, l));
@@ -46148,21 +46853,21 @@ ${code2}
   function luminance(hex) {
     const c = hexToRgb(hex);
     if (!c) return 0;
-    const [r, g, b] = c.map((v) => {
+    const [r, g2, b] = c.map((v) => {
       v /= 255;
       return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
     });
-    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    return 0.2126 * r + 0.7152 * g2 + 0.0722 * b;
   }
   function contrast(a, b) {
     const l1 = luminance(a), l2 = luminance(b);
     return (Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05);
   }
   function contrastVerdict(ratio, big = false) {
-    if (ratio >= 7) return "AAA \u2705";
-    if (ratio >= (big ? 3 : 4.5)) return "AA \u2705";
-    if (ratio >= 3) return "\u0442\u043E\u043B\u044C\u043A\u043E \u043A\u0440\u0443\u043F\u043D\u044B\u0439 \u0442\u0435\u043A\u0441\u0442 \u26A0";
-    return "\u043D\u0435 \u043F\u0440\u043E\u0445\u043E\u0434\u0438\u0442 \u274C";
+    if (ratio >= 7) return "AAA ";
+    if (ratio >= (big ? 3 : 4.5)) return "AA ";
+    if (ratio >= 3) return "\u0442\u043E\u043B\u044C\u043A\u043E \u043A\u0440\u0443\u043F\u043D\u044B\u0439 \u0442\u0435\u043A\u0441\u0442 ";
+    return "\u043D\u0435 \u043F\u0440\u043E\u0445\u043E\u0434\u0438\u0442 ";
   }
   function paletteFrom(hex, count2 = 6) {
     const hsl = hexToHsl(hex) || { h: 260, s: 70, l: 55 };
@@ -46352,12 +47057,12 @@ ${b}${prop}${c}:`);
   function generateTests(code2) {
     const fns = [...code2.matchAll(/(?:function\s+([\w$]+)|const\s+([\w$]+)\s*=\s*\([^)]*\)\s*=>)/g)].map((m) => m[1] || m[2]);
     if (!fns.length) return `// \u0424\u0443\u043D\u043A\u0446\u0438\u0438 \u043D\u0435 \u043D\u0430\u0439\u0434\u0435\u043D\u044B. \u041F\u0440\u0438\u043C\u0435\u0440 \u0442\u0435\u0441\u0442\u0430:
-function assert(c, m) { if (!c) throw new Error('\u274C ' + m); console.log('\u2705 ' + m); }
+function assert(c, m) { if (!c) throw new Error(' ' + m); console.log(' ' + m); }
 assert(1 + 1 === 2, '\u0441\u043B\u043E\u0436\u0435\u043D\u0438\u0435');`;
     return `// \u0410\u0432\u0442\u043E\u0442\u0435\u0441\u0442\u044B \u0434\u043B\u044F: ${fns.join(", ")}
 function assert(condition, message) {
-  if (!condition) throw new Error('\u274C ' + message);
-  console.log('\u2705 ' + message);
+  if (!condition) throw new Error(' ' + message);
+  console.log(' ' + message);
 }
 
 ` + fns.map((f) => `assert(typeof ${f} === 'function', '${f} \u2014 \u0444\u0443\u043D\u043A\u0446\u0438\u044F');
@@ -46582,10 +47287,10 @@ ${JSON.stringify({ "@context": "https://schema.org", "@type": "WebSite", name: S
     c.width = w;
     c.height = h;
     const ctx2 = c.getContext("2d");
-    const g = ctx2.createLinearGradient(0, 0, w, h);
-    g.addColorStop(0, color);
-    g.addColorStop(1, complementary(color));
-    ctx2.fillStyle = g;
+    const g2 = ctx2.createLinearGradient(0, 0, w, h);
+    g2.addColorStop(0, color);
+    g2.addColorStop(1, complementary(color));
+    ctx2.fillStyle = g2;
     ctx2.fillRect(0, 0, w, h);
     ctx2.fillStyle = "rgba(255,255,255,.9)";
     ctx2.font = `bold ${Math.round(Math.min(w, h) / 7)}px sans-serif`;
@@ -46663,6 +47368,7 @@ ${f.content}
   }
 
   // app/src/core/files.js
+  init_browser();
   var treeFilter = "";
   var dragPath = null;
   function initFiles() {
@@ -46710,9 +47416,9 @@ ${f.content}
     updateSize();
   }
   function renderTree() {
-    const host = $("#fileTree");
-    if (!host) return;
-    host.innerHTML = "";
+    const host2 = $("#fileTree");
+    if (!host2) return;
+    host2.innerHTML = "";
     const files = listFiles().filter((p) => !treeFilter || p.toLowerCase().includes(treeFilter));
     const dirs = /* @__PURE__ */ new Set();
     for (const p of files) {
@@ -46787,42 +47493,42 @@ ${f.content}
             renderTree();
           }
         });
-        host.appendChild(row);
+        host2.appendChild(row);
         if (isDir) {
-          const before = host.children.length;
+          const before = host2.children.length;
           build(path, depth + 1);
         }
       }
     };
     build("", 0);
-    if (!files.length) host.appendChild(el("div", { class: "empty-note", text: "\u0424\u0430\u0439\u043B\u043E\u0432 \u043D\u0435\u0442. \u041D\u0430\u0436\u043C\u0438\u0442\u0435 \xAB\uFF0B \u0444\u0430\u0439\u043B\xBB." }));
+    if (!files.length) host2.appendChild(el("div", { class: "empty-note", text: "\u0424\u0430\u0439\u043B\u043E\u0432 \u043D\u0435\u0442. \u041D\u0430\u0436\u043C\u0438\u0442\u0435 \xAB\uFF0B \u0444\u0430\u0439\u043B\xBB." }));
     updateSize();
   }
   function iconFor(path, isDir) {
-    if (isDir) return "\u{1F4C1}";
+    if (isDir) return "";
     const e = (path.split(".").pop() || "").toLowerCase();
     return {
-      html: "\u{1F7E0}",
-      htm: "\u{1F7E0}",
-      css: "\u{1F535}",
-      scss: "\u{1F535}",
-      js: "\u{1F7E1}",
-      mjs: "\u{1F7E1}",
-      ts: "\u{1F537}",
-      json: "\u{1F7E3}",
-      md: "\u{1F4C4}",
-      png: "\u{1F5BC}",
-      jpg: "\u{1F5BC}",
-      jpeg: "\u{1F5BC}",
-      gif: "\u{1F5BC}",
-      webp: "\u{1F5BC}",
-      svg: "\u2712",
-      woff2: "\u{1F524}",
-      ttf: "\u{1F524}",
-      mp3: "\u{1F3B5}",
-      mp4: "\u{1F3AC}",
-      txt: "\u{1F4C4}"
-    }[e] || "\u{1F4C4}";
+      html: "",
+      htm: "",
+      css: "",
+      scss: "",
+      js: "",
+      mjs: "",
+      ts: "",
+      json: "",
+      md: "",
+      png: "",
+      jpg: "",
+      jpeg: "",
+      gif: "",
+      webp: "",
+      svg: "",
+      woff2: "",
+      ttf: "",
+      mp3: "",
+      mp4: "",
+      txt: ""
+    }[e] || "";
   }
   function updateSize() {
     const n = $("#projectSize"), s = $("#statusSize");
@@ -46944,18 +47650,18 @@ ${f.content}
     });
   }
   function doSearch(query, useRegex = false) {
-    const host = $("#searchResults");
-    if (!host) return [];
-    host.innerHTML = "";
+    const host2 = $("#searchResults");
+    if (!host2) return [];
+    host2.innerHTML = "";
     if (!query || query.length < 1) {
-      host.innerHTML = '<div class="empty-note">\u0412\u0432\u0435\u0434\u0438\u0442\u0435 \u0437\u0430\u043F\u0440\u043E\u0441 \u0434\u043B\u044F \u043F\u043E\u0438\u0441\u043A\u0430 \u043F\u043E \u043F\u0440\u043E\u0435\u043A\u0442\u0443</div>';
+      host2.innerHTML = '<div class="empty-note">\u0412\u0432\u0435\u0434\u0438\u0442\u0435 \u0437\u0430\u043F\u0440\u043E\u0441 \u0434\u043B\u044F \u043F\u043E\u0438\u0441\u043A\u0430 \u043F\u043E \u043F\u0440\u043E\u0435\u043A\u0442\u0443</div>';
       return [];
     }
     let re;
     try {
       re = useRegex ? new RegExp(query, "gi") : new RegExp(query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi");
     } catch (e) {
-      host.innerHTML = `<div class="empty-note">\u041E\u0448\u0438\u0431\u043A\u0430 \u0440\u0435\u0433\u0443\u043B\u044F\u0440\u043D\u043E\u0433\u043E \u0432\u044B\u0440\u0430\u0436\u0435\u043D\u0438\u044F: ${esc(e.message)}</div>`;
+      host2.innerHTML = `<div class="empty-note">\u041E\u0448\u0438\u0431\u043A\u0430 \u0440\u0435\u0433\u0443\u043B\u044F\u0440\u043D\u043E\u0433\u043E \u0432\u044B\u0440\u0430\u0436\u0435\u043D\u0438\u044F: ${esc(e.message)}</div>`;
       return [];
     }
     const results = [];
@@ -46976,23 +47682,23 @@ ${f.content}
             if (state.panes[pane] !== path) setPaneFile(pane, path);
             goto(pane, i4 + 1, 1);
           });
-          host.appendChild(row);
+          host2.appendChild(row);
         }
       });
     }
-    if (!results.length) host.innerHTML = '<div class="empty-note">\u041D\u0438\u0447\u0435\u0433\u043E \u043D\u0435 \u043D\u0430\u0439\u0434\u0435\u043D\u043E</div>';
+    if (!results.length) host2.innerHTML = '<div class="empty-note">\u041D\u0438\u0447\u0435\u0433\u043E \u043D\u0435 \u043D\u0430\u0439\u0434\u0435\u043D\u043E</div>';
     return results;
   }
   function replaceAllInProject() {
-    const q2 = $("#globalSearch")?.value || "", r = $("#globalReplace")?.value ?? "";
-    if (!q2) {
+    const q = $("#globalSearch")?.value || "", r = $("#globalReplace")?.value ?? "";
+    if (!q) {
       toast("\u0412\u0432\u0435\u0434\u0438\u0442\u0435 \u0441\u0442\u0440\u043E\u043A\u0443 \u043F\u043E\u0438\u0441\u043A\u0430", "warn");
       return 0;
     }
     const useRegex = $("#searchRegex")?.checked;
     let re;
     try {
-      re = useRegex ? new RegExp(q2, "g") : new RegExp(q2.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "g");
+      re = useRegex ? new RegExp(q, "g") : new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "g");
     } catch (e) {
       toast("\u041E\u0448\u0438\u0431\u043A\u0430 regex: " + e.message, "err");
       return 0;
@@ -47009,7 +47715,7 @@ ${f.content}
       }
     }
     toast(`\u0417\u0430\u043C\u0435\u043D\u0435\u043D\u043E \u0432\u0445\u043E\u0436\u0434\u0435\u043D\u0438\u0439: ${n}`, "ok", "\u041F\u043E\u0438\u0441\u043A");
-    doSearch(q2, useRegex);
+    doSearch(q, useRegex);
     return n;
   }
   function findReferences(path) {
@@ -47176,19 +47882,19 @@ ${f.content}
     });
   }
   function renderLibs() {
-    const host = $("#libsPanel");
-    if (!host) return;
-    host.innerHTML = "";
-    host.appendChild(el(
+    const host2 = $("#libsPanel");
+    if (!host2) return;
+    host2.innerHTML = "";
+    host2.appendChild(el(
       "div",
       { class: "rowflex mb8" },
       el("input", { id: "libSearch", placeholder: "\u041F\u043E\u0438\u0441\u043A \u0431\u0438\u0431\u043B\u0438\u043E\u0442\u0435\u043A\u0438\u2026", style: { flex: "1", height: "29px", borderRadius: "9px", border: "1px solid var(--border)", background: "var(--code-bg)", padding: "0 9px" } })
     ));
     const list2 = el("div", { class: "list-rows", id: "libList" });
-    host.appendChild(list2);
-    const draw = (q2) => {
+    host2.appendChild(list2);
+    const draw = (q) => {
       list2.innerHTML = "";
-      for (const lib of CDN_LIBS.filter((l) => !q2 || (l.name + l.cat + l.desc).toLowerCase().includes(q2.toLowerCase()))) {
+      for (const lib of CDN_LIBS.filter((l) => !q || (l.name + l.cat + l.desc).toLowerCase().includes(q.toLowerCase()))) {
         const dep = state.deps.find((d) => (typeof d === "string" ? d : d.id) === lib.id);
         const row = el(
           "div",
@@ -47199,7 +47905,7 @@ ${f.content}
             { class: "mini-select", title: "\u0412\u0435\u0440\u0441\u0438\u044F" },
             ...lib.versions.map((v) => el("option", { value: v, selected: typeof dep === "object" && dep.version === v ? "selected" : null, text: v }))
           ),
-          el("button", { class: "mini-btn " + (dep ? "active" : ""), text: dep ? "\u2713" : "+" })
+          el("button", { class: "mini-btn " + (dep ? "active" : ""), text: dep ? "" : "+" })
         );
         const sel = row.querySelector("select"), btn = row.querySelector("button");
         btn.classList.toggle("active", !!dep);
@@ -47209,7 +47915,7 @@ ${f.content}
             state.deps.push({ id: lib.id, version: sel.value, name: lib.name, enabled: true });
           }
           emit("deps:changed");
-          draw(q2);
+          draw(q);
           toast(`${dep ? "\u041E\u0442\u043A\u043B\u044E\u0447\u0435\u043D\u0430" : "\u041F\u043E\u0434\u043A\u043B\u044E\u0447\u0435\u043D\u0430"} \u0431\u0438\u0431\u043B\u0438\u043E\u0442\u0435\u043A\u0430 ${lib.name}`, "ok");
         });
         sel.addEventListener("change", () => {
@@ -47224,17 +47930,17 @@ ${f.content}
       if (!list2.children.length) list2.appendChild(el("div", { class: "empty-note", text: "\u041D\u0438\u0447\u0435\u0433\u043E \u043D\u0435 \u043D\u0430\u0439\u0434\u0435\u043D\u043E" }));
     };
     draw("");
-    host.querySelector("#libSearch").addEventListener("input", (e) => draw(e.target.value));
-    host.appendChild(el(
+    host2.querySelector("#libSearch").addEventListener("input", (e) => draw(e.target.value));
+    host2.appendChild(el(
       "div",
       { class: "mt8 muted", style: { fontSize: "10px" } },
       `\u041F\u043E\u0434\u043A\u043B\u044E\u0447\u0435\u043D\u043E: ${state.deps.length}. \u0414\u0443\u0431\u043B\u0438 \u043F\u0440\u043E\u0432\u0435\u0440\u044F\u044E\u0442\u0441\u044F \u0430\u0432\u0442\u043E\u043C\u0430\u0442\u0438\u0447\u0435\u0441\u043A\u0438.`
     ));
   }
   function renderAssets() {
-    const host = $("#assetsPanel");
-    if (!host) return;
-    host.innerHTML = "";
+    const host2 = $("#assetsPanel");
+    if (!host2) return;
+    host2.innerHTML = "";
     const assets = listFiles().filter((p) => /\.(png|jpe?g|gif|webp|svg|ico|woff2?|ttf|otf|mp3|wav|mp4|webm)$/i.test(p));
     const actions = el(
       "div",
@@ -47266,15 +47972,15 @@ ${f.content}
       el("button", { class: "mini-btn", text: "ZIP \u0430\u0441\u0441\u0435\u0442\u043E\u0432", onclick: () => exportZip({ assetsOnly: true }) }),
       el("button", { class: "mini-btn", text: "\u041E\u0447\u0438\u0441\u0442\u0438\u0442\u044C \u043B\u0438\u0448\u043D\u0438\u0435", onclick: cleanupAssets })
     );
-    host.appendChild(actions);
-    if (!assets.length) host.appendChild(el("div", { class: "empty-note", text: "\u0410\u0441\u0441\u0435\u0442\u043E\u0432 \u043F\u043E\u043A\u0430 \u043D\u0435\u0442. \u041F\u0435\u0440\u0435\u0442\u0430\u0449\u0438\u0442\u0435 \u0444\u0430\u0439\u043B\u044B \u0432 \u043E\u043A\u043D\u043E \u0440\u0435\u0434\u0430\u043A\u0442\u043E\u0440\u0430." }));
+    host2.appendChild(actions);
+    if (!assets.length) host2.appendChild(el("div", { class: "empty-note", text: "\u0410\u0441\u0441\u0435\u0442\u043E\u0432 \u043F\u043E\u043A\u0430 \u043D\u0435\u0442. \u041F\u0435\u0440\u0435\u0442\u0430\u0449\u0438\u0442\u0435 \u0444\u0430\u0439\u043B\u044B \u0432 \u043E\u043A\u043D\u043E \u0440\u0435\u0434\u0430\u043A\u0442\u043E\u0440\u0430." }));
     const grid = el("div", { class: "grid-cards" });
     for (const p of assets) {
       const f = state.files[p];
       const tile = el("div", { class: "tile" });
       const isImg = isImage(p);
       const src = isImg ? safeDataSrc(f.content) : "";
-      tile.innerHTML = `<div class="tile-ico">${src ? `<img src="${esc(src)}" style="width:100%;height:64px;object-fit:contain;border-radius:8px">` : /\.mp3|wav/.test(p) ? "\u{1F3B5}" : /\.mp4|webm/.test(p) ? "\u{1F3AC}" : "\u{1F524}"}</div>
+      tile.innerHTML = `<div class="tile-ico">${src ? `<img src="${esc(src)}" style="width:100%;height:64px;object-fit:contain;border-radius:8px">` : /\.mp3|wav/.test(p) ? "" : /\.mp4|webm/.test(p) ? "" : ""}</div>
       <b>${esc(p.split("/").pop())}</b><small>${fmtBytes(f.content.length)} \xB7 ${esc(mimeOf(p))}</small>`;
       const row = el(
         "div",
@@ -47285,7 +47991,7 @@ ${f.content}
       tile.appendChild(row);
       grid.appendChild(tile);
     }
-    host.appendChild(grid);
+    host2.appendChild(grid);
   }
   function randomAccent() {
     return state.settings.accent || "#7c6cf6";
@@ -47377,12 +48083,12 @@ ${f.content}
     toast("\u0421\u043D\u0430\u043F\u0448\u043E\u0442 \u0441\u043E\u0437\u0434\u0430\u043D", "ok", "\u0412\u0435\u0440\u0441\u0438\u0438");
     versionsDialog(snap.id);
   }
-  function versionsDialog(selected = null) {
+  function versionsDialog(selected2 = null) {
     const rows = state.snapshots.map((s) => `<div class="list-row">
     <div class="grow"><b>${esc(s.label)}</b><small>${new Date(s.at).toLocaleString("ru-RU")} \xB7 ${Object.keys(s.files).length} \u0444\u0430\u0439\u043B\u043E\u0432</small></div>
     <button class="mini-btn" data-restore="${s.id}">\u0412\u043E\u0441\u0441\u0442\u0430\u043D\u043E\u0432\u0438\u0442\u044C</button>
     <button class="mini-btn" data-diff="${s.id}">Diff</button>
-    <button class="mini-btn" data-del="${s.id}">\u2715</button></div>`).join("");
+    <button class="mini-btn" data-del="${s.id}"></button></div>`).join("");
     ctx.modal({
       title: "\u0418\u0441\u0442\u043E\u0440\u0438\u044F \u0432\u0435\u0440\u0441\u0438\u0439",
       wide: true,
@@ -47439,10 +48145,10 @@ ${f.content}
       </div>
       <div class="field"><label>Embed-\u043A\u043E\u0434</label><textarea id="embedCode" rows="3" readonly>${esc(embedCode({ height: 520 }))}</textarea></div>
       <div class="tabs-line" id="shareActions">
-        <button data-act="copyLink">\u{1F4CB} \u041A\u043E\u043F\u0438\u0440\u043E\u0432\u0430\u0442\u044C \u0441\u0441\u044B\u043B\u043A\u0443</button><button data-act="copyEmbed">\u{1F4CB} Embed</button>
+        <button data-act="copyLink"> \u041A\u043E\u043F\u0438\u0440\u043E\u0432\u0430\u0442\u044C \u0441\u0441\u044B\u043B\u043A\u0443</button><button data-act="copyEmbed"> Embed</button>
         <button data-act="gist">GitHub Gist</button><button data-act="pen">CodePen</button>
         <button data-act="fiddle">JSFiddle</button><button data-act="stackblitz">StackBlitz</button>
-        <button data-act="email">\u2709 \u041F\u0440\u0438\u0433\u043B\u0430\u0441\u0438\u0442\u044C</button><button data-act="qr">QR-\u043A\u043E\u0434</button>
+        <button data-act="email"> \u041F\u0440\u0438\u0433\u043B\u0430\u0441\u0438\u0442\u044C</button><button data-act="qr">QR-\u043A\u043E\u0434</button>
       </div><div id="shareExtra" class="mt8"></div>`,
       okText: "\u0413\u043E\u0442\u043E\u0432\u043E",
       onMount: (root) => {
@@ -47498,7 +48204,14 @@ ${f.content}
     toast("\u041E\u0442\u043A\u0440\u044B\u0442\u043E \u0432 \u043D\u043E\u0432\u043E\u0439 \u0432\u043A\u043B\u0430\u0434\u043A\u0435", "ok");
   }
 
+  // app/src/core/panels.js
+  init_core();
+  init_icons();
+  init_state();
+
   // app/src/core/analyzer.js
+  init_core();
+  init_state();
   var MAX_ANALYZE_TOTAL = 4 * 1024 * 1024;
   function analysisJob() {
     const files = {};
@@ -47745,9 +48458,9 @@ ${f.content}
         if (/console\.log/.test(line)) add2("JS050", "hint", file, L, "\u041E\u0442\u043B\u0430\u0434\u043E\u0447\u043D\u044B\u0439 console.log.", "style");
         if (/JSON\.parse/.test(line) && !/try/.test(code2)) add2("JS039", "warning", file, L, "JSON.parse \u0431\u0435\u0437 try/catch.", "correctness");
         if (/\bfetch\s*\(/.test(line) && !/\.catch|try\b/.test(code2)) add2("JS040", "warning", file, L, "fetch \u0431\u0435\u0437 \u043E\u0431\u0440\u0430\u0431\u043E\u0442\u043A\u0438 \u043E\u0448\u0438\u0431\u043A\u0438.", "correctness");
-        const q2 = /(?:querySelector(?:All)?|getElementById)\s*\(\s*['"]([^'"]+)['"]/.exec(line);
-        if (q2) {
-          const sel = q2[1];
+        const q = /(?:querySelector(?:All)?|getElementById)\s*\(\s*['"]([^'"]+)['"]/.exec(line);
+        if (q) {
+          const sel = q[1];
           const found = sel.startsWith("#") ? !!ids[sel.slice(1)] : sel.startsWith(".") ? classes.has(sel.slice(1)) : tags3.has(sel.toLowerCase());
           behavior.selectors.push({ selector: sel, line: L, file, exists: found });
           if (!found) add2("JS060", "error", file, L, `\u0421\u0435\u043B\u0435\u043A\u0442\u043E\u0440 "${sel}" \u043D\u0435 \u043D\u0430\u0439\u0434\u0435\u043D \u0432 HTML \u2014 \u0431\u0443\u0434\u0435\u0442 TypeError \u043F\u0440\u0438 \u043E\u0431\u0440\u0430\u0449\u0435\u043D\u0438\u0438 \u043A null.`, "correctness", "\u041F\u0440\u043E\u0432\u0435\u0440\u044C\u0442\u0435 \u044D\u043B\u0435\u043C\u0435\u043D\u0442");
@@ -47878,11 +48591,11 @@ ${summary.steps.map((s) => "- " + s.text).join("\n")}
     renderAnalysis();
   }
   function renderAnalysis() {
-    const host = $("#analysisPanel");
-    if (!host) return;
+    const host2 = $("#analysisPanel");
+    if (!host2) return;
     const r = state.report;
     if (!r) {
-      host.innerHTML = `<div class="analysis-hero"><div class="score-ring" style="--score:0"><span class="num">\u2014</span></div>
+      host2.innerHTML = `<div class="analysis-hero"><div class="score-ring" style="--score:0"><span class="num">\u2014</span></div>
       <div class="analysis-hero-text"><h2>\u0427\u0442\u043E \u0434\u0435\u043B\u0430\u0435\u0442 \u0432\u0430\u0448 \u043A\u043E\u0434?</h2>
       <p class="analysis-desc">\u041D\u0430\u0436\u043C\u0438\u0442\u0435 \xAB\u0410\u043D\u0430\u043B\u0438\u0437 \u043A\u043E\u0434\u0430\xBB \u2014 Python-\u0434\u0432\u0438\u0436\u043E\u043A \u0440\u0430\u0437\u0431\u0435\u0440\u0451\u0442 HTML, CSS \u0438 JS, \u043E\u0431\u044A\u044F\u0441\u043D\u0438\u0442 \u043F\u043E\u0432\u0435\u0434\u0435\u043D\u0438\u0435 \u0438 \u043D\u0430\u0439\u0434\u0451\u0442 \u043E\u0448\u0438\u0431\u043A\u0438.</p>
       <div class="engine-line"><button class="mini-btn" data-cmd="analyze">\u25B6 \u0417\u0430\u043F\u0443\u0441\u0442\u0438\u0442\u044C \u0430\u043D\u0430\u043B\u0438\u0437</button><span>Ctrl+Shift+A</span></div></div></div>
@@ -47893,17 +48606,17 @@ ${summary.steps.map((s) => "- " + s.text).join("\n")}
       return;
     }
     const py = r.engine?.startsWith("runlet-python");
-    host.innerHTML = `
+    host2.innerHTML = `
     <div class="analysis-hero">
       <div class="score-ring" style="--score:${r.score}"><span class="num">${r.score}</span><span class="lbl">/ 100</span></div>
       <div class="analysis-hero-text">
         <span class="verdict ${r.summary.verdict_level}">${esc(r.summary.verdict)}</span>
         <h2>${esc(r.summary.headline)}</h2>
         <p class="analysis-desc">${esc(r.summary.description)}</p>
-        <div class="engine-line"><span class="pill ${py ? "pill-accent" : ""}">${py ? "\u{1F40D} Python-\u0434\u0432\u0438\u0436\u043E\u043A" : "\u26A1 JS-\u0430\u043D\u0430\u043B\u0438\u0437"}</span>
+        <div class="engine-line"><span class="pill ${py ? "pill-accent" : ""}">${icon(py ? "code" : "info", 12)} ${py ? "Python-\u0434\u0432\u0438\u0436\u043E\u043A" : "JS-\u0430\u043D\u0430\u043B\u0438\u0437"}</span>
           <span>${r.elapsed_ms} \u043C\u0441</span><span>${r.diagnostics.length} \u0437\u0430\u043C\u0435\u0447\u0430\u043D\u0438\u0439</span>
-          <button class="mini-btn" data-cmd="analyze">\u21BB \u041E\u0431\u043D\u043E\u0432\u0438\u0442\u044C</button>
-          <button class="mini-btn" data-cmd="analysisReport">\u26F6 \u0420\u0430\u0437\u0432\u0435\u0440\u043D\u0443\u0442\u044C</button></div>
+          <button class="mini-btn" data-cmd="analyze">${icon("refresh", 12)} \u041E\u0431\u043D\u043E\u0432\u0438\u0442\u044C</button>
+          <button class="mini-btn" data-cmd="analysisReport">${icon("maximize", 12)} \u0420\u0430\u0437\u0432\u0435\u0440\u043D\u0443\u0442\u044C</button></div>
       </div>
     </div>
     <div class="grade-bars">${Object.entries(r.grades).map(([k, v]) => `
@@ -47913,29 +48626,30 @@ ${summary.steps.map((s) => "- " + s.text).join("\n")}
         <div>${esc(s.text)}<span class="conf">${esc(s.confidence)}</span></div></div>`).join("")}</div></div>
     <div class="section"><h3>\u041E\u0448\u0438\u0431\u043A\u0438 \u0438 \u0437\u0430\u043C\u0435\u0447\u0430\u043D\u0438\u044F <span class="count">${r.diagnostics.length}</span></h3>
       <div class="sev-filters">${["all", "error", "warning", "info", "hint"].map((f) => `<button class="sev-chip ${diagFilter === f ? "active" : ""}" data-sev="${f}">${sevRu[f]} <span class="n">${f === "all" ? r.diagnostics.length : r.diagnostics.filter((d) => d.sev === f).length}</span></button>`).join("")}
-        <button class="sev-chip" data-cmd="fixAll">\u{1F6E0} \u0418\u0441\u043F\u0440\u0430\u0432\u0438\u0442\u044C</button></div>
+        <button class="sev-chip" data-cmd="fixAll">${icon("wand", 12)} \u0418\u0441\u043F\u0440\u0430\u0432\u0438\u0442\u044C</button></div>
       <div class="diag-list">${diagnosticsHtml(r)}</div></div>
     ${chipsHtml(r)}
     <div class="section"><h3>\u0414\u043B\u044F \u043D\u043E\u0432\u0438\u0447\u043A\u0430 <button class="mini-btn" id="beginnerToggle" style="margin-left:auto">${beginnerMode ? "\u0421\u043A\u0440\u044B\u0442\u044C" : "\u041E\u0431\u044A\u044F\u0441\u043D\u0438\u0442\u044C"}</button></h3>
       <div class="beginner ${beginnerMode ? "" : "hidden"}" id="beginnerBox"><ul>${r.summary.beginner.map((b) => `<li>${esc(b)}</li>`).join("")}</ul></div></div>
     <div class="rowflex" style="padding:0 14px 14px">
-      <button class="mini-btn" data-cmd="exportReportMd">\u2B07 Markdown</button>
-      <button class="mini-btn" data-cmd="exportReportJson">\u2B07 JSON</button>
-      <button class="mini-btn" data-cmd="copyReport">\u{1F4CB} \u041A\u043E\u043F\u0438\u0440\u043E\u0432\u0430\u0442\u044C</button>
-      <button class="mini-btn" data-cmd="assistant">\u2726 \u0421\u043F\u0440\u043E\u0441\u0438\u0442\u044C \u0430\u0441\u0441\u0438\u0441\u0442\u0435\u043D\u0442\u0430</button></div>`;
-    host.querySelectorAll("[data-sev]").forEach((b) => b.addEventListener("click", () => {
+      <button class="mini-btn" data-cmd="exportReportMd">${icon("download", 12)} Markdown</button>
+      <button class="mini-btn" data-cmd="exportReportJson">${icon("download", 12)} JSON</button>
+      <button class="mini-btn" data-cmd="copyReport">${icon("copy", 12)} \u041A\u043E\u043F\u0438\u0440\u043E\u0432\u0430\u0442\u044C</button>
+      <button class="mini-btn" data-cmd="helpWelcome">${icon("help", 12)} \u041A\u0430\u043A \u0440\u0430\u0431\u043E\u0442\u0430\u0442\u044C</button>
+      </div>`;
+    host2.querySelectorAll("[data-sev]").forEach((b) => b.addEventListener("click", () => {
       diagFilter = b.dataset.sev;
       renderAnalysis();
     }));
-    host.querySelectorAll(".diag-top .file").forEach((b) => b.addEventListener("click", () => {
+    host2.querySelectorAll(".diag-top .file").forEach((b) => b.addEventListener("click", () => {
       const d = r.diagnostics.find((x2) => x2.id === b.dataset.rid && x2.line === +b.dataset.line);
       if (d) gotoDiagnostic(d);
     }));
-    host.querySelectorAll("[data-fix]").forEach((b) => b.addEventListener("click", () => {
+    host2.querySelectorAll("[data-fix]").forEach((b) => b.addEventListener("click", () => {
       const d = r.diagnostics.find((x2) => x2.id === b.dataset.fix && x2.line === +b.dataset.line);
       if (d) applyFix(d);
     }));
-    host.querySelectorAll(".diag-msg").forEach((n) => n.addEventListener("click", () => n.parentElement.querySelector(".diag-why")?.classList.toggle("hidden")));
+    host2.querySelectorAll(".diag-msg").forEach((n) => n.addEventListener("click", () => n.parentElement.querySelector(".diag-why")?.classList.toggle("hidden")));
     $("#beginnerToggle")?.addEventListener("click", () => {
       beginnerMode = !beginnerMode;
       renderAnalysis();
@@ -47945,14 +48659,14 @@ ${summary.steps.map((s) => "- " + s.text).join("\n")}
   var sevRu = { all: "\u0432\u0441\u0435", error: "\u043E\u0448\u0438\u0431\u043A\u0438", warning: "\u043F\u0440\u0435\u0434\u0443\u043F\u0440.", info: "\u0438\u043D\u0444\u043E", hint: "\u0441\u043E\u0432\u0435\u0442\u044B" };
   function diagnosticsHtml(r) {
     const list2 = r.diagnostics.filter((d) => diagFilter === "all" || d.sev === diagFilter);
-    if (!list2.length) return '<div class="empty-note">\u0417\u0434\u0435\u0441\u044C \u0447\u0438\u0441\u0442\u043E \u2728</div>';
+    if (!list2.length) return '<div class="empty-note">\u0417\u0434\u0435\u0441\u044C \u0447\u0438\u0441\u0442\u043E </div>';
     return list2.slice(0, 90).map((d) => `<div class="diag ${d.sev}">
     <div class="diag-top"><span class="sev ${d.sev}">${{ error: "\u041E\u0428\u0418\u0411\u041A\u0410", warning: "\u0412\u041D\u0418\u041C\u0410\u041D\u0418\u0415", info: "\u0418\u041D\u0424\u041E", hint: "\u0421\u041E\u0412\u0415\u0422" }[d.sev]}</span>
       <span>${esc(d.id)} \xB7 ${esc(gradesRu[d.cat] || d.cat)}</span>
       <span class="file" data-rid="${esc(d.id)}" data-line="${d.line}">${esc(d.file)}:${d.line} \u2197</span></div>
     <p class="diag-msg">${esc(d.msg)}</p>
     ${d.why ? `<div class="diag-why hidden"><b>\u041F\u043E\u0447\u0435\u043C\u0443:</b> ${esc(d.why)}</div>` : ""}
-    ${d.fix ? `<div class="diag-fix">\u{1F4A1} ${esc(d.fix)}</div>` : ""}
+    ${d.fix ? `<div class="diag-fix"> ${esc(d.fix)}</div>` : ""}
     <div class="diag-actions">${d.edit ? `<button class="mini-btn" data-fix="${esc(d.id)}" data-line="${d.line}">\u0418\u0441\u043F\u0440\u0430\u0432\u0438\u0442\u044C</button>` : ""}
       <button class="mini-btn" data-cmd="gotoDiag" data-rid="${esc(d.id)}" data-line="${d.line}">\u041A \u0441\u0442\u0440\u043E\u043A\u0435</button>
       <button class="mini-btn" data-cmd="explainDiag" data-rid="${esc(d.id)}" data-line="${d.line}">\u041E\u0431\u044A\u044F\u0441\u043D\u0438\u0442\u044C</button></div>
@@ -47961,13 +48675,13 @@ ${summary.steps.map((s) => "- " + s.text).join("\n")}
   function chipsHtml(r) {
     const b = r.behavior || {};
     const chips = [];
-    for (const e of (b.events || []).slice(0, 6)) chips.push(`<span class="chip">\u26A1 <b>${esc(e.type)}</b> \u2192 ${esc(e.target)}</span>`);
-    for (const n of (b.network || []).slice(0, 4)) chips.push(`<span class="chip">\u{1F310} <b>${esc(n.method || "fetch")}</b> ${esc(String(n.url).slice(0, 40))}</span>`);
+    for (const e of (b.events || []).slice(0, 6)) chips.push(`<span class="chip"> <b>${esc(e.type)}</b> \u2192 ${esc(e.target)}</span>`);
+    for (const n of (b.network || []).slice(0, 4)) chips.push(`<span class="chip"> <b>${esc(n.method || "fetch")}</b> ${esc(String(n.url).slice(0, 40))}</span>`);
     for (const t2 of (b.timers || []).slice(0, 3)) chips.push(`<span class="chip">\u23F1 ${esc(t2.kind || "timer")}</span>`);
-    for (const s of (b.storage || []).slice(0, 4)) chips.push(`<span class="chip">\u{1F4BE} <b>${esc(s.store)}</b> ${esc(s.key)}</span>`);
+    for (const s of (b.storage || []).slice(0, 4)) chips.push(`<span class="chip"> <b>${esc(s.store)}</b> ${esc(s.key)}</span>`);
     for (const c of (b.colors || []).slice(0, 6)) {
       const col = sanitizeColor(c.value, "transparent");
-      chips.push(`<span class="chip">\u{1F3A8} <b style="color:${col}">\u25A0</b> ${esc(String(c.value).slice(0, 40))}</span>`);
+      chips.push(`<span class="chip"> <b style="color:${col}">\u25A0</b> ${esc(String(c.value).slice(0, 40))}</span>`);
     }
     if (!chips.length) return "";
     return `<div class="section"><h3>\u041F\u043E\u0432\u0435\u0434\u0435\u043D\u0438\u0435 \u043A\u043E\u0434\u0430</h3><div class="chips">${chips.join("")}</div></div>`;
@@ -47975,7 +48689,7 @@ ${summary.steps.map((s) => "- " + s.text).join("\n")}
   function fullAnalysisReport() {
     const r = state.report;
     ctx.modal({
-      title: "\u{1F9E0} \u041F\u043E\u043B\u043D\u044B\u0439 \u0430\u043D\u0430\u043B\u0438\u0437 \u043A\u043E\u0434\u0430",
+      title: " \u041F\u043E\u043B\u043D\u044B\u0439 \u0430\u043D\u0430\u043B\u0438\u0437 \u043A\u043E\u0434\u0430",
       wide: true,
       body: `<div id="fullReport" class="analysis-report">${r ? reportBody(r) : '<div class="empty-note">\u0421\u043D\u0430\u0447\u0430\u043B\u0430 \u0437\u0430\u043F\u0443\u0441\u0442\u0438\u0442\u0435 \u0430\u043D\u0430\u043B\u0438\u0437</div>'}</div>`,
       okText: "\u0417\u0430\u043A\u0440\u044B\u0442\u044C",
@@ -48009,7 +48723,7 @@ ${summary.steps.map((s) => "- " + s.text).join("\n")}
       ${metric("\u0421\u043E\u0431\u044B\u0442\u0438\u0439", r.behavior?.events?.length || 0)}${metric("\u0411\u0438\u0442\u044B\u0445 \u0441\u0441\u044B\u043B\u043E\u043A", r.metrics?.broken_links || 0)}
       </div></div>
     <div class="section"><h3>\u041E\u0431\u044A\u044F\u0441\u043D\u0435\u043D\u0438\u0435 \u0434\u043B\u044F \u043D\u043E\u0432\u0438\u0447\u043A\u0430</h3><div class="beginner"><ul>${r.summary.beginner.map((b) => `<li>${esc(b)}</li>`).join("")}</ul></div></div>
-    <div class="section"><h3>\u0413\u043B\u043E\u0441\u0441\u0430\u0440\u0438\u0439</h3><div class="chips">${(r.glossary || []).slice(0, 12).map((g) => `<span class="chip" title="${esc(g.meaning)}"><b>${esc(g.term)}</b></span>`).join("")}</div></div>`;
+    <div class="section"><h3>\u0413\u043B\u043E\u0441\u0441\u0430\u0440\u0438\u0439</h3><div class="chips">${(r.glossary || []).slice(0, 12).map((g2) => `<span class="chip" title="${esc(g2.meaning)}"><b>${esc(g2.term)}</b></span>`).join("")}</div></div>`;
   }
   function metric(label, v) {
     return `<div class="grade"><span>${label}</span><b>${v}</b></div>`;
@@ -48023,8 +48737,8 @@ ${summary.steps.map((s) => "- " + s.text).join("\n")}
     toast("\u041E\u0442\u0447\u0451\u0442 \u0441\u043E\u0445\u0440\u0430\u043D\u0451\u043D", "ok");
   }
   function renderConsole() {
-    const host = $("#consolePanel");
-    if (!host) return;
+    const host2 = $("#consolePanel");
+    if (!host2) return;
     const levels = { all: 0, log: 0, info: 0, warn: 1, error: 2 };
     let logs = state.logs;
     if (state.consoleFilter !== "all") logs = logs.filter((l) => l.level === state.consoleFilter);
@@ -48035,36 +48749,36 @@ ${summary.steps.map((s) => "- " + s.text).join("\n")}
       } catch (e) {
       }
     }
-    if (!host.dataset.wired) {
-      host.dataset.wired = "1";
-      host.innerHTML = `<div class="insp-toolbar">
+    if (!host2.dataset.wired) {
+      host2.dataset.wired = "1";
+      host2.innerHTML = `<div class="insp-toolbar">
       <select id="logLevel" class="mini-select"><option value="all">\u0432\u0441\u0435</option><option value="log">log</option><option value="info">info</option><option value="warn">warn</option><option value="error">error</option></select>
       <input id="logSearch" placeholder="\u041F\u043E\u0438\u0441\u043A / regex\u2026" style="flex:1;min-width:70px;height:25px;border-radius:8px;border:1px solid var(--border);background:var(--code-bg);padding:0 8px;font-size:11px">
       <label class="chk"><input type="checkbox" id="logGroup" ${state.consoleGroup ? "checked" : ""}> \u0433\u0440\u0443\u043F\u043F\u0438\u0440\u043E\u0432\u0430\u0442\u044C</label>
-      <button class="mini-btn" id="logClear">\u041E\u0447\u0438\u0441\u0442\u0438\u0442\u044C</button><button class="mini-btn" id="logSave">\u2B07</button>
+      <button class="mini-btn" id="logClear">\u041E\u0447\u0438\u0441\u0442\u0438\u0442\u044C</button><button class="mini-btn" id="logSave"></button>
       <button class="mini-btn" id="logJson">JSON</button></div>
       <div class="console-list" id="logList" style="flex:1;overflow:auto"></div>
       <div class="repl-bar"><span class="repl-prompt">\u203A</span><input id="replInput" placeholder="\u0412\u0432\u0435\u0434\u0438\u0442\u0435 JS-\u0432\u044B\u0440\u0430\u0436\u0435\u043D\u0438\u0435 (Enter \u2014 \u0432\u044B\u043F\u043E\u043B\u043D\u0438\u0442\u044C)" autocomplete="off">
       <button class="mini-btn" id="replRun">\u21B5</button></div>`;
-      host.querySelector("#logLevel").addEventListener("change", (e) => {
+      host2.querySelector("#logLevel").addEventListener("change", (e) => {
         state.consoleFilter = e.target.value;
         renderConsole();
       });
-      host.querySelector("#logSearch").addEventListener("input", debounce((e) => {
+      host2.querySelector("#logSearch").addEventListener("input", debounce((e) => {
         state.consoleSearch = e.target.value;
         renderConsole();
       }, 200));
-      host.querySelector("#logGroup").addEventListener("change", (e) => {
+      host2.querySelector("#logGroup").addEventListener("change", (e) => {
         state.consoleGroup = e.target.checked;
         renderConsole();
       });
-      host.querySelector("#logClear").addEventListener("click", () => {
+      host2.querySelector("#logClear").addEventListener("click", () => {
         state.logs = [];
         renderConsole();
       });
-      host.querySelector("#logSave").addEventListener("click", () => download("runlet-console.txt", state.logs.map((l) => `[${l.level}] ${l.text}`).join("\n"), "text/plain"));
-      host.querySelector("#logJson").addEventListener("click", () => download("runlet-console.json", JSON.stringify(state.logs, null, 2), "application/json"));
-      const input = host.querySelector("#replInput");
+      host2.querySelector("#logSave").addEventListener("click", () => download("runlet-console.txt", state.logs.map((l) => `[${l.level}] ${l.text}`).join("\n"), "text/plain"));
+      host2.querySelector("#logJson").addEventListener("click", () => download("runlet-console.json", JSON.stringify(state.logs, null, 2), "application/json"));
+      const input = host2.querySelector("#replInput");
       const runExpr = async () => {
         const expr = input.value.trim();
         if (!expr) return;
@@ -48079,7 +48793,7 @@ ${summary.steps.map((s) => "- " + s.text).join("\n")}
         input.value = "";
         renderConsole();
       };
-      host.querySelector("#replRun").addEventListener("click", runExpr);
+      host2.querySelector("#replRun").addEventListener("click", runExpr);
       input.addEventListener("keydown", (e) => {
         if (e.key === "Enter") {
           e.preventDefault();
@@ -48095,7 +48809,7 @@ ${summary.steps.map((s) => "- " + s.text).join("\n")}
         }
       });
     }
-    const list2 = host.querySelector("#logList");
+    const list2 = host2.querySelector("#logList");
     if (!list2) return;
     let rows = logs;
     if (state.consoleGroup) {
@@ -48130,11 +48844,11 @@ ${summary.steps.map((s) => "- " + s.text).join("\n")}
     if (n) n.textContent = state.logs.length;
   }
   function renderDebug() {
-    const host = $("#debugPanel");
-    if (!host) return;
+    const host2 = $("#debugPanel");
+    if (!host2) return;
     const bps = Object.entries(state.breakpoints).flatMap(([f, arr]) => arr.map((b) => ({ ...b, file: f })));
     const trace = state.trace || [];
-    host.innerHTML = `<div class="insp-toolbar">
+    host2.innerHTML = `<div class="insp-toolbar">
       <button class="mini-btn" id="dbgRefresh">\u21BB \u0422\u0440\u0430\u0441\u0441\u0438\u0440\u043E\u0432\u043A\u0430</button>
       <button class="mini-btn" id="dbgStepInto">\u2193 Step into</button>
       <button class="mini-btn" id="dbgStepOver">\u2192 Step over</button>
@@ -48143,8 +48857,8 @@ ${summary.steps.map((s) => "- " + s.text).join("\n")}
       <button class="mini-btn" id="dbgAddBp">\uFF0B \u0422\u043E\u0447\u043A\u0430</button></div>
     <div class="section"><h3>\u0422\u043E\u0447\u043A\u0438 \u043E\u0441\u0442\u0430\u043D\u043E\u0432\u0430 <span class="count">${bps.length}</span></h3>
       <div class="debug-steps">${bps.length ? bps.map((b) => `<div class="kv"><span>${esc(b.file)}:${b.line}</span>
-        <span>${b.condition ? "\u2753 " + esc(b.condition) : "\u043E\u0431\u044B\u0447\u043D\u0430\u044F"}</span>
-        <button class="mini-btn" data-bpdel="${esc(b.file)}:${b.line}">\u2715</button></div>`).join("") : '<div class="empty-note">\u041A\u043B\u0438\u043A \xAB\uFF0B \u0422\u043E\u0447\u043A\u0430\xBB \u0438 \u0443\u043A\u0430\u0436\u0438\u0442\u0435 \u0441\u0442\u0440\u043E\u043A\u0443</div>'}</div></div>
+        <span>${b.condition ? " " + esc(b.condition) : "\u043E\u0431\u044B\u0447\u043D\u0430\u044F"}</span>
+        <button class="mini-btn" data-bpdel="${esc(b.file)}:${b.line}"></button></div>`).join("") : '<div class="empty-note">\u041A\u043B\u0438\u043A \xAB\uFF0B \u0422\u043E\u0447\u043A\u0430\xBB \u0438 \u0443\u043A\u0430\u0436\u0438\u0442\u0435 \u0441\u0442\u0440\u043E\u043A\u0443</div>'}</div></div>
     <div class="section"><h3>\u0412\u044B\u043F\u043E\u043B\u043D\u0435\u043D\u043D\u044B\u0435 \u0441\u0442\u0440\u043E\u043A\u0438 <span class="count">${trace.length}</span></h3>
       <div class="debug-steps" id="timeline" style="max-height:150px;overflow:auto">${trace.slice(-120).map((t2, i4) => `<div class="timeline-row ${i4 === state.traceIndex ? "active" : ""}" data-ti="${i4}">
         <span>${t2.t}ms</span><b>${esc(t2.file)}:${t2.line}</b><span>${esc(Object.keys(t2.vars || {}).slice(0, 5).join(", "))}</span></div>`).join("") || '<div class="empty-note">\u0417\u0430\u043F\u0443\u0441\u0442\u0438\u0442\u0435 \u043A\u043E\u0434 \u2014 \u0442\u0440\u0430\u0441\u0441\u0438\u0440\u043E\u0432\u0449\u0438\u043A \u0437\u0430\u043F\u0438\u0448\u0435\u0442 executed lines</div>'}</div></div>
@@ -48152,41 +48866,41 @@ ${summary.steps.map((s) => "- " + s.text).join("\n")}
       <div class="debug-steps" id="scopeBox">${scopeHtml()}</div>
       <div class="rowflex" style="padding:0 10px 10px"><input id="watchInput" placeholder="watch: \u0432\u044B\u0440\u0430\u0436\u0435\u043D\u0438\u0435" style="flex:1;height:26px;border-radius:8px;border:1px solid var(--border);background:var(--code-bg);padding:0 8px;font-size:11px"><button class="mini-btn" id="watchAdd">\uFF0B</button></div></div>
     <div class="section"><h3>Call stack</h3><div class="stack-list">${stackHtml()}</div></div>`;
-    host.querySelector("#dbgRefresh").onclick = () => {
+    host2.querySelector("#dbgRefresh").onclick = () => {
       send("getTrace", {});
       toast("\u0417\u0430\u043F\u0440\u043E\u0448\u0435\u043D\u0430 \u0442\u0440\u0430\u0441\u0441\u0438\u0440\u043E\u0432\u043A\u0430", "info");
     };
-    host.querySelector("#dbgStepInto").onclick = () => step(1);
-    host.querySelector("#dbgStepOver").onclick = () => {
+    host2.querySelector("#dbgStepInto").onclick = () => step(1);
+    host2.querySelector("#dbgStepOver").onclick = () => {
       const d = (state.trace[state.traceIndex] || {}).depth || 0;
       let i4 = state.traceIndex + 1;
       while (i4 < state.trace.length && (state.trace[i4].depth || 0) > d) i4++;
       state.traceIndex = Math.min(i4, state.trace.length - 1);
       renderDebug();
     };
-    host.querySelector("#dbgStepOut").onclick = () => {
+    host2.querySelector("#dbgStepOut").onclick = () => {
       const d = (state.trace[state.traceIndex] || {}).depth || 0;
       let i4 = state.traceIndex + 1;
       while (i4 < state.trace.length && (state.trace[i4].depth || 0) >= d) i4++;
       state.traceIndex = Math.min(i4, state.trace.length - 1);
       renderDebug();
     };
-    host.querySelector("#dbgResume").onclick = () => {
+    host2.querySelector("#dbgResume").onclick = () => {
       state.traceIndex = state.trace.length - 1;
       renderDebug();
       toast("\u041F\u0440\u043E\u0434\u043E\u043B\u0436\u0435\u043D\u043E \u0434\u043E \u043A\u043E\u043D\u0446\u0430 \u0442\u0440\u0430\u0441\u0441\u0438\u0440\u043E\u0432\u043A\u0438", "info");
     };
-    host.querySelector("#dbgAddBp").onclick = addBreakpointDialog;
-    host.querySelectorAll("[data-bpdel]").forEach((b) => b.onclick = () => {
+    host2.querySelector("#dbgAddBp").onclick = addBreakpointDialog;
+    host2.querySelectorAll("[data-bpdel]").forEach((b) => b.onclick = () => {
       const [f, l] = b.dataset.bpdel.split(":");
       setBreakpoint(f, +l);
     });
-    host.querySelectorAll("[data-ti]").forEach((n) => n.onclick = () => {
+    host2.querySelectorAll("[data-ti]").forEach((n) => n.onclick = () => {
       state.traceIndex = +n.dataset.ti;
       renderDebug();
     });
-    host.querySelector("#watchAdd").onclick = async () => {
-      const input = host.querySelector("#watchInput"), expr = input.value.trim();
+    host2.querySelector("#watchAdd").onclick = async () => {
+      const input = host2.querySelector("#watchInput"), expr = input.value.trim();
       if (!expr) return;
       state.watch.push(expr);
       const res = await evalInPreview(expr);
@@ -48205,7 +48919,7 @@ ${summary.steps.map((s) => "- " + s.text).join("\n")}
     const vars = t2?.vars || {};
     const entries = Object.entries(vars);
     const watches = state.watch || [];
-    return (entries.length ? entries.slice(0, 16).map(([k, v]) => `<div class="kv"><span>${esc(k)}</span><b>${esc(typeof v === "object" ? JSON.stringify(v) : String(v))}</b></div>`).join("") : '<div class="dim" style="padding:4px">\u041F\u0435\u0440\u0435\u043C\u0435\u043D\u043D\u044B\u0435 \u043F\u043E\u044F\u0432\u044F\u0442\u0441\u044F \u043F\u0440\u0438 \u0448\u0430\u0433\u0435 \u043F\u043E \u0442\u0440\u0430\u0441\u0441\u0438\u0440\u043E\u0432\u043A\u0435</div>') + watches.map((w) => `<div class="kv"><span>\u{1F441} ${esc(w)}</span><b>${esc((state.watchValues || {})[w] || "\u2014")}</b></div>`).join("");
+    return (entries.length ? entries.slice(0, 16).map(([k, v]) => `<div class="kv"><span>${esc(k)}</span><b>${esc(typeof v === "object" ? JSON.stringify(v) : String(v))}</b></div>`).join("") : '<div class="dim" style="padding:4px">\u041F\u0435\u0440\u0435\u043C\u0435\u043D\u043D\u044B\u0435 \u043F\u043E\u044F\u0432\u044F\u0442\u0441\u044F \u043F\u0440\u0438 \u0448\u0430\u0433\u0435 \u043F\u043E \u0442\u0440\u0430\u0441\u0441\u0438\u0440\u043E\u0432\u043A\u0435</div>') + watches.map((w) => `<div class="kv"><span> ${esc(w)}</span><b>${esc((state.watchValues || {})[w] || "\u2014")}</b></div>`).join("");
   }
   function stackHtml() {
     const t2 = state.trace[state.traceIndex];
@@ -48241,22 +48955,22 @@ ${summary.steps.map((s) => "- " + s.text).join("\n")}
     });
   }
   function renderDom() {
-    const host = $("#domPanel");
-    if (!host) return;
-    const selected = state.selectedElement;
-    host.innerHTML = `<div class="insp-toolbar"><button class="mini-btn" id="domRefresh">\u21BB \u041E\u0431\u043D\u043E\u0432\u0438\u0442\u044C DOM</button>
-      <button class="mini-btn" id="domInspect">\u2316 \u0418\u043D\u0441\u043F\u0435\u043A\u0442\u043E\u0440</button><button class="mini-btn" id="domA11y">\u267F a11y</button>
-      <button class="mini-btn" id="domSpeech">\u{1F50A} \u0421\u043A\u0440\u0438\u043D\u0440\u0438\u0434\u0435\u0440</button></div>
+    const host2 = $("#domPanel");
+    if (!host2) return;
+    const selected2 = state.selectedElement;
+    host2.innerHTML = `<div class="insp-toolbar"><button class="mini-btn" id="domRefresh">\u21BB \u041E\u0431\u043D\u043E\u0432\u0438\u0442\u044C DOM</button>
+      <button class="mini-btn" id="domInspect">\u2316 \u0418\u043D\u0441\u043F\u0435\u043A\u0442\u043E\u0440</button><button class="mini-btn" id="domA11y"> a11y</button>
+      <button class="mini-btn" id="domSpeech"> \u0421\u043A\u0440\u0438\u043D\u0440\u0438\u0434\u0435\u0440</button></div>
     <div class="dom-tree" id="domTreeBox">${state.domTree ? domHtml(state.domTree, 0) : '<div class="empty-note">\u041D\u0430\u0436\u043C\u0438\u0442\u0435 \xAB\u041E\u0431\u043D\u043E\u0432\u0438\u0442\u044C DOM\xBB</div>'}</div>
-    <div class="section"><h3>Computed styles ${selected ? "\u2014 " + esc(selected.tag) : ""}</h3>
+    <div class="section"><h3>Computed styles ${selected2 ? "\u2014 " + esc(selected2.tag) : ""}</h3>
       <div class="debug-steps">${Object.entries(state.computedStyles || {}).map(([k, v]) => `<div class="kv"><span>${esc(k)}</span><b>${esc(v)}</b></div>`).join("") || '<div class="dim">\u0412\u044B\u0431\u0435\u0440\u0438\u0442\u0435 \u044D\u043B\u0435\u043C\u0435\u043D\u0442 \u0432 \u043F\u0440\u0435\u0434\u043F\u0440\u043E\u0441\u043C\u043E\u0442\u0440\u0435</div>'}</div></div>
     <div class="section"><h3>Event listeners <span class="count">${(state.listeners || []).length}</span></h3>
       <div class="debug-steps">${(state.listeners || []).slice(-20).map((l) => `<div class="kv"><span>${esc(l.target)}</span><b>${esc(l.type)}</b></div>`).join("") || '<div class="dim">\u041D\u0435\u0442 \u0434\u0430\u043D\u043D\u044B\u0445</div>'}</div></div>`;
-    host.querySelector("#domRefresh").onclick = () => refreshInspectors();
-    host.querySelector("#domInspect").onclick = () => ctx.runCommand("inspectMode");
-    host.querySelector("#domA11y").onclick = () => emulateA11y();
-    host.querySelector("#domSpeech").onclick = () => screenReader();
-    host.querySelectorAll(".dom-node").forEach((n) => n.onclick = () => send("highlight", { selector: n.dataset.sel }));
+    host2.querySelector("#domRefresh").onclick = () => refreshInspectors();
+    host2.querySelector("#domInspect").onclick = () => ctx.runCommand("inspectMode");
+    host2.querySelector("#domA11y").onclick = () => emulateA11y();
+    host2.querySelector("#domSpeech").onclick = () => screenReader();
+    host2.querySelectorAll(".dom-node").forEach((n) => n.onclick = () => send("highlight", { selector: n.dataset.sel }));
   }
   function domHtml(node, depth) {
     if (!node || depth > 6) return "";
@@ -48267,36 +48981,36 @@ ${summary.steps.map((s) => "- " + s.text).join("\n")}
     ${node.text ? `<span class="dim"> ${esc(node.text.slice(0, 40))}</span>` : ""}</div>` + (node.kids || []).map((k) => domHtml(k, depth + 1)).join("");
   }
   function renderNetwork() {
-    const host = $("#networkPanel");
-    if (!host) return;
+    const host2 = $("#networkPanel");
+    if (!host2) return;
     const items = state.network || [];
     const rows = items.slice(-60).map((n) => {
       const color = n.status >= 400 || n.status < 0 ? "var(--err)" : "var(--ok)";
       return '<div class="kv"><span style="max-width:55%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + esc(n.url) + '">' + esc(n.method || "GET") + " " + esc(n.url) + '</span><b style="color:' + color + '">' + (n.status || "\u2014") + "</b><span>" + (n.ms || 0) + "ms" + (n.local ? " \xB7 VFS" : "") + "</span></div>";
     }).join("");
     const empty3 = '<div class="empty-note">\u0417\u0430\u043F\u0440\u043E\u0441\u043E\u0432 \u043F\u043E\u043A\u0430 \u043D\u0435\u0442. \u0412\u044B\u0437\u043E\u0432\u0438\u0442\u0435 fetch() \u2014 \u0437\u0430\u043F\u0440\u043E\u0441 \u043F\u043E\u044F\u0432\u0438\u0442\u0441\u044F \u0437\u0434\u0435\u0441\u044C.</div>';
-    host.innerHTML = '<div class="insp-toolbar"><button class="mini-btn" id="netRefresh">\u21BB</button><span class="muted">' + items.length + ' \u0437\u0430\u043F\u0440\u043E\u0441\u043E\u0432</span><button class="mini-btn" id="netClear">\u041E\u0447\u0438\u0441\u0442\u0438\u0442\u044C</button></div><div class="debug-steps">' + (rows || empty3) + "</div>";
-    host.querySelector("#netRefresh").onclick = () => send("getNetwork", {});
-    host.querySelector("#netClear").onclick = () => {
+    host2.innerHTML = '<div class="insp-toolbar"><button class="mini-btn" id="netRefresh">\u21BB</button><span class="muted">' + items.length + ' \u0437\u0430\u043F\u0440\u043E\u0441\u043E\u0432</span><button class="mini-btn" id="netClear">\u041E\u0447\u0438\u0441\u0442\u0438\u0442\u044C</button></div><div class="debug-steps">' + (rows || empty3) + "</div>";
+    host2.querySelector("#netRefresh").onclick = () => send("getNetwork", {});
+    host2.querySelector("#netClear").onclick = () => {
       state.network = [];
       renderNetwork();
     };
   }
   function renderStorage() {
-    const host = $("#storagePanel");
-    if (!host) return;
+    const host2 = $("#storagePanel");
+    if (!host2) return;
     const d = state.storageData || {};
     const block = (title, obj) => `<div class="section"><h3>${title}</h3><div class="debug-steps">${Object.entries(obj || {}).map(([k, v]) => `<div class="kv"><span>${esc(k)}</span><b>${esc(String(v).slice(0, 60))}</b></div>`).join("") || '<div class="dim">\u043F\u0443\u0441\u0442\u043E</div>'}</div></div>`;
-    host.innerHTML = `<div class="insp-toolbar"><button class="mini-btn" id="stRefresh">\u21BB \u041E\u0431\u043D\u043E\u0432\u0438\u0442\u044C</button><span class="muted">\u0438\u0437\u043E\u043B\u0438\u0440\u043E\u0432\u0430\u043D\u043E \u0432 sandbox</span></div>` + block("localStorage", d.local) + block("sessionStorage", d.session) + `<div class="section"><h3>Cookies</h3><div class="debug-steps"><div class="kv"><span>document.cookie</span><b>${esc(d.cookies || "\u2014")}</b></div></div></div>`;
-    host.querySelector("#stRefresh").onclick = () => send("getStorage", {});
+    host2.innerHTML = `<div class="insp-toolbar"><button class="mini-btn" id="stRefresh">\u21BB \u041E\u0431\u043D\u043E\u0432\u0438\u0442\u044C</button><span class="muted">\u0438\u0437\u043E\u043B\u0438\u0440\u043E\u0432\u0430\u043D\u043E \u0432 sandbox</span></div>` + block("localStorage", d.local) + block("sessionStorage", d.session) + `<div class="section"><h3>Cookies</h3><div class="debug-steps"><div class="kv"><span>document.cookie</span><b>${esc(d.cookies || "\u2014")}</b></div></div></div>`;
+    host2.querySelector("#stRefresh").onclick = () => send("getStorage", {});
   }
   function renderPerf() {
-    const host = $("#perfPanel");
-    if (!host) return;
+    const host2 = $("#perfPanel");
+    if (!host2) return;
     const p = state.perf || {}, r = state.report;
     const size = Object.values(state.files).reduce((n, f) => n + (f.content?.length || 0), 0);
     const lighthouse = r?.score ?? Math.max(0, 100 - Math.round(size / 2e3));
-    host.innerHTML = `<div class="insp-toolbar"><button class="mini-btn" id="perfRefresh">\u21BB \u0417\u0430\u043C\u0435\u0440\u044B</button>
+    host2.innerHTML = `<div class="insp-toolbar"><button class="mini-btn" id="perfRefresh">\u21BB \u0417\u0430\u043C\u0435\u0440\u044B</button>
     <button class="mini-btn" id="perfTips">\u0421\u043E\u0432\u0435\u0442\u044B</button><span class="spacer"></span>
     <span class="muted">Lighthouse-\u043F\u043E\u0434\u043E\u0431\u043D\u0430\u044F \u043E\u0446\u0435\u043D\u043A\u0430: <b style="color:${lighthouse > 75 ? "var(--ok)" : "var(--warn)"}">${lighthouse}</b></span></div>
     <div class="grade-bars" style="padding-top:12px">
@@ -48304,33 +49018,33 @@ ${summary.steps.map((s) => "- " + s.text).join("\n")}
       ${metric("\u0420\u0435\u043D\u0434\u0435\u0440", (p.renderMs || p.load || 0) + " ms")}${metric("\u0411\u0430\u043D\u0434\u043B", fmtBytes(size))}${metric("\u042D\u043B\u0435\u043C\u0435\u043D\u0442\u043E\u0432", p.elements || 0)}</div>
     <div class="section"><h3>\u0420\u0435\u0441\u0443\u0440\u0441\u044B</h3><div class="debug-steps">${(p.resources || []).slice(0, 20).map((x2) => `<div class="kv"><span style="max-width:70%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(x2.name.slice(0, 70))}</span><b>${x2.duration}ms</b></div>`).join("") || '<div class="dim">\u0412\u043D\u0435\u0448\u043D\u0438\u0445 \u0440\u0435\u0441\u0443\u0440\u0441\u043E\u0432 \u043D\u0435\u0442</div>'}</div></div>
     <div class="section"><h3>Long tasks</h3><div class="debug-steps"><div class="kv"><span>\u0417\u0430\u0434\u0430\u0447 > 50 \u043C\u0441</span><b>${p.longTasks || 0}</b></div></div></div>`;
-    host.querySelector("#perfRefresh").onclick = () => send("getPerf", {});
-    host.querySelector("#perfTips").onclick = () => ctx.modal({
+    host2.querySelector("#perfRefresh").onclick = () => send("getPerf", {});
+    host2.querySelector("#perfTips").onclick = () => ctx.modal({
       title: "\u0421\u043E\u0432\u0435\u0442\u044B \u043F\u043E \u043F\u0440\u043E\u0438\u0437\u0432\u043E\u0434\u0438\u0442\u0435\u043B\u044C\u043D\u043E\u0441\u0442\u0438",
       body: '<ul style="font-size:12px;line-height:1.8">' + perfTips().map((t2) => `<li>${esc(t2)}</li>`).join("") + "</ul>",
       okText: "\u041F\u043E\u043D\u044F\u0442\u043D\u043E"
     });
   }
   function renderLog() {
-    const host = $("#logPanel");
-    if (!host) return;
-    host.innerHTML = `<div class="insp-toolbar"><button class="mini-btn" id="logExport">\u2B07 \u0416\u0443\u0440\u043D\u0430\u043B</button>
+    const host2 = $("#logPanel");
+    if (!host2) return;
+    host2.innerHTML = `<div class="insp-toolbar"><button class="mini-btn" id="logExport"> \u0416\u0443\u0440\u043D\u0430\u043B</button>
     <button class="mini-btn" id="logClear2">\u041E\u0447\u0438\u0441\u0442\u0438\u0442\u044C</button><span class="spacer"></span><span class="muted">${state.activity.length} \u0441\u043E\u0431\u044B\u0442\u0438\u0439</span></div>
     <div class="debug-steps">${state.activity.map((a) => `<div class="kv"><span>${new Date(a.t).toLocaleTimeString("ru-RU")}</span><b style="font-weight:400;text-align:right">${esc(a.msg.slice(0, 90))}</b></div>`).join("") || '<div class="empty-note">\u0416\u0443\u0440\u043D\u0430\u043B \u043F\u0443\u0441\u0442</div>'}</div>`;
-    host.querySelector("#logExport").onclick = () => download("runlet-activity.json", JSON.stringify(state.activity, null, 2), "application/json");
-    host.querySelector("#logClear2").onclick = () => {
+    host2.querySelector("#logExport").onclick = () => download("runlet-activity.json", JSON.stringify(state.activity, null, 2), "application/json");
+    host2.querySelector("#logClear2").onclick = () => {
       state.activity = [];
       renderLog();
     };
   }
   function showA11yScan(data3) {
     ctx.modal({
-      title: "\u267F \u041E\u0442\u0447\u0451\u0442 \u043E \u0434\u043E\u0441\u0442\u0443\u043F\u043D\u043E\u0441\u0442\u0438",
+      title: " \u041E\u0442\u0447\u0451\u0442 \u043E \u0434\u043E\u0441\u0442\u0443\u043F\u043D\u043E\u0441\u0442\u0438",
       wide: false,
       body: `<p><b>\u0424\u043E\u043A\u0443\u0441\u0438\u0440\u0443\u0435\u043C\u044B\u0445 \u044D\u043B\u0435\u043C\u0435\u043D\u0442\u043E\u0432:</b> ${data3.focusables}</p><p><b>\u0417\u0430\u0433\u043E\u043B\u043E\u0432\u043A\u043E\u0432:</b> ${data3.headings}</p>
       <p><b>\u042F\u0437\u044B\u043A \u0441\u0442\u0440\u0430\u043D\u0438\u0446\u044B:</b> ${esc(data3.lang || "\u043D\u0435 \u0443\u043A\u0430\u0437\u0430\u043D")}</p>
       <h4 style="margin:12px 0 6px">\u041F\u0440\u043E\u0431\u043B\u0435\u043C\u044B (${data3.issues.length})</h4>
-      <ul style="font-size:12px;line-height:1.7">${data3.issues.length ? data3.issues.map((i4) => `<li>${esc(i4)}</li>`).join("") : "<li>\u041F\u0440\u043E\u0431\u043B\u0435\u043C \u043D\u0435 \u043D\u0430\u0439\u0434\u0435\u043D\u043E \u2705</li>"}</ul>`,
+      <ul style="font-size:12px;line-height:1.7">${data3.issues.length ? data3.issues.map((i4) => `<li>${esc(i4)}</li>`).join("") : "<li>\u041F\u0440\u043E\u0431\u043B\u0435\u043C \u043D\u0435 \u043D\u0430\u0439\u0434\u0435\u043D\u043E </li>"}</ul>`,
       okText: "\u0417\u0430\u043A\u0440\u044B\u0442\u044C"
     });
   }
@@ -48357,355 +49071,27 @@ ${summary.steps.map((s) => "- " + s.text).join("\n")}
     });
   }
 
-  // app/src/core/assistant.js
-  var messages = [];
-  function initAssistant() {
-    const host = $("#assistantPanel");
-    if (!host) return;
-    host.innerHTML = `<div class="insp-toolbar"><span class="pill pill-accent">\u2726 \u043B\u043E\u043A\u0430\u043B\u044C\u043D\u044B\u0439 \u0430\u0441\u0441\u0438\u0441\u0442\u0435\u043D\u0442</span>
-      <span class="spacer"></span><button class="mini-btn" id="aiClear">\u041E\u0447\u0438\u0441\u0442\u0438\u0442\u044C</button></div>
-    <div class="chat" id="aiChat"></div>
-    <div class="quick-prompts" id="aiQuick"></div>
-    <div class="repl-bar"><span class="repl-prompt">\u2726</span><input id="aiInput" placeholder="\u0421\u043F\u0440\u043E\u0441\u0438\u0442\u0435: \xAB\u0447\u0442\u043E \u0434\u0435\u043B\u0430\u0435\u0442 \u043A\u043E\u0434?\xBB, \xAB\u0438\u0441\u043F\u0440\u0430\u0432\u044C \u043E\u0448\u0438\u0431\u043A\u0438\xBB\u2026">
-      <button class="mini-btn" id="aiSend">\u27A4</button></div>`;
-    const quick = [
-      "\u0427\u0442\u043E \u0434\u0435\u043B\u0430\u0435\u0442 \u043A\u043E\u0434?",
-      "\u041E\u0431\u044A\u044F\u0441\u043D\u0438 \u043A\u0430\u043A \u043D\u043E\u0432\u0438\u0447\u043A\u0443",
-      "\u041D\u0430\u0439\u0434\u0438 \u043E\u0448\u0438\u0431\u043A\u0438",
-      "\u0418\u0441\u043F\u0440\u0430\u0432\u044C \u0432\u0441\u0451",
-      "\u0421\u0434\u0435\u043B\u0430\u0439 \u043A\u0430\u0440\u0442\u043E\u0447\u043A\u0443",
-      "\u0421\u0433\u0435\u043D\u0435\u0440\u0438\u0440\u0443\u0439 \u0442\u0435\u0441\u0442\u044B",
-      "SEO-\u043C\u0435\u0442\u0430\u0442\u0435\u0433\u0438",
-      "\u041F\u0440\u043E\u0432\u0435\u0440\u044C \u0431\u0435\u0437\u043E\u043F\u0430\u0441\u043D\u043E\u0441\u0442\u044C"
-    ];
-    const qp = host.querySelector("#aiQuick");
-    for (const q2 of quick) {
-      const b = el("button", { class: "mini-btn", text: q2, onclick: () => {
-        host.querySelector("#aiInput").value = q2;
-        ask(q2);
-      } });
-      qp.appendChild(b);
-    }
-    const input = host.querySelector("#aiInput");
-    input.addEventListener("keydown", (e) => {
-      if (e.key === "Enter") {
-        e.preventDefault();
-        ask(input.value);
-        input.value = "";
-      }
-    });
-    host.querySelector("#aiSend").onclick = () => {
-      ask(input.value);
-      input.value = "";
-    };
-    host.querySelector("#aiClear").onclick = () => {
-      messages.length = 0;
-      render();
-    };
-    push("bot", "\u041F\u0440\u0438\u0432\u0435\u0442! \u042F \u043B\u043E\u043A\u0430\u043B\u044C\u043D\u044B\u0439 \u0430\u0441\u0441\u0438\u0441\u0442\u0435\u043D\u0442 Runlet \u{1F40D}. \u0423\u043C\u0435\u044E \u043E\u0431\u044A\u044F\u0441\u043D\u044F\u0442\u044C \u043A\u043E\u0434 \u043F\u043E \u043E\u0442\u0447\u0451\u0442\u0443 Python-\u0434\u0432\u0438\u0436\u043A\u0430, \u0438\u0441\u043A\u0430\u0442\u044C \u043E\u0448\u0438\u0431\u043A\u0438, \u0433\u0435\u043D\u0435\u0440\u0438\u0440\u043E\u0432\u0430\u0442\u044C \u0440\u0430\u0437\u043C\u0435\u0442\u043A\u0443, \u0442\u0435\u0441\u0442\u044B, \u0434\u043E\u043A\u0443\u043C\u0435\u043D\u0442\u0430\u0446\u0438\u044E \u0438 SEO. \u0412\u0441\u0451 \u0440\u0430\u0431\u043E\u0442\u0430\u0435\u0442 \u043E\u0444\u043B\u0430\u0439\u043D, \u0431\u0435\u0437 \u043A\u043B\u044E\u0447\u0435\u0439 API.");
-    render();
-  }
-  function push(who, text, code2 = "", actions = []) {
-    messages.push({ who, text, code: code2, actions });
-    render();
-  }
-  function render() {
-    const chat = $("#aiChat");
-    if (!chat) return;
-    chat.innerHTML = messages.map((m, i4) => `<div class="msg ${m.who}">
-    ${esc(m.text)}${m.code ? `<pre>${esc(m.code)}</pre>` : ""}
-    ${m.code ? `<div class="msg-actions"><button class="mini-btn" data-ai-insert="${i4}">\u0412\u0441\u0442\u0430\u0432\u0438\u0442\u044C</button>
-      <button class="mini-btn" data-ai-copy="${i4}">\u041A\u043E\u043F\u0438\u0440\u043E\u0432\u0430\u0442\u044C</button>
-      <button class="mini-btn" data-ai-file="${i4}">\u0412 \u0444\u0430\u0439\u043B</button></div>` : ""}
-    ${(m.actions || []).map((a, j) => `<button class="mini-btn" data-ai-action="${i4}:${j}">${esc(a.label)}</button>`).join("")}
-    </div>`).join("");
-    chat.scrollTop = chat.scrollHeight;
-    chat.querySelectorAll("[data-ai-insert]").forEach((b) => b.onclick = () => insertText(messages[+b.dataset.aiInsert].code));
-    chat.querySelectorAll("[data-ai-copy]").forEach((b) => b.onclick = () => {
-      copy(messages[+b.dataset.aiCopy].code);
-      toast("\u0421\u043A\u043E\u043F\u0438\u0440\u043E\u0432\u0430\u043D\u043E", "ok");
-    });
-    chat.querySelectorAll("[data-ai-file]").forEach((b) => b.onclick = () => {
-      const code2 = messages[+b.dataset.aiFile].code;
-      const ext = /<[a-z]+|<!doctype/i.test(code2) ? "html" : /[{};]\s*(\.|-?\w+:)/.test(code2) && !/\bfunction\b|\bconst\b/.test(code2) ? "css" : "js";
-      const p = `generated/${Date.now().toString(36)}.${ext}`;
-      write(p, code2);
-      emit("files:changed", { path: p });
-      toast("\u0421\u043E\u0437\u0434\u0430\u043D " + p, "ok");
-    });
-    chat.querySelectorAll("[data-ai-action]").forEach((b) => b.onclick = () => {
-      const [i4, j] = b.dataset.aiAction.split(":").map(Number);
-      messages[i4].actions[j]?.run?.();
-    });
-  }
-  function ask(question3) {
-    const q2 = String(question3 || "").trim();
-    if (!q2) return;
-    push("user", q2);
-    const low = q2.toLowerCase();
-    const r = state.report;
-    const code2 = allTextFiles();
-    const joined = Object.values(code2).join("\n").slice(0, 6e4);
-    setTimeout(() => respond(low, q2, r, joined), 120);
-  }
-  function respond(low, q2, r, joined) {
-    if (/привет|здравств|help|помощь|что умеешь/.test(low)) {
-      push(
-        "bot",
-        "\u042F \u0430\u043D\u0430\u043B\u0438\u0437\u0438\u0440\u0443\u044E \u043F\u0440\u043E\u0435\u043A\u0442 \u043B\u043E\u043A\u0430\u043B\u044C\u043D\u043E. \u041F\u043E\u043F\u0440\u043E\u0431\u0443\u0439\u0442\u0435: \xAB\u0447\u0442\u043E \u0434\u0435\u043B\u0430\u0435\u0442 \u043A\u043E\u0434?\xBB, \xAB\u043E\u0431\u044A\u044F\u0441\u043D\u0438 \u0432\u044B\u0434\u0435\u043B\u0435\u043D\u043D\u043E\u0435\xBB, \xAB\u043D\u0430\u0439\u0434\u0438 \u043E\u0448\u0438\u0431\u043A\u0438\xBB, \xAB\u0438\u0441\u043F\u0440\u0430\u0432\u044C \u0432\u0441\u0451\xBB, \xAB\u0441\u0434\u0435\u043B\u0430\u0439 \u0444\u043E\u0440\u043C\u0443\xBB, \xAB\u0441\u0433\u0435\u043D\u0435\u0440\u0438\u0440\u0443\u0439 \u0442\u0435\u0441\u0442\u044B\xBB, \xABREADME\xBB.",
-        "",
-        [{ label: "\u25B6 \u0410\u043D\u0430\u043B\u0438\u0437", run: () => runAnalysis2() }]
-      );
-      return;
-    }
-    if (/исправь|почини|fix|автопочин/.test(low)) {
-      const n = fixAllSafe(20);
-      push(
-        "bot",
-        `\u041F\u0440\u0438\u043C\u0435\u043D\u0438\u043B ${n} \u0431\u0435\u0437\u043E\u043F\u0430\u0441\u043D\u044B\u0445 \u0430\u0432\u0442\u043E\u0438\u0441\u043F\u0440\u0430\u0432\u043B\u0435\u043D\u0438\u0439. \u041E\u0448\u0438\u0431\u043A\u0438 \u0443\u0440\u043E\u0432\u043D\u044F error \u043B\u0443\u0447\u0448\u0435 \u0441\u043C\u043E\u0442\u0440\u0435\u0442\u044C \u0432\u0440\u0443\u0447\u043D\u0443\u044E \u2014 \u0442\u0430\u043C \u0447\u0430\u0441\u0442\u043E \u043D\u0443\u0436\u043D\u0430 \u043B\u043E\u0433\u0438\u043A\u0430.`,
-        "",
-        [{ label: "\u041F\u0435\u0440\u0435\u0437\u0430\u043F\u0443\u0441\u0442\u0438\u0442\u044C \u0430\u043D\u0430\u043B\u0438\u0437", run: () => runAnalysis2() }]
-      );
-      return;
-    }
-    if (/ошибк|error|проблем|слома|баг/.test(low)) {
-      if (!r) {
-        push("bot", "\u0421\u043D\u0430\u0447\u0430\u043B\u0430 \u0437\u0430\u043F\u0443\u0441\u0442\u0438\u0442\u0435 \u0430\u043D\u0430\u043B\u0438\u0437 \u043A\u043E\u0434\u0430 \u2014Ctrl+Shift+A.");
-        return;
-      }
-      const errs = r.diagnostics.filter((d) => d.sev === "error");
-      const warns = r.diagnostics.filter((d) => d.sev === "warning");
-      push(
-        "bot",
-        `\u041D\u0430\u0448\u0451\u043B ${errs.length} \u043E\u0448\u0438\u0431\u043E\u043A \u0438 ${warns.length} \u043F\u0440\u0435\u0434\u0443\u043F\u0440\u0435\u0436\u0434\u0435\u043D\u0438\u0439. ${r.summary.verdict}.
-
-\u0413\u043B\u0430\u0432\u043D\u043E\u0435:
-` + errs.slice(0, 6).map((d, i4) => `${i4 + 1}. ${d.file}:${d.line} \u2014 ${d.msg}`).join("\n"),
-        "",
-        [{ label: "\u{1F6E0} \u0418\u0441\u043F\u0440\u0430\u0432\u0438\u0442\u044C \u0431\u0435\u0437\u043E\u043F\u0430\u0441\u043D\u043E\u0435", run: () => fixAllSafe() }, { label: "\u041F\u043E\u043B\u043D\u044B\u0439 \u043E\u0442\u0447\u0451\u0442", run: () => ctx.runCommand("analysisReport") }]
-      );
-      return;
-    }
-    if (/объясни|что делает|как работает|explain|новичк/.test(low)) {
-      const sel = getSelection2();
-      if (sel && sel.length > 4) {
-        push("bot", explainSnippet(sel, r));
-        return;
-      }
-      if (!r) {
-        push("bot", "\u0417\u0430\u043F\u0443\u0441\u0442\u0438\u0442\u0435 \u0430\u043D\u0430\u043B\u0438\u0437, \u0447\u0442\u043E\u0431\u044B \u044F \u0441\u043E\u0431\u0440\u0430\u043B \u043E\u0431\u044A\u044F\u0441\u043D\u0435\u043D\u0438\u0435 \u043F\u043E \u0432\u0441\u0435\u043C\u0443 \u043F\u0440\u043E\u0435\u043A\u0442\u0443.");
-        return;
-      }
-      const text = /новичк|простыми|как новичку/.test(low) ? r.summary.beginner.join("\n") : `${r.summary.headline}
-
-${r.summary.description}
-
-\u0427\u0442\u043E \u043F\u0440\u043E\u0438\u0437\u043E\u0439\u0434\u0451\u0442:
-` + r.summary.steps.map((s, i4) => `${i4 + 1}. ${s.text} (${s.confidence})`).join("\n");
-      push("bot", text, "", [{ label: "\u041E\u0442\u0447\u0451\u0442 \u0446\u0435\u043B\u0438\u043A\u043E\u043C", run: () => ctx.runCommand("analysisReport") }]);
-      return;
-    }
-    if (/тест|test/.test(low)) {
-      const t2 = generateTests(joined);
-      push("bot", "\u0421\u0433\u0435\u043D\u0435\u0440\u0438\u0440\u043E\u0432\u0430\u043B \u043A\u0430\u0440\u043A\u0430\u0441 \u0442\u0435\u0441\u0442\u043E\u0432 \u0434\u043B\u044F \u043D\u0430\u0439\u0434\u0435\u043D\u043D\u044B\u0445 \u0444\u0443\u043D\u043A\u0446\u0438\u0439. \u0414\u043E\u0431\u0430\u0432\u044C\u0442\u0435 \u043A\u043E\u043D\u043A\u0440\u0435\u0442\u043D\u044B\u0435 \u043F\u0440\u043E\u0432\u0435\u0440\u043A\u0438 \u0432 TODO.", t2);
-      return;
-    }
-    if (/документ|jsdoc|doc/.test(low)) {
-      push("bot", "\u0414\u043E\u043A\u0443\u043C\u0435\u043D\u0442\u0430\u0446\u0438\u044F \u043F\u043E \u0444\u0443\u043D\u043A\u0446\u0438\u044F\u043C \u043F\u0440\u043E\u0435\u043A\u0442\u0430:", generateDocs(joined));
-      return;
-    }
-    if (/readme|описани/.test(low)) {
-      push("bot", "README \u0434\u043B\u044F \u043F\u0440\u043E\u0435\u043A\u0442\u0430:", generateReadme());
-      return;
-    }
-    if (/changelog|изменен/.test(low)) {
-      push("bot", "Changelog:", generateChangelog2());
-      return;
-    }
-    if (/seo|мета|micro|schema|og:/.test(low)) {
-      push("bot", "\u0412\u0441\u0442\u0430\u0432\u044C\u0442\u0435 \u044D\u0442\u043E \u0432 <head>:", generateSEO());
-      return;
-    }
-    if (/alt|доступн|a11y| aria/.test(low)) {
-      const html2 = read(state.entry);
-      push("bot", "\u0412\u0435\u0440\u0441\u0438\u044F \u0441 \u0443\u043B\u0443\u0447\u0448\u0435\u043D\u043D\u043E\u0439 \u0434\u043E\u0441\u0442\u0443\u043F\u043D\u043E\u0441\u0442\u044C\u044E (\u0434\u043E\u0431\u0430\u0432\u043B\u0435\u043D\u044B alt \u0438 aria-label):", accessibleWrap(html2));
-      return;
-    }
-    if (/безопасн|security|xss|уязвим/.test(low)) {
-      const f = securityScan(joined);
-      push("bot", f.length ? `\u041D\u0430\u0439\u0434\u0435\u043D\u043E \u043F\u043E\u0442\u0435\u043D\u0446\u0438\u0430\u043B\u044C\u043D\u044B\u0445 \u043F\u0440\u043E\u0431\u043B\u0435\u043C: ${f.length}
-` + f.map((x2) => `\u2022 [${x2.sev}] ${x2.msg} (\u0441\u0442\u0440\u043E\u043A\u0430 ~${x2.line})`).join("\n") : "\u042F\u0432\u043D\u044B\u0445 \u043F\u0440\u043E\u0431\u043B\u0435\u043C \u0431\u0435\u0437\u043E\u043F\u0430\u0441\u043D\u043E\u0441\u0442\u0438 \u043D\u0435 \u043D\u0430\u0448\u0451\u043B \u2705");
-      return;
-    }
-    if (/оптимиз|производ|perf|быстр/.test(low)) {
-      push("bot", "\u0420\u0435\u043A\u043E\u043C\u0435\u043D\u0434\u0430\u0446\u0438\u0438:\n" + perfTips().map((t2) => "\u2022 " + t2).join("\n"));
-      return;
-    }
-    if (/рефактор|refactor|улучши код/.test(low)) {
-      const sel = getSelection2() || getDoc("js");
-      const out = refactorSelection(sel);
-      if (out === sel) {
-        push("bot", "\u0423\u0436\u0435 \u0432\u044B\u0433\u043B\u044F\u0434\u0438\u0442 \u043D\u0435\u043F\u043B\u043E\u0445\u043E: var \u0438 \u043D\u0435\u0441\u0442\u0440\u043E\u0433\u0438\u0435 \u0441\u0440\u0430\u0432\u043D\u0435\u043D\u0438\u044F \u043D\u0435 \u043D\u0430\u0439\u0434\u0435\u043D\u044B.");
-        return;
-      }
-      push("bot", "\u041F\u0440\u0435\u0434\u043B\u0430\u0433\u0430\u044E \u0442\u0430\u043A\u043E\u0439 \u0432\u0430\u0440\u0438\u0430\u043D\u0442 (var\u2192let, ==\u2192===):", out);
-      return;
-    }
-    if (/палитр|цвет|color/.test(low)) {
-      const base2 = (/#([0-9a-f]{6})/i.exec(q2) || [])[0] || state.settings.accent;
-      const p = paletteFrom(base2, 6);
-      push("bot", `\u041F\u0430\u043B\u0438\u0442\u0440\u0430 \u043D\u0430 \u043E\u0441\u043D\u043E\u0432\u0435 ${base2}: ${p.join(", ")}`, `:root {
-${p.map((c, i4) => `  --brand-${i4 + 1}: ${c};`).join("\n")}
-}`);
-      return;
-    }
-    if (/мок|данн|json|uuid|случайн/.test(low)) {
-      push("bot", "\u0421\u0433\u0435\u043D\u0435\u0440\u0438\u0440\u043E\u0432\u0430\u043B \u043C\u043E\u043A-\u0434\u0430\u043D\u043D\u044B\u0435:", generateMockData(6));
-      return;
-    }
-    if (/json|форматир/.test(low)) {
-      push("bot", "\u041E\u0442\u0444\u043E\u0440\u043C\u0430\u0442\u0438\u0440\u043E\u0432\u0430\u043D\u043D\u044B\u0439 JSON:", (() => {
-        try {
-          return JSON.stringify(JSON.parse(getSelection2() || getDoc("js")), null, 2);
-        } catch (e) {
-          return "\u041D\u0435\u0432\u0430\u043B\u0438\u0434\u043D\u044B\u0439 JSON: " + e.message;
-        }
-      })());
-      return;
-    }
-    if (/сделай|создай|сгенерируй|напиши|generate|построй|верст/.test(low)) {
-      const { code: code2, lang, note } = generateFromDescription(low);
-      insertText(code2, lang);
-      push("bot", note, code2);
-      return;
-    }
-    if (/перевод|translate|i18n/.test(low)) {
-      push(
-        "bot",
-        "\u0414\u043B\u044F \u0438\u043D\u0442\u0435\u0440\u0444\u0435\u0439\u0441\u0430 \u0440\u0435\u0434\u0430\u043A\u0442\u043E\u0440\u0430 \u043F\u0435\u0440\u0435\u043A\u043B\u044E\u0447\u0438\u0442\u0435 \u043B\u043E\u043A\u0430\u043B\u044C RU/EN \u0432 \u043D\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0430\u0445. \u0422\u0435\u043A\u0441\u0442\u044B \u0441\u0442\u0440\u0430\u043D\u0438\u0446\u044B \u043C\u043E\u0436\u043D\u043E \u043F\u0435\u0440\u0435\u0432\u0435\u0441\u0442\u0438 \u0447\u0435\u0440\u0435\u0437 \u0441\u043B\u043E\u0432\u0430\u0440\u044C:",
-        `const i18n = { ru: { hello: '\u041F\u0440\u0438\u0432\u0435\u0442' }, en: { hello: 'Hello' } };
-document.querySelector('h1').textContent = i18n[location.hash.slice(1) || 'ru'].hello;`
-      );
-      return;
-    }
-    if (/анимац|animation/.test(low)) {
-      push("bot", "\u041F\u043B\u0430\u0432\u043D\u043E\u0435 \u043F\u043E\u044F\u0432\u043B\u0435\u043D\u0438\u0435 \u044D\u043B\u0435\u043C\u0435\u043D\u0442\u0430:", `@keyframes reveal { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: none; } }
-.reveal { animation: reveal .6s cubic-bezier(.2,.8,.2,1) both; }
-@media (prefers-reduced-motion: reduce) { .reveal { animation: none; } }`);
-      return;
-    }
-    if (r) push("bot", `\u041A\u043E\u0440\u043E\u0442\u043A\u043E: ${r.summary.verdict}. ${r.summary.headline}
-
-${r.summary.steps[0]?.text || ""}
-
-\u0421\u043F\u0440\u043E\u0441\u0438\u0442\u0435 \u043A\u043E\u043D\u043A\u0440\u0435\u0442\u043D\u0435\u0435: \xAB\u043E\u0431\u044A\u044F\u0441\u043D\u0438 \u043A\u043E\u0434\xBB, \xAB\u043D\u0430\u0439\u0434\u0438 \u043E\u0448\u0438\u0431\u043A\u0438\xBB, \xAB\u0441\u0434\u0435\u043B\u0430\u0439 \u0444\u043E\u0440\u043C\u0443\xBB, \xAB\u0441\u0433\u0435\u043D\u0435\u0440\u0438\u0440\u0443\u0439 \u0442\u0435\u0441\u0442\u044B\xBB.`);
-    else push("bot", "\u042F \u043F\u043E\u043A\u0430 \u043D\u0435 \u043F\u043E\u043D\u0438\u043C\u0430\u044E \u0437\u0430\u043F\u0440\u043E\u0441. \u0421\u043D\u0430\u0447\u0430\u043B\u0430 \u0437\u0430\u043F\u0443\u0441\u0442\u0438\u0442\u0435 \u0430\u043D\u0430\u043B\u0438\u0437 \u043A\u043E\u0434\u0430, \u0437\u0430\u0442\u0435\u043C \u0441\u043F\u0440\u043E\u0441\u0438\u0442\u0435 \xAB\u0447\u0442\u043E \u0434\u0435\u043B\u0430\u0435\u0442 \u043A\u043E\u0434?\xBB \u0438\u043B\u0438 \xAB\u043D\u0430\u0439\u0434\u0438 \u043E\u0448\u0438\u0431\u043A\u0438\xBB.");
-  }
-  function explainSnippet(sel, r) {
-    const lines = sel.split("\n");
-    const hits = [];
-    const patterns = [
-      [/querySelector|getElementById/, "\u0418\u0449\u0435\u0442 \u044D\u043B\u0435\u043C\u0435\u043D\u0442 \u043D\u0430 \u0441\u0442\u0440\u0430\u043D\u0438\u0446\u0435 \u043F\u043E \u0441\u0435\u043B\u0435\u043A\u0442\u043E\u0440\u0443. \u0415\u0441\u043B\u0438 \u044D\u043B\u0435\u043C\u0435\u043D\u0442 \u043D\u0435 \u043D\u0430\u0439\u0434\u0435\u043D \u2014 \u0432\u0435\u0440\u043D\u0451\u0442\u0441\u044F null, \u043F\u043E\u044D\u0442\u043E\u043C\u0443 \u0434\u0430\u043B\u044C\u0448\u0435 \u043D\u0443\u0436\u043D\u0430 \u043F\u0440\u043E\u0432\u0435\u0440\u043A\u0430."],
-      [/addEventListener/, "\u041F\u043E\u0434\u043F\u0438\u0441\u044B\u0432\u0430\u0435\u0442\u0441\u044F \u043D\u0430 \u0441\u043E\u0431\u044B\u0442\u0438\u0435: \u043A\u043E\u0434 \u0432\u043D\u0443\u0442\u0440\u0438 \u0432\u044B\u043F\u043E\u043B\u043D\u0438\u0442\u0441\u044F \u043D\u0435 \u0441\u0440\u0430\u0437\u0443, \u0430 \u043A\u043E\u0433\u0434\u0430 \u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u0435\u043B\u044C (\u0438\u043B\u0438 \u0431\u0440\u0430\u0443\u0437\u0435\u0440) \u0432\u044B\u0437\u043E\u0432\u0435\u0442 \u044D\u0442\u043E \u0441\u043E\u0431\u044B\u0442\u0438\u0435."],
-      [/fetch|XMLHttpRequest/, "\u0414\u0435\u043B\u0430\u0435\u0442 \u0441\u0435\u0442\u0435\u0432\u043E\u0439 \u0437\u0430\u043F\u0440\u043E\u0441. \u041E\u0442\u0432\u0435\u0442 \u043F\u0440\u0438\u0445\u043E\u0434\u0438\u0442 \u0430\u0441\u0438\u043D\u0445\u0440\u043E\u043D\u043D\u043E \u2014 \u043D\u0443\u0436\u0435\u043D await \u0438\u043B\u0438 .then(), \u0430 \u043E\u0448\u0438\u0431\u043A\u0438 \u043D\u0430\u0434\u043E \u043B\u043E\u0432\u0438\u0442\u044C."],
-      [/localStorage|sessionStorage/, "\u0421\u043E\u0445\u0440\u0430\u043D\u044F\u0435\u0442 \u0434\u0430\u043D\u043D\u044B\u0435 \u0432 \u0431\u0440\u0430\u0443\u0437\u0435\u0440\u0435. \u041E\u043D\u0438 \u043E\u0441\u0442\u0430\u043D\u0443\u0442\u0441\u044F \u043F\u043E\u0441\u043B\u0435 \u043F\u0435\u0440\u0435\u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0438 \u0441\u0442\u0440\u0430\u043D\u0438\u0446\u044B."],
-      [/innerHTML|textContent/, "\u041C\u0435\u043D\u044F\u0435\u0442 \u0441\u043E\u0434\u0435\u0440\u0436\u0438\u043C\u043E\u0435 \u044D\u043B\u0435\u043C\u0435\u043D\u0442\u0430. textContent \u0431\u0435\u0437\u043E\u043F\u0430\u0441\u043D\u0435\u0435: \u043E\u043D \u043D\u0435 \u0432\u044B\u043F\u043E\u043B\u043D\u044F\u0435\u0442 HTML."],
-      [/console\.log/, "\u041F\u0435\u0447\u0430\u0442\u0430\u0435\u0442 \u0437\u043D\u0430\u0447\u0435\u043D\u0438\u0435 \u0432 \u043A\u043E\u043D\u0441\u043E\u043B\u044C \u0440\u0435\u0434\u0430\u043A\u0442\u043E\u0440\u0430 (\u0432\u043A\u043B\u0430\u0434\u043A\u0430 \xAB\u041A\u043E\u043D\u0441\u043E\u043B\u044C\xBB)."],
-      [/for\s*\(|\.forEach|\.map/, "\u041F\u0435\u0440\u0435\u0431\u0438\u0440\u0430\u0435\u0442 \u043A\u043E\u043B\u043B\u0435\u043A\u0446\u0438\u044E: \u0442\u0435\u043B\u043E \u0432\u044B\u043F\u043E\u043B\u043D\u0438\u0442\u0441\u044F \u043F\u043E \u0440\u0430\u0437\u0443 \u0434\u043B\u044F \u043A\u0430\u0436\u0434\u043E\u0433\u043E \u044D\u043B\u0435\u043C\u0435\u043D\u0442\u0430."],
-      [/if\s*\(|\?\s*:/, "\u0423\u0441\u043B\u043E\u0432\u043D\u044B\u0439 \u043F\u0435\u0440\u0435\u0445\u043E\u0434: \u043E\u0434\u043D\u0430 \u0432\u0435\u0442\u043A\u0430 \u0432\u044B\u043F\u043E\u043B\u043D\u044F\u0435\u0442\u0441\u044F, \u0435\u0441\u043B\u0438 \u0443\u0441\u043B\u043E\u0432\u0438\u0435 \u0438\u0441\u0442\u0438\u043D\u043D\u043E."],
-      [/=>|function/, "\u041E\u0431\u044A\u044F\u0432\u043B\u0435\u043D\u0438\u0435 \u0444\u0443\u043D\u043A\u0446\u0438\u0438 \u2014 \u0431\u043B\u043E\u043A\u0430 \u043A\u043E\u0434\u0430, \u043A\u043E\u0442\u043E\u0440\u044B\u0439 \u043C\u043E\u0436\u043D\u043E \u0432\u044B\u0437\u0432\u0430\u0442\u044C \u043F\u043E\u0437\u0436\u0435."],
-      [/const|let|var/, "\u0421\u043E\u0437\u0434\u0430\u0451\u0442 \u043F\u0435\u0440\u0435\u043C\u0435\u043D\u043D\u0443\u044E \u2014 \u0438\u043C\u0435\u043D\u043E\u0432\u0430\u043D\u043D\u043E\u0435 \u043C\u0435\u0441\u0442\u043E \u0434\u043B\u044F \u0437\u043D\u0430\u0447\u0435\u043D\u0438\u044F."],
-      [/display\s*:|grid-template|flex/, "CSS-\u043F\u0440\u0430\u0432\u0438\u043B\u043E, \u0443\u043F\u0440\u0430\u0432\u043B\u044F\u044E\u0449\u0435\u0435 \u0440\u0430\u0441\u043F\u043E\u043B\u043E\u0436\u0435\u043D\u0438\u0435\u043C \u044D\u043B\u0435\u043C\u0435\u043D\u0442\u043E\u0432."],
-      [/#[0-9a-f]{3,8}|rgb\(|hsl\(/i, "\u0426\u0432\u0435\u0442 \u0432 CSS."],
-      [/@media/, "\u041C\u0435\u0434\u0438\u0430\u0437\u0430\u043F\u0440\u043E\u0441: \u0441\u0442\u0438\u043B\u0438 \u043F\u0440\u0438\u043C\u0435\u043D\u044F\u044E\u0442\u0441\u044F \u0442\u043E\u043B\u044C\u043A\u043E \u043F\u0440\u0438 \u043F\u043E\u0434\u0445\u043E\u0434\u044F\u0449\u0438\u0445 \u0443\u0441\u043B\u043E\u0432\u0438\u044F\u0445 (\u0448\u0438\u0440\u0438\u043D\u0430, \u0442\u0435\u043C\u0430)."]
-    ];
-    for (const [re, text] of patterns) if (re.test(sel)) hits.push(text);
-    const russian = {
-      querySelector: "\u043F\u043E\u0438\u0441\u043A \u044D\u043B\u0435\u043C\u0435\u043D\u0442\u0430",
-      addEventListener: "\u043E\u0431\u0440\u0430\u0431\u043E\u0442\u0447\u0438\u043A \u0441\u043E\u0431\u044B\u0442\u0438\u044F",
-      fetch: "\u0441\u0435\u0442\u0435\u0432\u043E\u0439 \u0437\u0430\u043F\u0440\u043E\u0441",
-      innerHTML: "\u0437\u0430\u043C\u0435\u043D\u0430 HTML",
-      console: "\u0432\u044B\u0432\u043E\u0434 \u0432 \u043A\u043E\u043D\u0441\u043E\u043B\u044C"
-    };
-    return `\u0412\u044B\u0434\u0435\u043B\u0435\u043D\u043E ${lines.length} \u0441\u0442\u0440\u043E\u043A. ${hits.length ? "\u0427\u0442\u043E \u0437\u0434\u0435\u0441\u044C \u043F\u0440\u043E\u0438\u0441\u0445\u043E\u0434\u0438\u0442:\n" + hits.map((h, i4) => `${i4 + 1}. ${h}`).join("\n") : "\u042D\u0442\u043E \u0444\u0440\u0430\u0433\u043C\u0435\u043D\u0442 \u043A\u043E\u0434\u0430, \u043A\u043E\u0442\u043E\u0440\u044B\u0439 \u0434\u0432\u0438\u0436\u043E\u043A \u0440\u0430\u0437\u0431\u0435\u0440\u0451\u0442 \u043F\u0440\u0438 \u0441\u043B\u0435\u0434\u0443\u044E\u0449\u0435\u043C \u0430\u043D\u0430\u043B\u0438\u0437\u0435."}
-
-` + (r ? `\u041A\u043E\u043D\u0442\u0435\u043A\u0441\u0442 \u043F\u0440\u043E\u0435\u043A\u0442\u0430: ${r.summary.verdict}. \u041E\u0448\u0438\u0431\u043E\u043A: ${r.metrics?.diagnostics?.error || 0}.` : "\u0417\u0430\u043F\u0443\u0441\u0442\u0438\u0442\u0435 \u0430\u043D\u0430\u043B\u0438\u0437 \u0434\u043B\u044F \u043F\u043E\u043B\u043D\u043E\u0433\u043E \u043A\u043E\u043D\u0442\u0435\u043A\u0441\u0442\u0430.");
-  }
-  function generateFromDescription(text) {
-    const t2 = String(text).toLowerCase();
-    const g = (code2, lang = "html", note = "\u0413\u043E\u0442\u043E\u0432\u043E \u2014 \u0432\u0441\u0442\u0430\u0432\u0438\u043B \u043A\u043E\u0434 \u0432 \u0430\u043A\u0442\u0438\u0432\u043D\u0443\u044E \u043F\u0430\u043D\u0435\u043B\u044C.") => ({ code: code2, lang, note });
-    if (/форму|form|логин|регистрац|вход/.test(t2)) return g(SNIPPETS.find((s) => s.id === "form").code);
-    if (/карточк|card|товар|продукт/.test(t2)) return g(SNIPPETS.find((s) => s.id === "card").code);
-    if (/кнопк|button/.test(t2)) return g(`<button class="btn" type="button">\u041D\u0430\u0436\u043C\u0438 \u043C\u0435\u043D\u044F</button>
-<style>
-.btn { border: 0; border-radius: 14px; padding: 12px 22px; font-weight: 700; color: #fff;
-  background: linear-gradient(135deg, ${state.settings.accent}, #b06cf6); cursor: pointer;
-  box-shadow: 0 8px 20px ${state.settings.accent}55; transition: transform .2s; }
-.btn:hover { transform: translateY(-2px); }
-</style>`);
-    if (/модал|диалог|popup|modal/.test(t2)) return g(SNIPPETS.find((s) => s.id === "modal").code);
-    if (/таб|вкладк|tab/.test(t2)) return g(SNIPPETS.find((s) => s.id === "tabs").code);
-    if (/аккордеон|accordion|faq/.test(t2)) return g(SNIPPETS.find((s) => s.id === "accordion").code);
-    if (/навигац|меню|navbar|nav/.test(t2)) return g(SNIPPETS.find((s) => s.id === "nav").code);
-    if (/hero|первый экран|баннер/.test(t2)) return g(SNIPPETS.find((s) => s.id === "hero").code);
-    if (/футер|подвал|footer/.test(t2)) return g(SNIPPETS.find((s) => s.id === "footer").code);
-    if (/таблиц|table/.test(t2)) return g(SNIPPETS.find((s) => s.id === "list").code);
-    if (/градиент|gradient/.test(t2)) return g(`.gradient {
-  min-height: 180px;
-  border-radius: 24px;
-  background: linear-gradient(135deg, ${state.settings.accent}, ${randomColor()});
-}`, "css", "\u0413\u0440\u0430\u0434\u0438\u0435\u043D\u0442 \u0433\u043E\u0442\u043E\u0432.");
-    if (/сетк|grid/.test(t2)) return g(`display: grid;
-grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-gap: 16px;`, "css");
-    if (/центрир|center/.test(t2)) return g(`display: grid;
-place-items: center;
-min-height: 100vh;`, "css");
-    if (/анимац|animation|появлен/.test(t2)) return g(`@keyframes fadeUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: none; } }
-.animated { animation: fadeUp .6s ease both; }`, "css");
-    if (/график|chart/.test(t2)) return g(`<canvas id="chart" width="500" height="260"></canvas>
-<script>
-const ctx = document.getElementById('chart').getContext('2d');
-const data = [12, 19, 7, 15, 23];
-data.forEach((v, i) => { ctx.fillStyle = '#7c6cf6'; ctx.fillRect(i * 95 + 20, 240 - v * 8, 60, v * 8); });
-<\/script>`);
-    if (/fetch|запрос|api/.test(t2)) return g(SNIPPETS.find((s) => s.id === "fetch").code, "js");
-    if (/debounce|задерж/.test(t2)) return g(SNIPPETS.find((s) => s.id === "debounce").code, "js");
-    if (/наблюдател|observer|скролл/.test(t2)) return g(SNIPPETS.find((s) => s.id === "intersection").code, "js");
-    if (/слайдер|slider|карусел/.test(t2)) return g(SNIPPETS.find((s) => s.id === "slider").code);
-    if (/тултип|tooltip|подсказк/.test(t2)) return g(SNIPPETS.find((s) => s.id === "tooltip").code);
-    if (/скелет|страниц|html5|шаблон/.test(t2)) return g(SNIPPETS.find((s) => s.id === "html5").code);
-    return g(`<!-- ${q(text)} -->
-<section class="generated">
-  <h2>\u041D\u043E\u0432\u044B\u0439 \u0431\u043B\u043E\u043A</h2>
-  <p>\u041E\u043F\u0438\u0448\u0438\u0442\u0435 \u0434\u0435\u0442\u0430\u043B\u044C\u043D\u0435\u0435: \xAB\u0441\u0434\u0435\u043B\u0430\u0439 \u043A\u0430\u0440\u0442\u043E\u0447\u043A\u0443 \u0442\u043E\u0432\u0430\u0440\u0430\xBB, \xAB\u0441\u043E\u0437\u0434\u0430\u0439 \u0444\u043E\u0440\u043C\u0443 \u043B\u043E\u0433\u0438\u043D\u0430\xBB, \xAB\u0441\u0433\u0435\u043D\u0435\u0440\u0438\u0440\u0443\u0439 \u0433\u0440\u0430\u0444\u0438\u043A\xBB.</p>
-</section>
-<style>
-.generated { padding: 28px; border-radius: 24px; background: ${state.settings.accent}22; border: 1px solid ${state.settings.accent}55; }
-</style>`);
-  }
-  function q(s) {
-    return String(s).replace(/[<>&"]/g, "");
-  }
-
   // app/src/core/extras.js
+  init_core();
+  init_state();
+  init_icons();
   function initLearn() {
-    const host = $("#learnPanel");
-    if (!host) return;
+    const host2 = $("#learnPanel");
+    if (!host2) return;
     renderLearn();
   }
   function renderLearn() {
-    const host = $("#learnPanel");
-    if (!host) return;
+    const host2 = $("#learnPanel");
+    if (!host2) return;
     const done = Object.keys(state.progress).filter((k) => state.progress[k]).length;
-    host.innerHTML = `<div class="rowflex mb8"><span class="pill pill-accent">\u{1F393} ${done}/${LESSONS.length} \u0443\u0440\u043E\u043A\u043E\u0432</span>
+    host2.innerHTML = `<div class="rowflex mb8"><span class="pill pill-accent"> ${done}/${LESSONS.length} \u0443\u0440\u043E\u043A\u043E\u0432</span>
     <div class="progress" style="flex:1"><i style="width:${Math.round(done / LESSONS.length * 100)}%"></i></div></div>
     <div class="tabs-line" id="learnTabs"><button class="active" data-lt="lessons">\u0423\u0440\u043E\u043A\u0438</button>
       <button data-lt="quiz">\u041A\u0432\u0438\u0437\u044B</button><button data-lt="recipes">\u0420\u0435\u0446\u0435\u043F\u0442\u044B</button>
       <button data-lt="viz">\u0412\u0438\u0437\u0443\u0430\u043B\u0438\u0437\u0430\u0446\u0438\u0438</button><button data-lt="achieve">\u0414\u043E\u0441\u0442\u0438\u0436\u0435\u043D\u0438\u044F</button></div>
     <div id="learnBody"></div>`;
-    host.querySelectorAll("[data-lt]").forEach((b) => b.onclick = () => {
-      host.querySelectorAll("[data-lt]").forEach((x2) => x2.classList.remove("active"));
+    host2.querySelectorAll("[data-lt]").forEach((b) => b.onclick = () => {
+      host2.querySelectorAll("[data-lt]").forEach((x2) => x2.classList.remove("active"));
       b.classList.add("active");
       renderLearnTab(b.dataset.lt);
     });
@@ -48725,7 +49111,7 @@ data.forEach((v, i) => { ctx.fillStyle = '#7c6cf6'; ctx.fillRect(i * 95 + 20, 24
           el(
             "div",
             { class: "grow" },
-            el("b", { text: (done ? "\u2705 " : "\u{1F4D8} ") + l.title }),
+            el("b", { text: (done ? " " : " ") + l.title }),
             el("small", { text: l.lang + " \xB7 " + l.task.slice(0, 60) + "\u2026" })
           ),
           el("button", { class: "mini-btn", text: done ? "\u041F\u043E\u0432\u0442\u043E\u0440\u0438\u0442\u044C" : "\u041D\u0430\u0447\u0430\u0442\u044C" })
@@ -48734,17 +49120,17 @@ data.forEach((v, i) => { ctx.fillStyle = '#7c6cf6'; ctx.fillRect(i * 95 + 20, 24
         list2.appendChild(row);
       }
     } else if (tab === "quiz") {
-      box.innerHTML = QUIZZES.map((q2, i4) => `<div class="list-row" style="flex-direction:column;align-items:stretch">
-      <b>${i4 + 1}. ${esc(q2.q)}</b><div class="mt8">${q2.opts.map((o, j) => `<button class="quiz-opt" data-q="${i4}" data-o="${j}">${esc(o)}</button>`).join("")}</div>
+      box.innerHTML = QUIZZES.map((q, i4) => `<div class="list-row" style="flex-direction:column;align-items:stretch">
+      <b>${i4 + 1}. ${esc(q.q)}</b><div class="mt8">${q.opts.map((o, j) => `<button class="quiz-opt" data-q="${i4}" data-o="${j}">${esc(o)}</button>`).join("")}</div>
       <div class="quiz-result" id="qr${i4}"></div></div>`).join("");
       box.querySelectorAll(".quiz-opt").forEach((b) => b.onclick = () => {
-        const qi = +b.dataset.q, oi = +b.dataset.o, q2 = QUIZZES[qi];
+        const qi = +b.dataset.q, oi = +b.dataset.o, q = QUIZZES[qi];
         const group = box.querySelectorAll(`[data-q="${qi}"]`);
         group.forEach((x2) => x2.classList.remove("correct", "wrong"));
-        b.classList.add(oi === q2.a ? "correct" : "wrong");
-        group[q2.a].classList.add("correct");
-        box.querySelector("#qr" + qi).innerHTML = `<div class="beginner mt8">${oi === q2.a ? "\u2705 \u0412\u0435\u0440\u043D\u043E! " : "\u274C \u041D\u0435 \u0441\u043E\u0432\u0441\u0435\u043C. "}${esc(q2.why)}</div>`;
-        if (oi === q2.a) {
+        b.classList.add(oi === q.a ? "correct" : "wrong");
+        group[q.a].classList.add("correct");
+        box.querySelector("#qr" + qi).innerHTML = `<div class="beginner mt8">${oi === q.a ? " \u0412\u0435\u0440\u043D\u043E! " : " \u041D\u0435 \u0441\u043E\u0432\u0441\u0435\u043C. "}${esc(q.why)}</div>`;
+        if (oi === q.a) {
           state.progress["quiz" + qi] = true;
           toast("\u0414\u043E\u0441\u0442\u0438\u0436\u0435\u043D\u0438\u0435: \u0432\u0435\u0440\u043D\u044B\u0439 \u043E\u0442\u0432\u0435\u0442", "ok");
         }
@@ -48756,7 +49142,7 @@ data.forEach((v, i) => { ctx.fillStyle = '#7c6cf6'; ctx.fillRect(i * 95 + 20, 24
         const row = el(
           "div",
           { class: "list-row", style: { flexDirection: "column", alignItems: "stretch" } },
-          el("b", { text: "\u2753 " + r.t }),
+          el("b", { text: " " + r.t }),
           el("code", { class: "inline", text: r.a, style: { marginTop: "6px", whiteSpace: "pre-wrap" } }),
           el("button", { class: "mini-btn mt8", text: "\u0412\u0441\u0442\u0430\u0432\u0438\u0442\u044C", style: { alignSelf: "flex-start" } })
         );
@@ -48778,15 +49164,15 @@ data.forEach((v, i) => { ctx.fillStyle = '#7c6cf6'; ctx.fillRect(i * 95 + 20, 24
       drawViz("loop");
     } else {
       const badges = [
-        ["\u041F\u0435\u0440\u0432\u044B\u0439 \u0448\u0430\u0433", () => Object.keys(state.progress).length > 0, "\u{1F680}"],
-        ["HTML-\u043C\u0430\u0441\u0442\u0435\u0440", () => LESSONS.filter((l) => l.lang === "HTML").every((l) => state.progress[l.id]), "\u{1F7E0}"],
-        ["CSS-\u0441\u0442\u0438\u043B\u0438\u0441\u0442", () => LESSONS.filter((l) => l.lang === "CSS").every((l) => state.progress[l.id]), "\u{1F535}"],
-        ["JS-\u043D\u0438\u043D\u0434\u0437\u044F", () => LESSONS.filter((l) => l.lang === "JS").every((l) => state.progress[l.id]), "\u{1F7E1}"],
-        ["\u0417\u043D\u0430\u0442\u043E\u043A", () => QUIZZES.every((_, i4) => state.progress["quiz" + i4]), "\u{1F9E0}"],
-        ["\u0410\u043D\u0430\u043B\u0438\u0442\u0438\u043A", () => !!state.report, "\u{1F40D}"]
+        ["\u041F\u0435\u0440\u0432\u044B\u0439 \u0448\u0430\u0433", () => Object.keys(state.progress).length > 0, "check"],
+        ["HTML-\u043C\u0430\u0441\u0442\u0435\u0440", () => LESSONS.filter((l) => l.lang === "HTML").every((l) => state.progress[l.id]), "code"],
+        ["CSS-\u0441\u0442\u0438\u043B\u0438\u0441\u0442", () => LESSONS.filter((l) => l.lang === "CSS").every((l) => state.progress[l.id]), "palette"],
+        ["JS-\u043D\u0438\u043D\u0434\u0437\u044F", () => LESSONS.filter((l) => l.lang === "JS").every((l) => state.progress[l.id]), "braces"],
+        ["\u0417\u043D\u0430\u0442\u043E\u043A", () => QUIZZES.every((_, i4) => state.progress["quiz" + i4]), "book"],
+        ["\u0410\u043D\u0430\u043B\u0438\u0442\u0438\u043A", () => !!state.report, "chart"]
       ];
       box.innerHTML = `<div class="grid-cards">${badges.map(([n, f, ico]) => `<div class="tile" style="opacity:${f() ? 1 : 0.4}">
-      <div class="tile-ico">${ico}</div><b>${esc(n)}</b><small>${f() ? "\u041F\u043E\u043B\u0443\u0447\u0435\u043D\u043E \u2705" : "\u0415\u0449\u0451 \u043D\u0435 \u043F\u043E\u043B\u0443\u0447\u0435\u043D\u043E"}</small></div>`).join("")}</div>
+      <div class="tile-ico">${icon(ico, 18)}</div><b>${esc(n)}</b><small>${f() ? "\u041F\u043E\u043B\u0443\u0447\u0435\u043D\u043E " : "\u0415\u0449\u0451 \u043D\u0435 \u043F\u043E\u043B\u0443\u0447\u0435\u043D\u043E"}</small></div>`).join("")}</div>
       <div class="beginner mt8"><b>\u0421\u043B\u0435\u0434\u0443\u044E\u0449\u0438\u0439 \u0448\u0430\u0433:</b> ${nextStep()}</div>`;
     }
   }
@@ -48803,7 +49189,7 @@ data.forEach((v, i) => { ctx.fillStyle = '#7c6cf6'; ctx.fillRect(i * 95 + 20, 24
       <h4 style="margin:14px 0 6px">\u0417\u0430\u0434\u0430\u043D\u0438\u0435</h4><p>${esc(lesson.task)}</p>
       <div class="field"><label>\u0412\u0430\u0448 \u043A\u043E\u0434 (\u043F\u0430\u043D\u0435\u043B\u044C ${lesson.lang})</label><textarea id="lessonCode" rows="9" style="font:12px var(--mono)">${esc(getDoc(pane).slice(0, 2e3))}</textarea></div>
       <div class="rowflex"><button class="mini-btn" id="lessonLoad">\u21BB \u0417\u0430\u0433\u0440\u0443\u0437\u0438\u0442\u044C \u0441\u0442\u0430\u0440\u0442\u043E\u0432\u044B\u0439 \u043A\u043E\u0434</button>
-        <button class="mini-btn" id="lessonHint">\u{1F4A1} \u041F\u043E\u0434\u0441\u043A\u0430\u0437\u043A\u0430</button><button class="mini-btn" id="lessonCheck">\u2705 \u041F\u0440\u043E\u0432\u0435\u0440\u0438\u0442\u044C</button></div>
+        <button class="mini-btn" id="lessonHint"> \u041F\u043E\u0434\u0441\u043A\u0430\u0437\u043A\u0430</button><button class="mini-btn" id="lessonCheck"> \u041F\u0440\u043E\u0432\u0435\u0440\u0438\u0442\u044C</button></div>
       <div id="lessonResult" class="mt8"></div>`,
       okText: "\u0417\u0430\u043A\u0440\u044B\u0442\u044C",
       onMount: (root) => {
@@ -48813,13 +49199,13 @@ data.forEach((v, i) => { ctx.fillStyle = '#7c6cf6'; ctx.fillRect(i * 95 + 20, 24
           setDoc(lesson.starter, pane);
         };
         root.querySelector("#lessonHint").onclick = () => {
-          root.querySelector("#lessonResult").innerHTML = `<div class="beginner">\u{1F4A1} ${esc(lesson.hint)}</div>`;
+          root.querySelector("#lessonResult").innerHTML = `<div class="beginner"> ${esc(lesson.hint)}</div>`;
         };
         root.querySelector("#lessonCheck").onclick = () => {
           const code2 = ta.value;
           setDoc(code2, pane);
           const ok = lesson.check(code2);
-          root.querySelector("#lessonResult").innerHTML = ok ? '<div class="beginner" style="border-color:var(--ok);color:var(--ok)">\u2705 \u0412\u0435\u0440\u043D\u043E! \u0417\u0430\u0434\u0430\u043D\u0438\u0435 \u0437\u0430\u0447\u0442\u0435\u043D\u043E.</div>' : `<div class="beginner" style="border-color:var(--err);color:var(--err)">\u274C \u041F\u043E\u043A\u0430 \u043D\u0435 \u043F\u043E\u0434\u0445\u043E\u0434\u0438\u0442. ${esc(lesson.hint)}</div>`;
+          root.querySelector("#lessonResult").innerHTML = ok ? '<div class="beginner" style="border-color:var(--ok);color:var(--ok)"> \u0412\u0435\u0440\u043D\u043E! \u0417\u0430\u0434\u0430\u043D\u0438\u0435 \u0437\u0430\u0447\u0442\u0435\u043D\u043E.</div>' : `<div class="beginner" style="border-color:var(--err);color:var(--err)"> \u041F\u043E\u043A\u0430 \u043D\u0435 \u043F\u043E\u0434\u0445\u043E\u0434\u0438\u0442. ${esc(lesson.hint)}</div>`;
           if (ok) {
             state.progress[lesson.id] = true;
             emit("learn:progress");
@@ -48909,23 +49295,23 @@ data.forEach((v, i) => { ctx.fillStyle = '#7c6cf6'; ctx.fillRect(i * 95 + 20, 24
     version: "1.0"
   };
   function initPlugins() {
-    const host = $("#pluginsPanel");
-    if (!host) return;
+    const host2 = $("#pluginsPanel");
+    if (!host2) return;
     renderPlugins();
   }
   function renderPlugins() {
-    const host = $("#pluginsPanel");
-    if (!host) return;
-    host.innerHTML = `<div class="rowflex mb8"><span class="pill pill-accent">\u{1F50C} ${state.plugins.length} \u0430\u043A\u0442\u0438\u0432\u043D\u043E</span>
-    <button class="mini-btn" id="plugUrl">\uFF0B \u041F\u043E \u0441\u0441\u044B\u043B\u043A\u0435</button></div><div class="list-rows" id="plugList"></div>
+    const host2 = $("#pluginsPanel");
+    if (!host2) return;
+    host2.innerHTML = `<div class="rowflex mb8"><span class="pill pill-accent"> ${state.plugins.length} \u0430\u043A\u0442\u0438\u0432\u043D\u043E</span>
+    <button class="mini-btn" id="plugUrl">\u041F\u043E \u0441\u0441\u044B\u043B\u043A\u0435</button></div><div class="list-rows" id="plugList"></div>
     <div class="beginner mt8"><b>API \u0434\u043B\u044F \u043F\u043B\u0430\u0433\u0438\u043D\u043E\u0432:</b> window.Runlet.pluginAPI \u2014 state, toast, emit, on, insertText, setDoc, getDoc, analyze(). \u041F\u043B\u0430\u0433\u0438\u043D\u044B \u0437\u0430\u043F\u0443\u0441\u043A\u0430\u044E\u0442\u0441\u044F \u0432 \u043F\u0435\u0441\u043E\u0447\u043D\u0438\u0446\u0435 \u0431\u0435\u0437 \u0434\u043E\u0441\u0442\u0443\u043F\u0430 \u043A \u0444\u0430\u0439\u043B\u0430\u043C \u041E\u0421.</div>`;
-    const list2 = host.querySelector("#plugList");
+    const list2 = host2.querySelector("#plugList");
     for (const p of PLUGIN_CATALOG) {
       const active = state.plugins.includes(p.id);
       const row = el(
         "div",
         { class: "list-row" },
-        el("div", { style: { fontSize: "20px" }, text: p.icon }),
+        el("div", { class: "pr-ico", html: icon(p.icon || "puzzle", 17) }),
         el("div", { class: "grow" }, el("b", { text: p.name }), el("small", { text: p.desc })),
         el("button", { class: "mini-btn" + (active ? " active" : ""), text: active ? "\u041E\u0442\u043A\u0440\u044B\u0442\u044C" : "\u0412\u043A\u043B\u044E\u0447\u0438\u0442\u044C" })
       );
@@ -48939,10 +49325,10 @@ data.forEach((v, i) => { ctx.fillStyle = '#7c6cf6'; ctx.fillRect(i * 95 + 20, 24
       };
       list2.appendChild(row);
     }
-    host.querySelector("#plugUrl").onclick = () => ctx.modal({
+    host2.querySelector("#plugUrl").onclick = () => ctx.modal({
       title: "\u0423\u0441\u0442\u0430\u043D\u043E\u0432\u0438\u0442\u044C \u043F\u043B\u0430\u0433\u0438\u043D \u043F\u043E \u0441\u0441\u044B\u043B\u043A\u0435",
       body: `<div class="field"><label>URL JS-\u0444\u0430\u0439\u043B\u0430 (\u0442\u043E\u043B\u044C\u043A\u043E HTTPS)</label><input id="plugSrc" placeholder="https://example.com/plugin.js"></div>
-      <div class="beginner">\u26A0 \u0421\u0442\u043E\u0440\u043E\u043D\u043D\u0438\u0439 \u043A\u043E\u0434 \u0432\u044B\u043F\u043E\u043B\u043D\u044F\u0435\u0442\u0441\u044F \u0432 \u043E\u0442\u0434\u0435\u043B\u044C\u043D\u043E\u043C sandboxed iframe \u0431\u0435\u0437 \u0434\u043E\u0441\u0442\u0443\u043F\u0430 \u043A DOM \u0440\u0435\u0434\u0430\u043A\u0442\u043E\u0440\u0430, \u0444\u0430\u0439\u043B\u0430\u043C \u041E\u0421 \u0438 \u0441\u0435\u0442\u0438. \u0420\u0430\u0437\u0440\u0435\u0448\u0435\u043D\u044B \u0442\u043E\u043B\u044C\u043A\u043E \u044F\u0432\u043D\u043E \u043E\u043F\u0438\u0441\u0430\u043D\u043D\u044B\u0435 \u043A\u043E\u043C\u0430\u043D\u0434\u044B.</div>`,
+      <div class="beginner"> \u0421\u0442\u043E\u0440\u043E\u043D\u043D\u0438\u0439 \u043A\u043E\u0434 \u0432\u044B\u043F\u043E\u043B\u043D\u044F\u0435\u0442\u0441\u044F \u0432 \u043E\u0442\u0434\u0435\u043B\u044C\u043D\u043E\u043C sandboxed iframe \u0431\u0435\u0437 \u0434\u043E\u0441\u0442\u0443\u043F\u0430 \u043A DOM \u0440\u0435\u0434\u0430\u043A\u0442\u043E\u0440\u0430, \u0444\u0430\u0439\u043B\u0430\u043C \u041E\u0421 \u0438 \u0441\u0435\u0442\u0438. \u0420\u0430\u0437\u0440\u0435\u0448\u0435\u043D\u044B \u0442\u043E\u043B\u044C\u043A\u043E \u044F\u0432\u043D\u043E \u043E\u043F\u0438\u0441\u0430\u043D\u043D\u044B\u0435 \u043A\u043E\u043C\u0430\u043D\u0434\u044B.</div>`,
       okText: "\u0423\u0441\u0442\u0430\u043D\u043E\u0432\u0438\u0442\u044C",
       onOk: async (root) => {
         const url = root.querySelector("#plugSrc").value.trim();
@@ -49091,7 +49477,7 @@ return (typeof register === "function") ? register(api) : null;');
           ctx.registerCommand?.("plugin:" + id2, {
             title,
             group: "\u041F\u043B\u0430\u0433\u0438\u043D\u044B",
-            icon: "\u{1F50C}",
+            icon: "",
             run: () => ctx.runCommand?.(target)
           });
           registered++;
@@ -49175,9 +49561,9 @@ return (typeof register === "function") ? register(api) : null;');
   }
   function pluginTerminal() {
     ctx.modal({
-      title: "\u25B8 \u0422\u0435\u0440\u043C\u0438\u043D\u0430\u043B Runlet",
+      title: "\u0422\u0435\u0440\u043C\u0438\u043D\u0430\u043B Runlet",
       wide: true,
-      body: `<div id="termOut" style="height:280px;overflow:auto;background:var(--code-bg);border-radius:12px;padding:12px;font:12px var(--mono)">Runlet terminal v1.0 \u2014 \u0432\u0432\u0435\u0434\u0438\u0442\u0435 help
+      body: `<div id="termOut" style="height:280px;overflow:auto;background:var(--code-bg);border-radius:12px;padding:12px;font:12px var(--mono)">Runlet terminal 1.0 \u2014 \u0432\u0432\u0435\u0434\u0438\u0442\u0435 help
 </div>
       <div class="repl-bar"><span class="repl-prompt">$</span><input id="termIn" placeholder="help" style="flex:1;font:12px var(--mono)"><button class="mini-btn" id="termRun">\u21B5</button></div>`,
       okText: "\u0417\u0430\u043A\u0440\u044B\u0442\u044C",
@@ -49224,7 +49610,7 @@ return (typeof register === "function") ? register(api) : null;');
   }
   function pluginCalc() {
     ctx.modal({
-      title: "\u{1F9EE} \u041A\u0430\u043B\u044C\u043A\u0443\u043B\u044F\u0442\u043E\u0440",
+      title: "\u041A\u0430\u043B\u044C\u043A\u0443\u043B\u044F\u0442\u043E\u0440",
       narrow: true,
       body: `<div class="field"><label>\u0412\u044B\u0440\u0430\u0436\u0435\u043D\u0438\u0435</label><input id="calcIn" value="(16 * 2 + 8) / 2"></div>
       <div id="calcOut" class="gen-preview" style="color:var(--text);background:var(--card-2)">18</div>
@@ -49251,7 +49637,7 @@ return (typeof register === "function") ? register(api) : null;');
   }
   function pluginRegex() {
     ctx.modal({
-      title: ".* \u0413\u0435\u043D\u0435\u0440\u0430\u0442\u043E\u0440 regex",
+      title: "\u0413\u0435\u043D\u0435\u0440\u0430\u0442\u043E\u0440 regex",
       narrow: true,
       body: `<div class="field"><label>\u0427\u0442\u043E \u0438\u0449\u0435\u043C</label><select id="rgxType" class="field"><option value="email">E-mail</option><option value="phone">\u0422\u0435\u043B\u0435\u0444\u043E\u043D \u0420\u0424</option><option value="url">URL</option><option value="hex">HEX-\u0446\u0432\u0435\u0442</option><option value="date">\u0414\u0430\u0442\u0430 \u0414\u0414.\u041C\u041C.\u0413\u0413\u0413\u0413</option><option value="cyr">\u041A\u0438\u0440\u0438\u043B\u043B\u0438\u0446\u0430</option></select></div>
       <div class="field"><label>\u0428\u0430\u0431\u043B\u043E\u043D</label><input id="rgxOut" readonly></div><div class="field"><label>\u0422\u0435\u0441\u0442</label><input id="rgxTest" value="test@example.com"></div>
@@ -49264,7 +49650,7 @@ return (typeof register === "function") ? register(api) : null;');
           const p = presets[root.querySelector("#rgxType").value];
           root.querySelector("#rgxOut").value = "/" + p + "/";
           try {
-            root.querySelector("#rgxRes").textContent = new RegExp(p).test(root.querySelector("#rgxTest").value) ? "\u2705 \u0421\u043E\u0432\u043F\u0430\u0434\u0430\u0435\u0442" : "\u274C \u041D\u0435 \u0441\u043E\u0432\u043F\u0430\u0434\u0430\u0435\u0442";
+            root.querySelector("#rgxRes").textContent = new RegExp(p).test(root.querySelector("#rgxTest").value) ? " \u0421\u043E\u0432\u043F\u0430\u0434\u0430\u0435\u0442" : " \u041D\u0435 \u0441\u043E\u0432\u043F\u0430\u0434\u0430\u0435\u0442";
           } catch (e) {
             root.querySelector("#rgxRes").textContent = e.message;
           }
@@ -49276,7 +49662,7 @@ return (typeof register === "function") ? register(api) : null;');
   }
   function pluginUnits() {
     ctx.modal({
-      title: "\u21C4 \u041A\u043E\u043D\u0432\u0435\u0440\u0442\u0435\u0440 \u0435\u0434\u0438\u043D\u0438\u0446",
+      title: "\u041A\u043E\u043D\u0432\u0435\u0440\u0442\u0435\u0440 \u0435\u0434\u0438\u043D\u0438\u0446",
       narrow: true,
       body: `<div class="field-row"><div class="field"><label>\u0417\u043D\u0430\u0447\u0435\u043D\u0438\u0435</label><input id="uVal" type="number" value="16"></div>
       <div class="field"><label>\u0418\u0437</label><select id="uFrom"><option>px</option><option>rem</option><option>em</option><option>%</option></select></div>
@@ -49299,7 +49685,7 @@ return (typeof register === "function") ? register(api) : null;');
     const key = "runlet:plugin:notes";
     const saved = localStorage.getItem(key) || "# \u0417\u0430\u043C\u0435\u0442\u043A\u0438\n\n- \u0417\u0430\u043F\u0438\u0441\u0430\u0442\u044C \u0438\u0434\u0435\u0438 \u043F\u043E \u043F\u0440\u043E\u0435\u043A\u0442\u0443\n";
     ctx.modal({
-      title: "\u{1F4DD} \u0417\u0430\u043C\u0435\u0442\u043A\u0438",
+      title: "\u0417\u0430\u043C\u0435\u0442\u043A\u0438",
       wide: true,
       body: `<textarea id="notesArea" style="width:100%;height:320px;border:1px solid var(--border);border-radius:12px;background:var(--code-bg);padding:12px;font:13px var(--mono)">${esc(saved)}</textarea>`,
       okText: "\u0421\u043E\u0445\u0440\u0430\u043D\u0438\u0442\u044C",
@@ -49311,7 +49697,7 @@ return (typeof register === "function") ? register(api) : null;');
   }
   function pluginPomodoro() {
     ctx.modal({
-      title: "\u{1F345} \u041F\u043E\u043C\u043E\u0434\u043E\u0440\u043E",
+      title: "\u041F\u043E\u043C\u043E\u0434\u043E\u0440\u043E",
       narrow: true,
       body: `<div style="text-align:center"><div id="pomoTime" style="font-size:58px;font-weight:800;letter-spacing:-3px">25:00</div>
       <div class="muted">\u0420\u0430\u0431\u043E\u0442\u0430 25 \u043C\u0438\u043D / \u043E\u0442\u0434\u044B\u0445 5 \u043C\u0438\u043D</div>
@@ -49350,7 +49736,7 @@ return (typeof register === "function") ? register(api) : null;');
   }
   function pluginThemes() {
     ctx.modal({
-      title: "\u{1F3A8} \u0413\u0435\u043D\u0435\u0440\u0430\u0442\u043E\u0440 \u0442\u0435\u043C\u044B",
+      title: "\u0413\u0435\u043D\u0435\u0440\u0430\u0442\u043E\u0440 \u0442\u0435\u043C\u044B",
       narrow: true,
       body: `<div class="field"><label>\u0411\u0430\u0437\u043E\u0432\u044B\u0439 \u0446\u0432\u0435\u0442</label><input type="color" id="thColor" value="#7c6cf6"></div>
       <div id="thSwatches" class="rowflex"></div><pre id="thCss" style="font:11px var(--mono);background:var(--code-bg);padding:10px;border-radius:12px;margin-top:10px"></pre>`,
@@ -49375,7 +49761,7 @@ ${p.map((x2, i4) => `  --brand-${i4 + 1}: ${x2};`).join("\n")}
   }
   function pluginDiagram() {
     ctx.modal({
-      title: "\u25EB \u0414\u0438\u0430\u0433\u0440\u0430\u043C\u043C\u0430",
+      title: "\u0414\u0438\u0430\u0433\u0440\u0430\u043C\u043C\u0430",
       narrow: true,
       body: `<div class="field"><label>\u0423\u0437\u043B\u044B (\u0447\u0435\u0440\u0435\u0437 ->)</label><input id="dgIn" value="HTML -> CSSOM -> Render tree -> Layout -> Paint"></div>
       <div id="dgOut" class="gen-preview" style="background:var(--card-2);color:var(--text);height:auto;min-height:120px;flex-direction:column;gap:6px"></div>`,
@@ -49392,19 +49778,19 @@ ${p.map((x2, i4) => `  --brand-${i4 + 1}: ${x2};`).join("\n")}
     });
   }
   function initFeatures() {
-    const host = $("#featuresPanel");
-    if (!host) return;
+    const host2 = $("#featuresPanel");
+    if (!host2) return;
     const c = coverage();
-    host.innerHTML = `<div class="beginner" style="margin:0 0 10px"><b>\u041A\u0430\u0440\u0442\u0430 \u0438\u0434\u0435\u0439: ${c.done} \u0440\u0435\u0430\u043B\u0438\u0437\u043E\u0432\u0430\u043D\u043E, ${c.partial} \u0447\u0430\u0441\u0442\u0438\u0447\u043D\u043E, \u0432\u0441\u0435\u0433\u043E ${c.total}.</b><br>
+    host2.innerHTML = `<div class="beginner" style="margin:0 0 10px"><b>\u041A\u0430\u0440\u0442\u0430 \u0438\u0434\u0435\u0439: ${c.done} \u0440\u0435\u0430\u043B\u0438\u0437\u043E\u0432\u0430\u043D\u043E, ${c.partial} \u0447\u0430\u0441\u0442\u0438\u0447\u043D\u043E, \u0432\u0441\u0435\u0433\u043E ${c.total}.</b><br>
     <div class="progress mt8"><i style="width:${c.percent}%"></i></div>
-    <small class="dim">\u{1F7E2} \u0441\u0434\u0435\u043B\u0430\u043D\u043E \xB7 \u{1F7E1} \u0447\u0430\u0441\u0442\u0438\u0447\u043D\u043E \xB7 \u26AA \u0432 \u043F\u043B\u0430\u043D\u0430\u0445</small></div>
+    <small class="dim"> \u0441\u0434\u0435\u043B\u0430\u043D\u043E \xB7  \u0447\u0430\u0441\u0442\u0438\u0447\u043D\u043E \xB7  \u0432 \u043F\u043B\u0430\u043D\u0430\u0445</small></div>
     <input id="featFilter" placeholder="\u0424\u0438\u043B\u044C\u0442\u0440 \u043F\u043E \u043D\u0430\u0437\u0432\u0430\u043D\u0438\u044E\u2026" style="width:100%;height:29px;border-radius:9px;border:1px solid var(--border);background:var(--code-bg);padding:0 9px;margin-bottom:8px">
     <div id="featList"></div>`;
-    const list2 = host.querySelector("#featList");
-    const draw = (q2) => {
+    const list2 = host2.querySelector("#featList");
+    const draw = (q) => {
       list2.innerHTML = "";
       for (const cat of FEATURES) {
-        const items = cat.items.map((name2, i4) => ({ n: cat.from + i4, name: name2 })).filter((x2) => !q2 || x2.name.toLowerCase().includes(q2.toLowerCase()));
+        const items = cat.items.map((name2, i4) => ({ n: cat.from + i4, name: name2 })).filter((x2) => !q || x2.name.toLowerCase().includes(q.toLowerCase()));
         if (!items.length) continue;
         const d = items.filter((x2) => IMPLEMENTED.has(x2.n)).length;
         const box = el(
@@ -49422,10 +49808,815 @@ ${p.map((x2, i4) => `  --brand-${i4 + 1}: ${x2};`).join("\n")}
       }
     };
     draw("");
-    host.querySelector("#featFilter").addEventListener("input", debounce((e) => draw(e.target.value), 150));
+    host2.querySelector("#featFilter").addEventListener("input", debounce((e) => draw(e.target.value), 150));
+  }
+
+  // app/src/core/commands.js
+  init_core();
+  init_state();
+
+  // app/src/core/ui.js
+  init_core();
+  init_state();
+  init_icons();
+
+  // app/src/core/projects.js
+  init_core();
+  init_core();
+  init_state();
+  init_icons();
+  var LS = "runlet:projects:v1";
+  var LS_ACTIVE = "runlet:active-project:v1";
+  var BASE_HTML = `<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>\u041C\u043E\u0439 \u0441\u0430\u0439\u0442</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main>
+    <h1>\u041F\u0440\u0438\u0432\u0435\u0442!</h1>
+    <p>\u041F\u0438\u0448\u0438 \u043A\u043E\u0434 \u0432 \u0442\u0440\u0451\u0445 \u043F\u0430\u043D\u0435\u043B\u044F\u0445 \u0441\u043B\u0435\u0432\u0430 \u2014 \u0440\u0435\u0437\u0443\u043B\u044C\u0442\u0430\u0442 \u043F\u043E\u044F\u0432\u0438\u0442\u0441\u044F \u0441\u043F\u0440\u0430\u0432\u0430.</p>
+  </main>
+  <script src="script.js"><\/script>
+</body>
+</html>`;
+  var BASE_CSS = `*{box-sizing:border-box}
+body{margin:0;min-height:100vh;display:grid;place-items:center;font-family:system-ui,sans-serif;background:#eef1f6;color:#1b2431}
+main{max-width:560px;padding:32px;border-radius:16px;background:#fff;border:1px solid #d6dde8;box-shadow:0 10px 30px rgba(20,30,50,.08)}
+h1{margin:0 0 8px;font-size:32px;letter-spacing:-1px}
+p{color:#5a6879;line-height:1.6}
+`;
+  var BASE_JS = `// \u0422\u043E\u0447\u043A\u0430 \u0432\u0445\u043E\u0434\u0430 \u0432\u0430\u0448\u0435\u0433\u043E \u0441\u0430\u0439\u0442\u0430
+console.log('Runlet: \u0441\u0442\u0440\u0430\u043D\u0438\u0446\u0430 \u0437\u0430\u0433\u0440\u0443\u0436\u0435\u043D\u0430');
+`;
+  var LANDING_HTML = `<!DOCTYPE html>
+<html lang="ru"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>\u041B\u0435\u043D\u0434\u0438\u043D\u0433</title><link rel="stylesheet" href="style.css"></head><body>
+<header class="site"><b>Brand</b><nav><a href="#features">\u0412\u043E\u0437\u043C\u043E\u0436\u043D\u043E\u0441\u0442\u0438</a><a href="#contacts">\u041A\u043E\u043D\u0442\u0430\u043A\u0442\u044B</a></nav></header>
+<section class="hero"><span class="eyebrow">\u041D\u043E\u0432\u044B\u0439 \u043F\u0440\u043E\u0434\u0443\u043A\u0442</span><h1>\u0417\u0430\u0433\u043E\u043B\u043E\u0432\u043E\u043A, \u043A\u043E\u0442\u043E\u0440\u044B\u0439 \u0446\u0435\u043F\u043B\u044F\u0435\u0442</h1>
+<p>\u041A\u043E\u0440\u043E\u0442\u043A\u043E\u0435 \u043E\u043F\u0438\u0441\u0430\u043D\u0438\u0435 \u0432\u0430\u0448\u0435\u0433\u043E \u043F\u0440\u043E\u0434\u0443\u043A\u0442\u0430 \u0432 \u043E\u0434\u043D\u043E\u043C \u043F\u0440\u0435\u0434\u043B\u043E\u0436\u0435\u043D\u0438\u0438.</p><a class="cta" href="#features">\u041D\u0430\u0447\u0430\u0442\u044C</a></section>
+<section class="cards" id="features"><article><h3>\u0411\u044B\u0441\u0442\u0440\u043E</h3><p>\u041C\u0433\u043D\u043E\u0432\u0435\u043D\u043D\u044B\u0439 \u0437\u0430\u043F\u0443\u0441\u043A.</p></article>
+<article><h3>\u041F\u0440\u043E\u0441\u0442\u043E</h3><p>\u041F\u043E\u043D\u044F\u0442\u043D\u044B\u0439 \u0438\u043D\u0442\u0435\u0440\u0444\u0435\u0439\u0441.</p></article><article><h3>\u041D\u0430\u0434\u0451\u0436\u043D\u043E</h3><p>\u041F\u0440\u043E\u0432\u0435\u0440\u0435\u043D\u043E \u0432\u0440\u0435\u043C\u0435\u043D\u0435\u043C.</p></article></section>
+<footer id="contacts">\xA9 2026 Brand</footer></body></html>`;
+  var LANDING_CSS = `*{box-sizing:border-box}body{margin:0;font-family:system-ui,sans-serif;color:#1b2431;background:#f5f7fb}
+.site{display:flex;justify-content:space-between;align-items:center;padding:18px 6vw;border-bottom:1px solid #e1e6ef}
+.site nav{display:flex;gap:18px}.site a{color:#5a6879;text-decoration:none}
+.hero{padding:80px 6vw}.eyebrow{font-size:12px;font-weight:700;color:#4f8ff7;text-transform:uppercase;letter-spacing:1px}
+.hero h1{font-size:clamp(32px,5vw,56px);max-width:760px;margin:12px 0;letter-spacing:-2px;line-height:1.08}
+.hero p{color:#5a6879;max-width:520px;font-size:17px}.cta{display:inline-block;margin-top:18px;padding:12px 22px;border-radius:10px;background:#4f8ff7;color:#fff;text-decoration:none;font-weight:700}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;padding:0 6vw 70px}
+.cards article{padding:22px;border-radius:14px;background:#fff;border:1px solid #e1e6ef}.cards h3{margin:0 0 6px}
+footer{padding:24px 6vw;border-top:1px solid #e1e6ef;color:#8592a3}
+`;
+  var FORM_HTML = `<!DOCTYPE html>
+<html lang="ru"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>\u0424\u043E\u0440\u043C\u0430</title><link rel="stylesheet" href="style.css"></head><body>
+<form id="form"><h1>\u041E\u0431\u0440\u0430\u0442\u043D\u0430\u044F \u0441\u0432\u044F\u0437\u044C</h1>
+<label for="name">\u0418\u043C\u044F</label><input id="name" required minlength="2">
+<label for="email">E-mail</label><input id="email" type="email" required>
+<label for="msg">\u0421\u043E\u043E\u0431\u0449\u0435\u043D\u0438\u0435</label><textarea id="msg" rows="4" required></textarea>
+<button type="submit">\u041E\u0442\u043F\u0440\u0430\u0432\u0438\u0442\u044C</button><p id="out" role="status"></p></form>
+<script src="script.js"><\/script></body></html>`;
+  var FORM_CSS = `*{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;background:#eef1f6;font-family:system-ui,sans-serif}
+form{width:min(440px,92vw);padding:28px;border-radius:16px;background:#fff;border:1px solid #d6dde8}
+h1{margin:0 0 18px;font-size:23px}label{display:block;margin:12px 0 5px;font-size:12px;font-weight:650;color:#5a6879}
+input,textarea{width:100%;padding:10px;border:1px solid #d6dde8;border-radius:8px;font:inherit}
+button{width:100%;margin-top:18px;padding:12px;border:0;border-radius:9px;background:#4f8ff7;color:#fff;font-weight:700;cursor:pointer}
+#out{font-size:13px;color:#17805a}
+`;
+  var FORM_JS = `document.querySelector('#form').addEventListener('submit', e => {
+  e.preventDefault();
+  document.querySelector('#out').textContent = '\u0421\u043F\u0430\u0441\u0438\u0431\u043E! \u0424\u043E\u0440\u043C\u0430 \u043E\u0442\u043F\u0440\u0430\u0432\u043B\u0435\u043D\u0430.';
+  console.log('\u041E\u0442\u043F\u0440\u0430\u0432\u043B\u0435\u043D\u043E', new FormData(e.target));
+});
+`;
+  var THREE_HTML = `<!DOCTYPE html>
+<html lang="ru"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CSS 3D \u043A\u0443\u0431</title><link rel="stylesheet" href="style.css"></head><body>
+<div class="scene"><div class="cube"><div class="f front">1</div><div class="f back">2</div><div class="f right">3</div>
+<div class="f left">4</div><div class="f top">5</div><div class="f bottom">6</div></div></div>
+<p>\u041F\u043E\u0432\u043E\u0440\u0430\u0447\u0438\u0432\u0430\u0439\u0442\u0435 \u043A\u0443\u0431 \u0432 \u0440\u0435\u0434\u0430\u043A\u0442\u043E\u0440\u0435: \u043C\u0435\u043D\u044F\u0439\u0442\u0435 \u0440\u0430\u0437\u043C\u0435\u0440\u044B, \u0446\u0432\u0435\u0442\u0430 \u0438 \u0441\u043A\u043E\u0440\u043E\u0441\u0442\u044C.</p></body></html>`;
+  var THREE_CSS = `*{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;background:#0e1116;color:#9aa8ba;font-family:system-ui,sans-serif}
+.scene{width:180px;height:180px;perspective:600px;margin-top:60px}
+.cube{width:100%;height:100%;position:relative;transform-style:preserve-3d;animation:spin 9s linear infinite}
+.f{position:absolute;width:180px;height:180px;border:2px solid #4f8ff7;background:rgba(79,143,247,.12);display:grid;place-items:center;font-size:36px;color:#4f8ff7}
+.front{transform:translateZ(90px)}.back{transform:rotateY(180deg) translateZ(90px)}
+.right{transform:rotateY(90deg) translateZ(90px)}.left{transform:rotateY(-90deg) translateZ(90px)}
+.top{transform:rotateX(90deg) translateZ(90px)}.bottom{transform:rotateX(-90deg) translateZ(90px)}
+@keyframes spin{to{transform:rotateX(360deg) rotateY(720deg)}}
+p{margin-top:80px;font-size:13px}
+@media (prefers-reduced-motion: reduce){.cube{animation:none}}
+`;
+  var CANVAS_HTML = `<!DOCTYPE html>
+<html lang="ru"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Canvas</title><link rel="stylesheet" href="style.css"></head><body>
+<canvas id="c" width="640" height="400"></canvas><script src="script.js"><\/script></body></html>`;
+  var CANVAS_CSS = `body{margin:0;min-height:100vh;display:grid;place-items:center;background:#0e1116}
+canvas{border-radius:14px;border:1px solid #2a3341;max-width:92vw}
+`;
+  var CANVAS_JS = `const c = document.querySelector('#c'), x = c.getContext('2d');
+let t = 0;
+function frame(){
+  x.fillStyle = '#0e1116'; x.fillRect(0, 0, c.width, c.height);
+  x.fillStyle = '#4f8ff7';
+  for (let i = 0; i < 12; i++){
+    const a = t / 40 + i / 12 * Math.PI * 2;
+    x.beginPath(); x.arc(320 + Math.cos(a) * 140, 200 + Math.sin(a) * 110, 8 + Math.sin(t/20 + i) * 4, 0, 7); x.fill();
+  }
+  t++; requestAnimationFrame(frame);
+}
+frame();
+`;
+  var TEMPLATES = [
+    {
+      id: "blank",
+      name: "\u041F\u0443\u0441\u0442\u043E\u0439",
+      desc: "HTML5-\u0441\u043A\u0435\u043B\u0435\u0442, style.css \u0438 script.js",
+      icon: "file",
+      files: () => ({ "index.html": BASE_HTML, "style.css": BASE_CSS, "script.js": BASE_JS }),
+      entry: "index.html"
+    },
+    {
+      id: "starter",
+      name: "\u0414\u0435\u043C\u043E",
+      desc: "\u0413\u043E\u0442\u043E\u0432\u0430\u044F \u043A\u0430\u0440\u0442\u043E\u0447\u043A\u0430 \u0441\u043E \u0441\u0447\u0451\u0442\u0447\u0438\u043A\u043E\u043C \u043A\u043B\u0438\u043A\u043E\u0432",
+      icon: "code",
+      files: () => ({ ...DEFAULT_FILES }),
+      entry: "index.html"
+    },
+    {
+      id: "landing",
+      name: "\u041B\u0435\u043D\u0434\u0438\u043D\u0433",
+      desc: "\u0428\u0430\u043F\u043A\u0430, hero-\u0441\u0435\u043A\u0446\u0438\u044F, \u043A\u0430\u0440\u0442\u043E\u0447\u043A\u0438, \u0444\u0443\u0442\u0435\u0440",
+      icon: "layers",
+      files: () => ({ "index.html": LANDING_HTML, "style.css": LANDING_CSS, "script.js": BASE_JS }),
+      entry: "index.html"
+    },
+    {
+      id: "form",
+      name: "\u0424\u043E\u0440\u043C\u0430",
+      desc: "\u0424\u043E\u0440\u043C\u0430 \u0441 \u0432\u0430\u043B\u0438\u0434\u0430\u0446\u0438\u0435\u0439 \u0438 \u043E\u0431\u0440\u0430\u0431\u043E\u0442\u0447\u0438\u043A\u043E\u043C",
+      icon: "edit",
+      files: () => ({ "index.html": FORM_HTML, "style.css": FORM_CSS, "script.js": FORM_JS }),
+      entry: "index.html"
+    },
+    {
+      id: "three",
+      name: "CSS 3D",
+      desc: "\u0412\u0440\u0430\u0449\u0430\u044E\u0449\u0438\u0439\u0441\u044F \u043A\u0443\u0431 \u043D\u0430 \u0447\u0438\u0441\u0442\u043E\u043C CSS",
+      icon: "cube",
+      files: () => ({ "index.html": THREE_HTML, "style.css": THREE_CSS, "script.js": BASE_JS }),
+      entry: "index.html"
+    },
+    {
+      id: "canvas",
+      name: "Canvas",
+      desc: "\u0410\u043D\u0438\u043C\u0430\u0446\u0438\u044F \u043D\u0430 requestAnimationFrame",
+      icon: "palette",
+      files: () => ({ "index.html": CANVAS_HTML, "style.css": CANVAS_CSS, "script.js": CANVAS_JS }),
+      entry: "index.html"
+    }
+  ];
+  function load() {
+    try {
+      return JSON.parse(localStorage.getItem(LS) || "[]");
+    } catch (_) {
+      return [];
+    }
+  }
+  function save(list2) {
+    try {
+      localStorage.setItem(LS, JSON.stringify(list2.slice(0, 60)));
+    } catch (e) {
+      toast("\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u0441\u043E\u0445\u0440\u0430\u043D\u0438\u0442\u044C \u0441\u043F\u0438\u0441\u043E\u043A \u043F\u0440\u043E\u0435\u043A\u0442\u043E\u0432", "err");
+    }
+  }
+  function listProjects() {
+    return load().sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+  }
+  function getActiveId() {
+    return localStorage.getItem(LS_ACTIVE) || "";
+  }
+  function setActiveId(id2) {
+    try {
+      localStorage.setItem(LS_ACTIVE, id2 || "");
+    } catch (_) {
+    }
+  }
+  function getProject(id2) {
+    return load().find((p) => p.id === id2) || null;
+  }
+  function snapshotData() {
+    const files = {};
+    for (const [p, f] of Object.entries(state.files)) files[p] = f.content;
+    return {
+      projectName: state.projectName,
+      entry: state.entry,
+      panes: { ...state.panes },
+      deps: state.deps,
+      layout: state.layout,
+      files,
+      settings: JSON.parse(JSON.stringify(state.settings)),
+      progress: state.progress,
+      snapshots: state.snapshots.slice(0, 8)
+    };
+  }
+  function makeProject(name2, templateId = "blank") {
+    const tpl = TEMPLATES.find((t2) => t2.id === templateId) || TEMPLATES[0];
+    const files = tpl.files();
+    const rec = {
+      id: uid("prj"),
+      name: String(name2 || "\u041D\u043E\u0432\u044B\u0439 \u043F\u0440\u043E\u0435\u043A\u0442").slice(0, 80),
+      template: tpl.id,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+      data: {
+        projectName: String(name2 || "\u041D\u043E\u0432\u044B\u0439 \u043F\u0440\u043E\u0435\u043A\u0442").slice(0, 80),
+        entry: tpl.entry || Object.keys(files)[0],
+        panes: { html: "index.html", css: "style.css", js: "script.js" },
+        deps: [],
+        layout: "columns",
+        files,
+        settings: null,
+        progress: {},
+        snapshots: []
+      }
+    };
+    const list2 = load();
+    list2.push(rec);
+    save(list2);
+    emit("projects:changed");
+    return rec;
+  }
+  function saveActiveProject() {
+    let id2 = getActiveId();
+    const list2 = load();
+    let rec = list2.find((p) => p.id === id2);
+    if (!rec) {
+      rec = {
+        id: uid("prj"),
+        name: state.projectName || "\u041C\u043E\u0439 \u043F\u0440\u043E\u0435\u043A\u0442",
+        template: "custom",
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        data: null
+      };
+      list2.push(rec);
+      save(list2);
+      setActiveId(rec.id);
+    }
+    rec.data = snapshotData();
+    rec.name = state.projectName || rec.name;
+    rec.updatedAt = Date.now();
+    save(list2);
+    emit("projects:changed");
+    return rec;
+  }
+  function openProject(id2) {
+    const rec = getProject(id2);
+    if (!rec) return false;
+    setActiveId(id2);
+    const d = rec.data || {};
+    const files = d.files || TEMPLATES[0].files();
+    if (d.settings) Object.assign(state.settings, d.settings);
+    setProject({
+      ...d,
+      files,
+      projectName: rec.name,
+      entry: d.entry || Object.keys(files)[0],
+      panes: d.panes || { html: "index.html", css: "style.css", js: "script.js" },
+      deps: d.deps || [],
+      layout: d.layout || "columns",
+      progress: d.progress || {},
+      snapshots: d.snapshots || []
+    }, rec.name, true);
+    state.projectName = rec.name;
+    const pn = $("#projectName");
+    if (pn) pn.value = rec.name;
+    emit("project:restoreEditors");
+    emit("project:opened", rec);
+    ctx.applySettings?.();
+    ctx.run?.("full");
+    ctx.analyze?.();
+    return true;
+  }
+  function renameProject(id2, name2) {
+    const n = String(name2 || "").trim().slice(0, 80);
+    if (!n) return false;
+    const list2 = load();
+    const rec = list2.find((p) => p.id === id2);
+    if (!rec) return false;
+    rec.name = n;
+    if (rec.data) rec.data.projectName = n;
+    rec.updatedAt = Date.now();
+    save(list2);
+    emit("projects:changed");
+    if (getActiveId() === id2) {
+      state.projectName = n;
+      const pn = $("#projectName");
+      if (pn) pn.value = n;
+    }
+    return true;
+  }
+  function deleteProject(id2) {
+    const list2 = load().filter((p) => p.id !== id2);
+    save(list2);
+    if (getActiveId() === id2) setActiveId("");
+    emit("projects:changed");
+    return true;
+  }
+  function duplicateProject(id2) {
+    const rec = getProject(id2);
+    if (!rec) return null;
+    const copy2 = {
+      ...rec,
+      id: uid("prj"),
+      name: (rec.name + " \u2014 \u043A\u043E\u043F\u0438\u044F").slice(0, 80),
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+      data: rec.data ? JSON.parse(JSON.stringify(rec.data)) : null
+    };
+    if (copy2.data) copy2.data.projectName = copy2.name;
+    const list2 = load();
+    list2.push(copy2);
+    save(list2);
+    emit("projects:changed");
+    return copy2;
+  }
+  function exportProject(id2) {
+    const rec = getProject(id2) || (getActiveId() ? saveActiveProject() : null);
+    if (!rec) {
+      toast("\u041D\u0435\u0442 \u043F\u0440\u043E\u0435\u043A\u0442\u0430 \u0434\u043B\u044F \u044D\u043A\u0441\u043F\u043E\u0440\u0442\u0430", "warn");
+      return;
+    }
+    const payload = {
+      format: "runlet-project",
+      version: 1,
+      exportedAt: Date.now(),
+      project: { name: rec.name, template: rec.template, data: rec.data || snapshotData() }
+    };
+    download(`${rec.name.replace(/[^\w-]/g, "_") || "project"}.runlet.json`, JSON.stringify(payload, null, 2), "application/json");
+    toast("\u041F\u0440\u043E\u0435\u043A\u0442 \u044D\u043A\u0441\u043F\u043E\u0440\u0442\u0438\u0440\u043E\u0432\u0430\u043D \u0432 JSON", "ok");
+  }
+  function exportAllProjects() {
+    const payload = { format: "runlet-backup", version: 1, exportedAt: Date.now(), projects: load() };
+    download("runlet-projects.json", JSON.stringify(payload, null, 2), "application/json");
+    toast("\u0412\u0441\u0435 \u043F\u0440\u043E\u0435\u043A\u0442\u044B \u044D\u043A\u0441\u043F\u043E\u0440\u0442\u0438\u0440\u043E\u0432\u0430\u043D\u044B", "ok");
+  }
+  async function importProjectFile(file) {
+    const text = await file.text();
+    let payload;
+    try {
+      payload = JSON.parse(text);
+    } catch (_) {
+      toast("\u042D\u0442\u043E \u043D\u0435 JSON-\u0444\u0430\u0439\u043B \u043F\u0440\u043E\u0435\u043A\u0442\u0430", "err");
+      return false;
+    }
+    const list2 = load();
+    if (payload.format === "runlet-backup" && Array.isArray(payload.projects)) {
+      for (const p of payload.projects.slice(0, 60)) {
+        if (!p || !p.id || typeof p.name !== "string") continue;
+        list2.push({ ...p, id: uid("prj"), name: p.name.slice(0, 80) });
+      }
+      save(list2);
+      emit("projects:changed");
+      toast(`\u0418\u043C\u043F\u043E\u0440\u0442\u0438\u0440\u043E\u0432\u0430\u043D\u043E \u043F\u0440\u043E\u0435\u043A\u0442\u043E\u0432: ${payload.projects.length}`, "ok");
+      return true;
+    }
+    if (payload.format === "runlet-project" && payload.project) {
+      const p = payload.project;
+      const rec = {
+        id: uid("prj"),
+        name: String(p.name || "\u0418\u043C\u043F\u043E\u0440\u0442").slice(0, 80),
+        template: p.template || "custom",
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        data: p.data || null
+      };
+      list2.push(rec);
+      save(list2);
+      emit("projects:changed");
+      toast("\u041F\u0440\u043E\u0435\u043A\u0442 \u0438\u043C\u043F\u043E\u0440\u0442\u0438\u0440\u043E\u0432\u0430\u043D \u2014 \u043E\u0442\u043A\u0440\u043E\u0439\u0442\u0435 \u0435\u0433\u043E \u0438\u0437 \u0441\u043F\u0438\u0441\u043A\u0430", "ok");
+      return true;
+    }
+    if (payload.files) {
+      importProjectJSON(text);
+      const rec = saveActiveProject();
+      emit("projects:changed");
+      toast("\u041F\u0440\u043E\u0435\u043A\u0442 \u0438\u043C\u043F\u043E\u0440\u0442\u0438\u0440\u043E\u0432\u0430\u043D \u043A\u0430\u043A \xAB" + rec.name + "\xBB", "ok");
+      return true;
+    }
+    toast("\u041D\u0435\u0438\u0437\u0432\u0435\u0441\u0442\u043D\u044B\u0439 \u0444\u043E\u0440\u043C\u0430\u0442 \u0444\u0430\u0439\u043B\u0430", "err");
+    return false;
+  }
+  function ensureSeed() {
+    if (load().length) return;
+    makeProject("\u041C\u043E\u0439 \u043F\u0435\u0440\u0432\u044B\u0439 \u0441\u0430\u0439\u0442", "starter");
+    setActiveId("");
+  }
+  function renderProjectRows(host2, onOpen) {
+    host2.innerHTML = "";
+    const list2 = listProjects();
+    if (!list2.length) {
+      host2.appendChild(Object.assign(
+        document.createElement("div"),
+        { className: "empty-note", textContent: "\u041F\u0440\u043E\u0435\u043A\u0442\u043E\u0432 \u043F\u043E\u043A\u0430 \u043D\u0435\u0442. \u0421\u043E\u0437\u0434\u0430\u0439\u0442\u0435 \u043F\u0435\u0440\u0432\u044B\u0439 \u0441\u043B\u0435\u0432\u0430." }
+      ));
+      return;
+    }
+    for (const rec of list2) {
+      const files = rec.data?.files ? Object.keys(rec.data.files).length : 0;
+      const tpl = TEMPLATES.find((t2) => t2.id === rec.template);
+      const row = document.createElement("div");
+      row.className = "project-row";
+      row.innerHTML = `<div class="pr-ico">${icon(tpl?.icon || "code", 17)}</div>
+      <div class="grow"><b>${esc(rec.name)}</b><div class="project-meta">${files} \u0444\u0430\u0439\u043B(\u043E\u0432) \xB7 ${new Date(rec.updatedAt || rec.createdAt).toLocaleString("ru-RU")}</div></div>
+      <div class="project-actions">
+        <button class="mini-btn" data-act="open" title="\u041E\u0442\u043A\u0440\u044B\u0442\u044C">${icon("arrowRight", 13)}</button>
+        <button class="mini-btn" data-act="rename" title="\u041F\u0435\u0440\u0435\u0438\u043C\u0435\u043D\u043E\u0432\u0430\u0442\u044C">${icon("edit", 13)}</button>
+        <button class="mini-btn" data-act="copy" title="\u0414\u0443\u0431\u043B\u0438\u0440\u043E\u0432\u0430\u0442\u044C">${icon("copy", 13)}</button>
+        <button class="mini-btn" data-act="export" title="\u042D\u043A\u0441\u043F\u043E\u0440\u0442">${icon("download", 13)}</button>
+        <button class="mini-btn" data-act="delete" title="\u0423\u0434\u0430\u043B\u0438\u0442\u044C">${icon("trash", 13)}</button>
+      </div>`;
+      row.querySelector('[data-act="open"]').onclick = (e) => {
+        e.stopPropagation();
+        onOpen(rec.id);
+      };
+      row.querySelector('[data-act="rename"]').onclick = (e) => {
+        e.stopPropagation();
+        ctx.modal({
+          title: "\u041F\u0435\u0440\u0435\u0438\u043C\u0435\u043D\u043E\u0432\u0430\u0442\u044C \u043F\u0440\u043E\u0435\u043A\u0442",
+          narrow: true,
+          body: `<div class="field"><label>\u0418\u043C\u044F</label><input id="prjRename" value="${esc(rec.name)}" maxlength="80"></div>`,
+          okText: "\u0421\u043E\u0445\u0440\u0430\u043D\u0438\u0442\u044C",
+          onOk: (root) => {
+            const name2 = root.querySelector("#prjRename").value.trim();
+            if (!name2) return false;
+            renameProject(rec.id, name2);
+            renderProjectRows(host2, onOpen);
+          }
+        });
+      };
+      row.querySelector('[data-act="copy"]').onclick = (e) => {
+        e.stopPropagation();
+        duplicateProject(rec.id);
+        renderProjectRows(host2, onOpen);
+      };
+      row.querySelector('[data-act="export"]').onclick = (e) => {
+        e.stopPropagation();
+        exportProject(rec.id);
+      };
+      row.querySelector('[data-act="delete"]').onclick = (e) => {
+        e.stopPropagation();
+        ctx.modal({
+          title: "\u0423\u0434\u0430\u043B\u0438\u0442\u044C \u043F\u0440\u043E\u0435\u043A\u0442?",
+          narrow: true,
+          danger: true,
+          okText: "\u0423\u0434\u0430\u043B\u0438\u0442\u044C",
+          body: `<p>\u041F\u0440\u043E\u0435\u043A\u0442 \xAB${esc(rec.name)}\xBB \u0431\u0443\u0434\u0435\u0442 \u0443\u0434\u0430\u043B\u0451\u043D \u0438\u0437 \u0441\u043F\u0438\u0441\u043A\u0430. \u042D\u0442\u043E \u0434\u0435\u0439\u0441\u0442\u0432\u0438\u0435 \u043D\u0435\u043B\u044C\u0437\u044F \u043E\u0442\u043C\u0435\u043D\u0438\u0442\u044C.</p>`,
+          onOk: () => {
+            deleteProject(rec.id);
+            renderProjectRows(host2, onOpen);
+          }
+        });
+      };
+      row.onclick = () => onOpen(rec.id);
+      host2.appendChild(row);
+    }
+  }
+  function initProjects() {
+    ensureSeed();
+    on("saved", () => saveActiveProject());
+    on("files:changed", debounce(() => {
+      if (!state.readOnly) saveActiveProject();
+    }, 1200));
+    on("project:rename", () => saveActiveProject());
+  }
+
+  // app/src/core/windows.js
+  init_core();
+  init_icons();
+  var layer2 = null;
+  var zTop = 900;
+  var wins = /* @__PURE__ */ new Map();
+  var cascade = 0;
+  function ensureLayer() {
+    if (!layer2) layer2 = $("#windowsLayer");
+    return layer2;
+  }
+  function focus(win) {
+    win.el.style.zIndex = ++zTop;
+    $$(".float-window").forEach((w) => w.classList.remove("fw-focus"));
+    win.el.classList.add("fw-focus");
+  }
+  function clamp(win) {
+    const r = win.el.getBoundingClientRect();
+    if (r.left < 4) win.el.style.left = "4px";
+    if (r.top < 4) win.el.style.top = "4px";
+    if (r.right > innerWidth - 4) win.el.style.left = Math.max(4, innerWidth - r.width - 8) + "px";
+    if (r.bottom > innerHeight - 4) win.el.style.top = Math.max(4, innerHeight - r.height - 8) + "px";
+  }
+  function openWindow(opts = {}) {
+    const host2 = ensureLayer();
+    if (!host2) return null;
+    const id2 = opts.id || "w" + Math.random().toString(36).slice(2, 8);
+    if (wins.has(id2)) {
+      const w = wins.get(id2);
+      focus(w);
+      w.el.classList.remove("fw-min");
+      return w;
+    }
+    const width = Math.min(opts.width || 620, Math.max(360, innerWidth - 40));
+    const height = Math.min(opts.height || 420, Math.max(260, innerHeight - 60));
+    const x2 = opts.x ?? Math.min(innerWidth - width - 20, 80 + cascade % 7 * 28);
+    const y = opts.y ?? Math.min(innerHeight - height - 20, 60 + cascade % 7 * 24);
+    cascade++;
+    const node = el("div", { class: "float-window", style: {
+      left: x2 + "px",
+      top: y + "px",
+      width: width + "px",
+      height: height + "px"
+    } });
+    const head = el("div", { class: "fw-head" });
+    head.innerHTML = `<span class="fw-title">${icon(opts.icon || "window", 14)} <span>${escapeText(opts.title || "\u041E\u043A\u043D\u043E")}</span></span>
+    <span class="fw-actions">
+      <button class="fw-btn" data-fw="min" title="\u0421\u0432\u0435\u0440\u043D\u0443\u0442\u044C">${icon("minus", 13)}</button>
+      <button class="fw-btn" data-fw="max" title="\u0420\u0430\u0437\u0432\u0435\u0440\u043D\u0443\u0442\u044C">${icon("maximize", 13)}</button>
+      <button class="fw-btn" data-fw="close" title="\u0417\u0430\u043A\u0440\u044B\u0442\u044C">${icon("close", 13)}</button>
+    </span>`;
+    const body = el("div", { class: "fw-body" });
+    const resize = el("div", { class: "fw-resize" });
+    node.append(head, body, resize);
+    host2.appendChild(node);
+    const win = { id: id2, el: node, body, opts, restore: null };
+    wins.set(id2, win);
+    if (opts.url) {
+      const f = document.createElement("iframe");
+      f.src = opts.url;
+      f.title = opts.title || "\u0421\u0430\u0439\u0442";
+      f.setAttribute("referrerpolicy", "no-referrer");
+      f.setAttribute("sandbox", "allow-scripts allow-forms allow-same-origin");
+      body.appendChild(f);
+      win.iframe = f;
+    } else if (opts.html) {
+      const f = document.createElement("iframe");
+      f.title = opts.title || "\u041F\u0440\u0435\u0434\u043F\u0440\u043E\u0441\u043C\u043E\u0442\u0440";
+      f.setAttribute("referrerpolicy", "no-referrer");
+      f.setAttribute("sandbox", "allow-scripts allow-forms");
+      f.srcdoc = opts.html;
+      body.appendChild(f);
+      win.iframe = f;
+    } else if (opts.content) {
+      body.appendChild(opts.content);
+      body.style.display = "flex";
+      body.style.flexDirection = "column";
+    }
+    if (opts.restore) win.restore = opts.restore;
+    let drag2 = null;
+    head.addEventListener("pointerdown", (e) => {
+      if (e.target.closest(".fw-btn")) return;
+      focus(win);
+      const r = node.getBoundingClientRect();
+      drag2 = { dx: e.clientX - r.left, dy: e.clientY - r.top };
+      head.setPointerCapture(e.pointerId);
+      e.preventDefault();
+    });
+    head.addEventListener("pointermove", (e) => {
+      if (!drag2) return;
+      node.style.left = Math.max(0, Math.min(innerWidth - 60, e.clientX - drag2.dx)) + "px";
+      node.style.top = Math.max(0, Math.min(innerHeight - 40, e.clientY - drag2.dy)) + "px";
+    });
+    head.addEventListener("pointerup", () => {
+      drag2 = null;
+      clamp(win);
+    });
+    head.addEventListener("pointercancel", () => {
+      drag2 = null;
+    });
+    node.addEventListener("pointerdown", () => focus(win));
+    let rz = null;
+    resize.addEventListener("pointerdown", (e) => {
+      focus(win);
+      const r = node.getBoundingClientRect();
+      rz = { w: r.width, h: r.height, x: e.clientX, y: e.clientY };
+      resize.setPointerCapture(e.pointerId);
+      e.preventDefault();
+      e.stopPropagation();
+    });
+    resize.addEventListener("pointermove", (e) => {
+      if (!rz) return;
+      node.style.width = Math.max(280, rz.w + e.clientX - rz.x) + "px";
+      node.style.height = Math.max(180, rz.h + e.clientY - rz.y) + "px";
+      emit("windows:changed");
+    });
+    resize.addEventListener("pointerup", () => {
+      rz = null;
+      clamp(win);
+      emit("windows:changed");
+    });
+    head.querySelector('[data-fw="min"]').onclick = () => node.classList.toggle("fw-min");
+    head.querySelector('[data-fw="max"]').onclick = () => {
+      if (win.maxRect) {
+        Object.assign(node.style, win.maxRect);
+        win.maxRect = null;
+      } else {
+        win.maxRect = { left: node.style.left, top: node.style.top, width: node.style.width, height: node.style.height };
+        Object.assign(node.style, { left: "10px", top: "10px", width: innerWidth - 20 + "px", height: innerHeight - 20 + "px" });
+      }
+      emit("windows:changed");
+    };
+    head.querySelector('[data-fw="close"]').onclick = () => closeWindow(id2);
+    focus(win);
+    emit("windows:changed");
+    return win;
+  }
+  function escapeText(s) {
+    return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+  }
+  function closeWindow(id2) {
+    const win = wins.get(id2);
+    if (!win) return false;
+    try {
+      win.restore?.();
+    } catch (e) {
+      console.warn("[windows] restore", e);
+    }
+    try {
+      win.opts.onClose?.();
+    } catch (_) {
+    }
+    win.el.remove();
+    wins.delete(id2);
+    emit("windows:changed");
+    return true;
+  }
+  function closeAllWindows() {
+    for (const id2 of [...wins.keys()]) closeWindow(id2);
+  }
+  function windowCount() {
+    return wins.size;
+  }
+  function refreshSiteWindow(url) {
+    const w = wins.get("site");
+    if (w?.iframe) {
+      w.iframe.src = url;
+      return true;
+    }
+    return false;
+  }
+  function movePanelWindow(node, opts) {
+    if (!node || !node.parentNode) return null;
+    const parent2 = node.parentNode;
+    const next = node.nextSibling;
+    const placeholder = el("div", { class: "panel-placeholder", style: { flex: "1", minHeight: "40px" } });
+    parent2.insertBefore(placeholder, node);
+    const saved = node.getAttribute("style") || "";
+    node.style.flex = "1 1 auto";
+    node.style.minHeight = "0";
+    node.style.minWidth = "0";
+    return openWindow({
+      ...opts,
+      content: node,
+      restore: () => {
+        node.setAttribute("style", saved);
+        if (placeholder.parentNode) parent2.insertBefore(node, placeholder);
+        else parent2.appendChild(node);
+        placeholder.remove();
+        emit("windows:changed");
+      }
+    });
+  }
+  function detachEditor(pane) {
+    const node = $(`.editor-pane[data-pane="${pane}"]`);
+    if (!node) return null;
+    const id2 = "editor-" + pane;
+    if (wins.has(id2)) {
+      closeWindow(id2);
+      return null;
+    }
+    return movePanelWindow(node, { id: id2, title: `\u0420\u0435\u0434\u0430\u043A\u0442\u043E\u0440 \xB7 ${pane.toUpperCase()}`, icon: "code", width: 700, height: 480 });
+  }
+  function openSiteWindow(url, html2) {
+    if (wins.has("site")) {
+      const w = wins.get("site");
+      focus(w);
+      if (url && w.iframe) w.iframe.src = url;
+      return w;
+    }
+    return openWindow({
+      id: "site",
+      title: "\u0421\u0430\u0439\u0442 \u2014 Live Server",
+      icon: "globe",
+      width: 940,
+      height: 660,
+      ...url ? { url } : { html: html2 }
+    });
+  }
+  var windowed = false;
+  function isWindowed() {
+    return windowed;
+  }
+  function toggleWindowedMode() {
+    windowed = !windowed;
+    $("#app")?.classList.toggle("windowed-mode", windowed);
+    if (windowed) {
+      const live = ctx.liveStatus?.();
+      openSiteWindow(live?.running ? live.url : null, ctx.srcdoc?.());
+      const three = $("#threePanel");
+      if (three) movePanelWindow(three, { id: "win-three", title: "3D-\u0440\u0435\u0434\u0430\u043A\u0442\u043E\u0440", icon: "cube", width: 760, height: 520 });
+      const cons = $("#consolePanel");
+      if (cons) movePanelWindow(cons, { id: "win-console", title: "\u041A\u043E\u043D\u0441\u043E\u043B\u044C", icon: "terminal", width: 620, height: 360 });
+    } else {
+      for (const id2 of ["site", "win-three", "win-console"]) closeWindow(id2);
+    }
+    state.settings.windowedMode = windowed;
+    ctx.applySettings?.();
+    emit("windows:changed");
+    return windowed;
+  }
+  function initWindows() {
+    ensureLayer();
+    on("live:changed", (st) => {
+      if (st?.running && st?.url) refreshSiteWindow(st.url);
+    });
+    window.addEventListener("resize", () => {
+      for (const w of wins.values()) clamp(w);
+    });
   }
 
   // app/src/core/ui.js
+  var TOOLBAR_PRESETS = [
+    { id: "run", label: "\u0417\u0430\u043F\u0443\u0441\u0442\u0438\u0442\u044C", icon: "play" },
+    { id: "liveServer", label: "Live Server", icon: "server" },
+    { id: "openSite", label: "\u0421\u0430\u0439\u0442 \u0432 \u043E\u043A\u043D\u0435", icon: "window" },
+    { id: "format", label: "\u0424\u043E\u0440\u043C\u0430\u0442", icon: "format" },
+    { id: "save", label: "\u0421\u043E\u0445\u0440\u0430\u043D\u0438\u0442\u044C", icon: "save" },
+    { id: "download", label: "\u0421\u043A\u0430\u0447\u0430\u0442\u044C ZIP", icon: "download" },
+    { id: "exportProject", label: "\u042D\u043A\u0441\u043F\u043E\u0440\u0442 \u043F\u0440\u043E\u0435\u043A\u0442\u0430", icon: "archive" },
+    { id: "importProject", label: "\u0418\u043C\u043F\u043E\u0440\u0442 \u043F\u0440\u043E\u0435\u043A\u0442\u0430", icon: "upload" },
+    { id: "analyze", label: "\u0410\u043D\u0430\u043B\u0438\u0437 \u043A\u043E\u0434\u0430", icon: "chart" },
+    { id: "snippets", label: "\u0421\u043D\u0438\u043F\u043F\u0435\u0442\u044B", icon: "brackets" },
+    { id: "cssLab", label: "CSS-\u043B\u0430\u0431\u043E\u0440\u0430\u0442\u043E\u0440\u0438\u044F", icon: "palette" },
+    { id: "jsTools", label: "JS-\u0438\u043D\u0441\u0442\u0440\u0443\u043C\u0435\u043D\u0442\u044B", icon: "braces" },
+    { id: "htmlTools", label: "HTML-\u0433\u0435\u043D\u0435\u0440\u0430\u0442\u043E\u0440\u044B", icon: "code" },
+    { id: "openThreeD", label: "3D-\u0440\u0435\u0434\u0430\u043A\u0442\u043E\u0440", icon: "cube" },
+    { id: "windowedMode", label: "\u041E\u043A\u043E\u043D\u043D\u044B\u0439 \u0440\u0435\u0436\u0438\u043C", icon: "window" },
+    { id: "tour", label: "\u0422\u0443\u0440", icon: "help" },
+    { id: "helpWelcome", label: "\u041A\u0430\u043A \u0440\u0430\u0431\u043E\u0442\u0430\u0442\u044C", icon: "info" },
+    { id: "learn", label: "\u0423\u0440\u043E\u043A\u0438", icon: "book" },
+    { id: "shortcuts", label: "\u0413\u043E\u0440\u044F\u0447\u0438\u0435 \u043A\u043B\u0430\u0432\u0438\u0448\u0438", icon: "keyboard" },
+    { id: "palette", label: "\u041A\u043E\u043C\u0430\u043D\u0434\u044B", icon: "search" },
+    { id: "theme", label: "\u0422\u0435\u043C\u0430", icon: "theme" },
+    { id: "settings", label: "\u041D\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0438", icon: "settings" },
+    { id: "share", label: "\u041F\u043E\u0434\u0435\u043B\u0438\u0442\u044C\u0441\u044F", icon: "link" },
+    { id: "snapshot", label: "\u0412\u0435\u0440\u0441\u0438\u044F", icon: "history" }
+  ];
+  var RAIL_TITLES = {
+    files: ["\u0424\u0430\u0439\u043B\u044B \u043F\u0440\u043E\u0435\u043A\u0442\u0430", "\u0434\u0435\u0440\u0435\u0432\u043E \u0444\u0430\u0439\u043B\u043E\u0432 \u0438 \u043F\u0430\u043F\u043E\u043A"],
+    search: ["\u041F\u043E\u0438\u0441\u043A", "\u043F\u043E \u0441\u043E\u0434\u0435\u0440\u0436\u0438\u043C\u043E\u043C\u0443 \u043F\u0440\u043E\u0435\u043A\u0442\u0430"],
+    libs: ["\u0411\u0438\u0431\u043B\u0438\u043E\u0442\u0435\u043A\u0438", "CDN-\u0437\u0430\u0432\u0438\u0441\u0438\u043C\u043E\u0441\u0442\u0438"],
+    assets: ["\u0410\u0441\u0441\u0435\u0442\u044B", "\u043A\u0430\u0440\u0442\u0438\u043D\u043A\u0438, \u0448\u0440\u0438\u0444\u0442\u044B, \u043C\u0435\u0434\u0438\u0430"],
+    three: ["3D-\u0440\u0435\u0434\u0430\u043A\u0442\u043E\u0440", "\u043F\u0440\u0438\u043C\u0438\u0442\u0438\u0432\u044B \u0438 \u0442\u0440\u0430\u043D\u0441\u0444\u043E\u0440\u043C\u0430\u0446\u0438\u0438"],
+    learn: ["\u0423\u0440\u043E\u043A\u0438", "HTML, CSS \u0438 JS"],
+    plugins: ["\u041F\u043B\u0430\u0433\u0438\u043D\u044B", "\u0434\u043E\u043F\u043E\u043B\u043D\u0438\u0442\u0435\u043B\u044C\u043D\u044B\u0435 \u0438\u043D\u0441\u0442\u0440\u0443\u043C\u0435\u043D\u0442\u044B"],
+    features: ["\u041A\u0430\u0440\u0442\u0430 \u0438\u0434\u0435\u0439", "500 \u0432\u043E\u0437\u043C\u043E\u0436\u043D\u043E\u0441\u0442\u0435\u0439"]
+  };
+  var INSP_TO_SUB = { dom: "dom", network: "network", storage: "storage", perf: "perf" };
+  function hydrateIcons(root = document) {
+    root.querySelectorAll("[data-icon]").forEach((n) => {
+      if (n.dataset.iconDone) return;
+      n.innerHTML = icon(n.dataset.icon, 16);
+      n.dataset.iconDone = "1";
+    });
+  }
+  function renderToolbar() {
+    const primary = $("#toolbarPrimary"), secondary = $("#toolbarSecondary");
+    if (!primary || !secondary) return;
+    const build = (ids, host2, compact) => {
+      host2.innerHTML = "";
+      for (const id2 of ids || []) {
+        const c = commands.get(id2);
+        const preset = TOOLBAR_PRESETS.find((p) => p.id === id2);
+        if (!c) continue;
+        const b = document.createElement("button");
+        const cls = id2 === "run" ? "btn-run" : id2 === "analyze" ? "btn-accent" : compact ? "btn-ghost" : "btn";
+        b.className = "btn " + cls;
+        b.dataset.cmd = id2;
+        b.title = deEmoji(c.title) + (c.key ? " \xB7 " + c.key : "");
+        b.innerHTML = icon(preset?.icon || c.icon || "chevronRight", 15) + `<span>${esc(preset?.label || deEmoji(c.title))}</span>` + (id2 === "analyze" ? '<span class="analyze-badge" id="analyzeBadge">0</span>' : "");
+        host2.appendChild(b);
+      }
+    };
+    build(state.settings.toolbarButtons, primary, false);
+    build(state.settings.toolbarSecondary, secondary, true);
+    hydrateIcons(primary);
+    hydrateIcons(secondary);
+    const badge = $("#analyzeBadge");
+    if (badge && state.report) badge.textContent = (state.report.metrics?.diagnostics?.error || 0) + "";
+  }
   var modalRoot;
   var activeModal = null;
   var tourSteps = [];
@@ -49434,10 +50625,16 @@ ${p.map((x2, i4) => `  --brand-${i4 + 1}: ${x2};`).join("\n")}
     modalRoot = $("#modalRoot");
     applyTheme();
     applyLocale();
+    hydrateIcons();
+    const pIcon = $("#projectIcon");
+    if (pIcon) pIcon.innerHTML = icon("folder", 14);
+    const palIcon = $("#paletteIcon");
+    if (palIcon) palIcon.innerHTML = icon("search", 14);
     initTabs();
     initSplitters();
     initHotkeys();
     initWindowControls();
+    renderToolbar();
     document.addEventListener("click", (e) => {
       const btn = e.target.closest("[data-cmd]");
       if (!btn) return;
@@ -49447,44 +50644,66 @@ ${p.map((x2, i4) => `  --brand-${i4 + 1}: ${x2};`).join("\n")}
       if (btn.dataset.rid) arg = { id: btn.dataset.rid, line: +btn.dataset.line };
       runCommand(id2, arg);
     });
-    $("#accentInput")?.addEventListener("input", debounce((e) => {
-      state.settings.accent = e.target.value;
-      applySettings();
-    }, 120));
-    $("#projectName")?.addEventListener("input", (e) => {
-      state.projectName = e.target.value;
+    $("#hiddenProjectInput")?.addEventListener("change", async (e) => {
+      if (e.target.files?.[0]) await importProjectFile(e.target.files[0]);
+      e.target.value = "";
+    });
+    $("#projectName")?.addEventListener("change", (e) => {
+      state.projectName = e.target.value.slice(0, 80);
+      emit("project:rename");
     });
     on("toast", (d) => toast(d.msg, d.type));
     on("project:restoreEditors", syncEditorLabels);
     on("settings:changed", () => {
       $("#optAutoRun") && ($("#optAutoRun").checked = state.settings.autoRun);
       $("#zoomSelect") && ($("#zoomSelect").value = String(state.zoom));
+      renderToolbar();
     });
-    on("files:changed", ({ path, removed }) => {
+    on("analysis:report", (r) => {
+      const b = $("#analyzeBadge");
+      if (b) b.textContent = (r?.metrics?.diagnostics?.error || 0) + "";
+    });
+    on("files:changed", ({ path }) => {
       const pane = Object.entries(state.panes).find(([, p]) => p === path)?.[0];
       if (pane) {
         const label = $(`[data-pane-file="${pane}"]`);
         if (label) label.textContent = path;
       }
     });
-    if (state.settings.firstRun) setTimeout(() => showStartScreen(), 450);
+    on("windows:changed", () => {
+      for (const v of Object.values(editors)) v.requestMeasure?.();
+    });
     applyLayout(state.layout);
+    if (state.settings.showLauncher) setTimeout(() => showStartScreen(), 260);
+    else if (!state.settings.welcomeSeen) setTimeout(() => showWelcome(), 350);
   }
   function initTabs() {
-    $("#railTabs")?.addEventListener("click", (e) => {
+    $("#railNav")?.addEventListener("click", (e) => {
       const t2 = e.target.closest("[data-rail-tab]");
       if (!t2) return;
-      $$(".rail-tab").forEach((x2) => x2.classList.toggle("active", x2 === t2));
-      $$(".rail-panel").forEach((x2) => x2.classList.toggle("active", x2.dataset.rail === t2.dataset.railTab));
-      emit("rail:tab", t2.dataset.railTab);
+      const name2 = t2.dataset.railTab;
+      $$("#railNav .nav-item").forEach((x2) => x2.classList.toggle("active", x2 === t2));
+      $$(".rail-panel").forEach((x2) => x2.classList.toggle("active", x2.dataset.rail === name2));
+      const meta2 = RAIL_TITLES[name2] || ["", ""];
+      const title = $("#railTitle");
+      if (title) title.textContent = meta2[0];
+      const hint = $("#railHint");
+      if (hint) hint.textContent = meta2[1];
+      emit("rail:tab", name2);
+      if (name2 === "three") emit("three:show");
     });
     $("#inspectorTabs")?.addEventListener("click", (e) => {
       const t2 = e.target.closest("[data-insp-tab]");
       if (!t2) return;
-      $$(".insp-tab").forEach((x2) => x2.classList.toggle("active", x2 === t2));
-      $$(".insp-panel").forEach((x2) => x2.classList.toggle("active", x2.dataset.insp === t2.dataset.inspTab));
-      emit("insp:tab", t2.dataset.inspTab);
-      if (["dom", "network", "storage", "perf", "debug"].includes(t2.dataset.inspTab)) ctx.refreshInspectors?.();
+      selectInspTab(t2.dataset.inspTab);
+    });
+    $("#inspectorSubTabs")?.addEventListener("click", (e) => {
+      const t2 = e.target.closest("[data-sub-tab]");
+      if (!t2) return;
+      const name2 = t2.dataset.subTab;
+      $$("#inspectorSubTabs .sub-tab").forEach((x2) => x2.classList.toggle("active", x2 === t2));
+      $$(".sub-panel").forEach((x2) => x2.classList.toggle("active", x2.dataset.sub === name2));
+      ctx.refreshInspectors?.();
     });
     $("#editors")?.addEventListener("click", (e) => {
       const t2 = e.target.closest("[data-pane-tab]");
@@ -49494,10 +50713,21 @@ ${p.map((x2, i4) => `  --brand-${i4 + 1}: ${x2};`).join("\n")}
     });
   }
   function selectRailTab(name2) {
-    $(`[data-rail-tab="${name2}"]`)?.click();
+    $(`#railNav [data-rail-tab="${name2}"]`)?.click();
   }
   function selectInspTab(name2) {
-    $(`[data-insp-tab="${name2}"]`)?.click();
+    const sub = INSP_TO_SUB[name2];
+    const target = sub ? "inspector" : name2;
+    const t2 = $(`[data-insp-tab="${target}"]`);
+    if (!t2) return;
+    $$(".insp-tab").forEach((x2) => x2.classList.toggle("active", x2 === t2));
+    $$(".insp-panel").forEach((x2) => x2.classList.toggle("active", x2.dataset.insp === target));
+    if (sub) {
+      $$(".sub-panel").forEach((x2) => x2.classList.toggle("active", x2.dataset.sub === sub));
+      $$("#inspectorSubTabs .sub-tab").forEach((x2) => x2.classList.toggle("active", x2.dataset.subTab === sub));
+    }
+    emit("insp:tab", target);
+    if (["debug", "dom", "network", "storage", "perf"].includes(name2)) ctx.refreshInspectors?.();
   }
   function initSplitters() {
     $$(".splitter").forEach((sp) => {
@@ -49550,9 +50780,9 @@ ${p.map((x2, i4) => `  --brand-${i4 + 1}: ${x2};`).join("\n")}
   }
   function applyLayout(layout, active = null) {
     state.layout = layout;
-    const host = $("#editors");
-    host.dataset.layout = layout;
-    host.className = "editors layout-" + layout;
+    const host2 = $("#editors");
+    host2.dataset.layout = layout;
+    host2.className = "editors layout-" + layout;
     $$(".layout-group .btn").forEach((b) => b.classList.toggle(
       "active",
       layout === "columns" && b.dataset.cmd === "layoutColumns" || layout === "rows" && b.dataset.cmd === "layoutRows" || layout === "tabs" && b.dataset.cmd === "layoutTabs"
@@ -49660,7 +50890,7 @@ ${p.map((x2, i4) => `  --brand-${i4 + 1}: ${x2};`).join("\n")}
     const cmds = [...commands.values()].filter((c) => !c.hidden);
     const groups = [...new Set(cmds.map((c) => c.group || "\u0420\u0430\u0437\u043D\u043E\u0435"))];
     modal({
-      title: "\u26A1 \u041F\u0430\u043B\u0438\u0442\u0440\u0430 \u043A\u043E\u043C\u0430\u043D\u0434",
+      title: "\u041F\u0430\u043B\u0438\u0442\u0440\u0430 \u043A\u043E\u043C\u0430\u043D\u0434",
       wide: true,
       cancelText: "",
       okText: "\u0417\u0430\u043A\u0440\u044B\u0442\u044C",
@@ -49670,8 +50900,8 @@ ${p.map((x2, i4) => `  --brand-${i4 + 1}: ${x2};`).join("\n")}
       onMount: (root) => {
         const input = root.querySelector("#paletteInput"), list2 = root.querySelector("#paletteList");
         let items = [], active = 0;
-        const draw = (q2) => {
-          const ql = q2.toLowerCase();
+        const draw = (q) => {
+          const ql = q.toLowerCase();
           let pool;
           if (ql.startsWith("#")) {
             const f = ql.slice(1);
@@ -49679,12 +50909,12 @@ ${p.map((x2, i4) => `  --brand-${i4 + 1}: ${x2};`).join("\n")}
               id: "open:" + p,
               title: p,
               group: "\u0424\u0430\u0439\u043B\u044B",
-              icon: "\u{1F4C4}",
+              icon: "file",
               run: () => ctx.openFile(p)
             }));
           } else if (ql.startsWith(":")) {
             const n = +ql.slice(1) || 1;
-            pool = [{ id: "goto", title: `\u041F\u0435\u0440\u0435\u0439\u0442\u0438 \u043A \u0441\u0442\u0440\u043E\u043A\u0435 ${n}`, group: "\u041D\u0430\u0432\u0438\u0433\u0430\u0446\u0438\u044F", icon: "\u2197", run: () => ctx.gotoLine(n) }];
+            pool = [{ id: "goto", title: `\u041F\u0435\u0440\u0435\u0439\u0442\u0438 \u043A \u0441\u0442\u0440\u043E\u043A\u0435 ${n}`, group: "\u041D\u0430\u0432\u0438\u0433\u0430\u0446\u0438\u044F", icon: "arrowRight", run: () => ctx.gotoLine(n) }];
           } else {
             pool = cmds.filter((c) => (c.title + " " + (c.group || "") + " " + c.id).toLowerCase().includes(ql));
           }
@@ -49700,7 +50930,7 @@ ${p.map((x2, i4) => `  --brand-${i4 + 1}: ${x2};`).join("\n")}
             const node = el(
               "div",
               { class: "cmd-item " + (i4 === 0 ? "active" : ""), "data-i": i4 },
-              el("span", { class: "cmd-ico", text: c.icon || "\u203A" }),
+              el("span", { class: "cmd-ico", html: icon(c.icon || "chevronRight", 14) }),
               el("div", { class: "grow" }, el("b", { text: c.title }), c.hint ? el("small", { class: "dim", text: c.hint }) : null),
               c.key ? el("kbd", { class: "cmd-key", text: c.key }) : null
             );
@@ -49746,47 +50976,75 @@ ${p.map((x2, i4) => `  --brand-${i4 + 1}: ${x2};`).join("\n")}
   }
   function settingsModal(tab = "editor") {
     const s = state.settings;
+    const bool = (label, key) => `<label class="chk"><input type="checkbox" data-set="${key}" ${s[key] ? "checked" : ""}> ${label}</label>`;
     const field = (label, key, type = "number", extra = "") => `<div class="field"><label>${label}</label>
-    <input data-set="${key}" type="${type}" ${type === "checkbox" ? s[key] ? "checked" : "" : `value="${type === "color" ? s[key] : s[key]}"`} ${extra}></div>`;
-    const bool = (label, key) => `<label class="chk" style="margin:4px 0"><input type="checkbox" data-set="${key}" ${s[key] ? "checked" : ""}> ${label}</label>`;
+    <input data-set="${key}" type="${type}" ${type === "checkbox" ? s[key] ? "checked" : "" : `value="${s[key]}"`} ${extra}></div>`;
+    const keyRows = () => Object.entries(s.keybindings).map(([id2, combo]) => {
+      const c = commands.get(id2);
+      return `<div class="list-row"><div class="grow"><b>${esc(deEmoji(c?.title || id2))}</b><small>${esc(id2)}</small></div>
+      <kbd data-kval="${esc(id2)}">${esc(combo)}</kbd>
+      <button class="mini-btn" data-rebind="${esc(id2)}">\u041D\u0430\u0437\u043D\u0430\u0447\u0438\u0442\u044C</button>
+      <button class="mini-btn" data-checkbind="${esc(id2)}">\u041F\u0440\u043E\u0432\u0435\u0440\u0438\u0442\u044C</button></div>`;
+    }).join("");
+    const presetOptions = (sel) => TOOLBAR_PRESETS.map((p) => `<option value="${p.id}" ${p.id === sel ? "selected" : ""}>${esc(p.label)}</option>`).join("");
+    const slotRows = (ids, group) => (ids || []).map((id2, i4) => `<div class="list-row">
+      <select class="mini-select" data-slot="${group}" data-i="${i4}" style="flex:1">${presetOptions(id2)}</select>
+      <button class="mini-btn" data-slotup="${group}" data-i="${i4}">${icon("arrowUp", 12)}</button>
+      <button class="mini-btn" data-slotdown="${group}" data-i="${i4}">${icon("arrowDown", 12)}</button>
+      <button class="mini-btn" data-slotdel="${group}" data-i="${i4}">${icon("trash", 12)}</button></div>`).join("");
     const pages = {
       editor: `<div class="field-row">
         ${field("\u0420\u0430\u0437\u043C\u0435\u0440 \u0448\u0440\u0438\u0444\u0442\u0430", "fontSize", "number", 'min="9" max="28"')}
         ${field("\u041C\u0435\u0436\u0441\u0442\u0440\u043E\u0447\u043D\u044B\u0439 \u0438\u043D\u0442\u0435\u0440\u0432\u0430\u043B", "lineHeight", "number", 'step="0.1" min="1" max="2.5"')}
         ${field("\u0428\u0438\u0440\u0438\u043D\u0430 \u0442\u0430\u0431\u0443\u043B\u044F\u0446\u0438\u0438", "tabSize", "number", 'min="1" max="8"')}
-        <div class="field"><label>\u0428\u0440\u0438\u0444\u0442</label><select data-set="fontFamily">
+        <div class="field"><label>\u0428\u0440\u0438\u0444\u0442 \u0440\u0435\u0434\u0430\u043A\u0442\u043E\u0440\u0430</label><select data-set="fontFamily">
           ${["mono", "system", "courier", "sans"].map((v) => `<option value="${v}" ${s.fontFamily === v ? "selected" : ""}>${v}</option>`).join("")}</select></div>
-        <div class="field"><label>\u0421\u0442\u0438\u043B\u044C \u043A\u0443\u0440\u0441\u043E\u0440\u0430</label><select data-set="cursorStyle">
-          <option value="smooth" ${s.cursorStyle === "smooth" ? "selected" : ""}>\u043F\u043B\u0430\u0432\u043D\u044B\u0439</option>
-          <option value="block" ${s.cursorStyle === "block" ? "selected" : ""}>\u0431\u043B\u043E\u043A</option></select></div>
-        <div class="field"><label>\u041B\u043E\u043A\u0430\u043B\u044C \u0438\u043D\u0442\u0435\u0440\u0444\u0435\u0439\u0441\u0430</label><select data-set="locale">
-          <option value="ru" ${s.locale === "ru" ? "selected" : ""}>\u0420\u0443\u0441\u0441\u043A\u0438\u0439</option>
-          <option value="en" ${s.locale === "en" ? "selected" : ""}>English</option></select></div>
       </div>
-      <h4 style="margin:12px 0 4px">\u041E\u0442\u043E\u0431\u0440\u0430\u0436\u0435\u043D\u0438\u0435</h4><div class="rowflex">
-        ${bool("\u041F\u0440\u043E\u0431\u0435\u043B\u044B \u0438 \u0442\u0430\u0431\u044B", "showWhitespace")}${bool("\u041D\u0435\u0432\u0438\u0434\u0438\u043C\u044B\u0435 \u0441\u0438\u043C\u0432\u043E\u043B\u044B", "showInvisibles")}
+      <h4 style="margin:10px 0 5px;font-size:11px">\u041E\u0442\u043E\u0431\u0440\u0430\u0436\u0435\u043D\u0438\u0435</h4>
+      <div class="rowflex">${bool("\u041F\u0440\u043E\u0431\u0435\u043B\u044B \u0438 \u0442\u0430\u0431\u044B", "showWhitespace")}${bool("\u041D\u0435\u0432\u0438\u0434\u0438\u043C\u044B\u0435 \u0441\u0438\u043C\u0432\u043E\u043B\u044B", "showInvisibles")}
         ${bool("\u041F\u0435\u0440\u0435\u043D\u043E\u0441 \u0441\u0442\u0440\u043E\u043A", "wrap")}${bool("\u041C\u0438\u043D\u0438-\u043A\u0430\u0440\u0442\u0430", "minimap")}${bool("\u0425\u043B\u0435\u0431\u043D\u044B\u0435 \u043A\u0440\u043E\u0448\u043A\u0438", "breadcrumbs")}
-        ${bool("\u041F\u043B\u0430\u0432\u043D\u0430\u044F \u043F\u0440\u043E\u043A\u0440\u0443\u0442\u043A\u0430", "smoothScroll")}${bool("\u041B\u0438\u043F\u043A\u0438\u0435 \u0437\u0430\u0433\u043E\u043B\u043E\u0432\u043A\u0438", "stickyHeaders")}
-        ${bool("\u0423\u0431\u0438\u0440\u0430\u0442\u044C \u043F\u0440\u043E\u0431\u0435\u043B\u044B \u0432 \u043A\u043E\u043D\u0446\u0435 \u0441\u0442\u0440\u043E\u043A", "trimTrailingWhitespace")}${bool("\u041F\u043E\u0434\u0441\u0432\u0435\u0442\u043A\u0430 \u043A\u043E\u0434\u0430\u2192\u043F\u0440\u0435\u0434\u043F\u0440\u043E\u0441\u043C\u043E\u0442\u0440", "codeToPreview")}
-      </div><h4 style="margin:12px 0 4px">\u041F\u0440\u0435\u0441\u0435\u0442\u044B</h4><div class="tabs-line">${Object.entries(PRESETS).map(([k, v]) => `<button data-preset="${k}" class="${s.presets === k ? "active" : ""}">${v.label}</button>`).join("")}</div>`,
+        ${bool("\u041F\u043B\u0430\u0432\u043D\u0430\u044F \u043F\u0440\u043E\u043A\u0440\u0443\u0442\u043A\u0430", "smoothScroll")}${bool("\u0423\u0431\u0438\u0440\u0430\u0442\u044C \u043F\u0440\u043E\u0431\u0435\u043B\u044B \u0432 \u043A\u043E\u043D\u0446\u0435", "trimTrailingWhitespace")}</div>
+      <h4 style="margin:12px 0 5px;font-size:11px">\u041F\u0440\u0435\u0441\u0435\u0442\u044B</h4>
+      <div class="tabs-line">${Object.entries(PRESETS).map(([k, v]) => `<button data-preset="${k}" class="${s.presets === k ? "active" : ""}">${v.label}</button>`).join("")}</div>`,
       preview: `<div class="field-row">
         ${field("\u0417\u0430\u0434\u0435\u0440\u0436\u043A\u0430 \u0430\u0432\u0442\u043E\u0437\u0430\u043F\u0443\u0441\u043A\u0430 (\u043C\u0441)", "autoRunDelay", "number", 'min="100" max="5000"')}
         ${field("\u0417\u0430\u0434\u0435\u0440\u0436\u043A\u0430 \u0430\u043D\u0430\u043B\u0438\u0437\u0430 (\u043C\u0441)", "autoAnalyzeDelay", "number", 'min="300" max="10000"')}
         ${field("\u0410\u0432\u0442\u043E\u0441\u043E\u0445\u0440\u0430\u043D\u0435\u043D\u0438\u0435 (\u0441\u0435\u043A)", "autoSaveInterval", "number", 'min="5" max="300"')}
-        ${field("\u041B\u0438\u043C\u0438\u0442 \u0432\u0440\u0435\u043C\u0435\u043D\u0438 \u0441\u043A\u0440\u0438\u043F\u0442\u0430 (\u043C\u0441)", "timeLimit", "number", 'min="500" max="30000"')}
-      </div><div class="rowflex">
-        ${bool("\u0410\u0432\u0442\u043E\u0437\u0430\u043F\u0443\u0441\u043A \u043F\u0440\u0435\u0434\u043F\u0440\u043E\u0441\u043C\u043E\u0442\u0440\u0430", "autoRun")}${bool("\u0410\u0432\u0442\u043E\u0430\u043D\u0430\u043B\u0438\u0437 \u043A\u043E\u0434\u0430", "autoAnalyze")}
+      </div><div class="rowflex">${bool("\u0410\u0432\u0442\u043E\u0437\u0430\u043F\u0443\u0441\u043A", "autoRun")}${bool("\u0410\u0432\u0442\u043E\u0430\u043D\u0430\u043B\u0438\u0437", "autoAnalyze")}
         ${bool("\u0410\u0432\u0442\u043E\u0441\u043E\u0445\u0440\u0430\u043D\u0435\u043D\u0438\u0435", "autoSave")}${bool("CSS hot swap", "hotCss")}${bool("JS hot reload", "hotJs")}
-        ${bool("\u041F\u043E\u0434\u0442\u0432\u0435\u0440\u0436\u0434\u0430\u0442\u044C \u0443\u0434\u0430\u043B\u0435\u043D\u0438\u0435", "confirmDelete")}${bool("\u041F\u043E\u0434\u0441\u043A\u0430\u0437\u043A\u0438 \u043F\u0440\u0438 \u043F\u0435\u0440\u0432\u043E\u043C \u0437\u0430\u043F\u0443\u0441\u043A\u0435", "firstRun")}
+        ${bool("\u041F\u043E\u0434\u0442\u0432\u0435\u0440\u0436\u0434\u0430\u0442\u044C \u0443\u0434\u0430\u043B\u0435\u043D\u0438\u0435", "confirmDelete")}</div>
+      <h4 style="margin:12px 0 5px;font-size:11px">\u0420\u0430\u0437\u0440\u0435\u0448\u0435\u043D\u0438\u044F sandbox</h4>
+      <p class="muted" style="font-size:10.5px;margin:0 0 6px">\u0412\u043A\u043B\u044E\u0447\u0430\u0439\u0442\u0435 \u0442\u043E\u043B\u044C\u043A\u043E \u0434\u043B\u044F \u0434\u043E\u0432\u0435\u0440\u0435\u043D\u043D\u044B\u0445 \u043F\u0440\u043E\u0435\u043A\u0442\u043E\u0432.</p>
+      <div class="rowflex">${[["forms", "\u0424\u043E\u0440\u043C\u044B"], ["popups", "\u041D\u043E\u0432\u044B\u0435 \u043E\u043A\u043D\u0430"], ["modals", "\u041C\u043E\u0434\u0430\u043B\u044C\u043D\u044B\u0435 \u043E\u043A\u043D\u0430"], ["downloads", "\u0421\u043A\u0430\u0447\u0438\u0432\u0430\u043D\u0438\u044F"], ["pointerLock", "Pointer lock"], ["orientationLock", "\u041E\u0440\u0438\u0435\u043D\u0442\u0430\u0446\u0438\u044F"]].map(([k, l]) => `<label class="chk"><input type="checkbox" data-sandbox="${k}" ${s.sandboxPermissions?.[k] ? "checked" : ""}> ${l}</label>`).join("")}</div>`,
+      keys: `<div class="beginner" style="margin:0 0 10px">\u0417\u0434\u0435\u0441\u044C \u043C\u043E\u0436\u043D\u043E \u043F\u0435\u0440\u0435\u043D\u0430\u0437\u043D\u0430\u0447\u0438\u0442\u044C \u0438 \u043F\u0440\u043E\u0432\u0435\u0440\u0438\u0442\u044C \u0441\u043E\u0447\u0435\u0442\u0430\u043D\u0438\u044F.
+      \u041D\u0430\u0436\u043C\u0438\u0442\u0435 \xAB\u041D\u0430\u0437\u043D\u0430\u0447\u0438\u0442\u044C\xBB, \u0437\u0430\u0442\u0435\u043C \u043D\u0443\u0436\u043D\u044B\u0435 \u043A\u043B\u0430\u0432\u0438\u0448\u0438. \xAB\u041F\u0440\u043E\u0432\u0435\u0440\u0438\u0442\u044C\xBB \u043F\u043E\u043A\u0430\u0436\u0435\u0442, \u0441\u0440\u0430\u0431\u043E\u0442\u0430\u0435\u0442 \u043B\u0438 \u0432\u044B\u0431\u0440\u0430\u043D\u043D\u044B\u0439 \u0431\u0438\u043D\u0434.</div>
+      <div class="list-rows" id="keyRows">${keyRows()}</div>
+      <div class="rowflex mt8"><button class="mini-btn" id="keysReset">\u0421\u0431\u0440\u043E\u0441\u0438\u0442\u044C \u0431\u0438\u043D\u0434\u044B</button>
+        <span class="muted" style="font-size:10.5px">\u0412\u0441\u0435\u0433\u043E \u043A\u043E\u043C\u0431\u0438\u043D\u0430\u0446\u0438\u0439: ${Object.keys(s.keybindings).length}</span></div>`,
+      buttons: `<div class="beginner" style="margin:0 0 10px">\u041A\u043D\u043E\u043F\u043A\u0438 \u0432\u0435\u0440\u0445\u043D\u0435\u0439 \u043F\u0430\u043D\u0435\u043B\u0438 \u0432\u044B\u0431\u0438\u0440\u0430\u044E\u0442\u0441\u044F \u0438\u0437 \u0433\u043E\u0442\u043E\u0432\u043E\u0433\u043E \u043D\u0430\u0431\u043E\u0440\u0430.
+      \u041C\u0435\u043D\u044F\u0439\u0442\u0435 \u043A\u043E\u043C\u0430\u043D\u0434\u0443 \u0432 \u0441\u0442\u0440\u043E\u043A\u0435, \u043F\u043E\u0440\u044F\u0434\u043E\u043A \u2014 \u0441\u0442\u0440\u0435\u043B\u043A\u0430\u043C\u0438, \u043B\u0438\u0448\u043D\u0438\u0435 \u2014 \u0443\u0434\u0430\u043B\u044F\u0439\u0442\u0435.</div>
+      <h4 style="margin:0 0 5px;font-size:11px">\u041E\u0441\u043D\u043E\u0432\u043D\u0430\u044F \u043F\u0430\u043D\u0435\u043B\u044C</h4>
+      <div class="list-rows" id="tbPrimary">${slotRows(s.toolbarButtons, "primary")}</div>
+      <div class="rowflex mt8"><select class="mini-select" id="tbAddPrimary" style="flex:1">${presetOptions("")}</select>
+        <button class="mini-btn" id="tbAddPrimaryBtn">\u0414\u043E\u0431\u0430\u0432\u0438\u0442\u044C</button></div>
+      <h4 style="margin:14px 0 5px;font-size:11px">\u0414\u043E\u043F\u043E\u043B\u043D\u0438\u0442\u0435\u043B\u044C\u043D\u0430\u044F \u043F\u0430\u043D\u0435\u043B\u044C</h4>
+      <div class="list-rows" id="tbSecondary">${slotRows(s.toolbarSecondary, "secondary")}</div>
+      <div class="rowflex mt8"><select class="mini-select" id="tbAddSecondary" style="flex:1">${presetOptions("")}</select>
+        <button class="mini-btn" id="tbAddSecondaryBtn">\u0414\u043E\u0431\u0430\u0432\u0438\u0442\u044C</button>
+        <button class="mini-btn" id="tbReset">\u0421\u0431\u0440\u043E\u0441\u0438\u0442\u044C \u043D\u0430\u0431\u043E\u0440</button></div>`,
+      windows: `<div class="list-rows">
+        <div class="list-row"><div class="grow"><b>\u041E\u043A\u043E\u043D\u043D\u044B\u0439 \u0440\u0435\u0436\u0438\u043C</b><small>\u0421\u0430\u0439\u0442, 3D \u0438 \u043A\u043E\u043D\u0441\u043E\u043B\u044C \u0432 \u043F\u043B\u0430\u0432\u0430\u044E\u0449\u0438\u0445 \u043E\u043A\u043D\u0430\u0445</small></div>
+          <button class="mini-btn ${isWindowed() ? "active" : ""}" id="wndToggle">${isWindowed() ? "\u0412\u044B\u043A\u043B\u044E\u0447\u0438\u0442\u044C" : "\u0412\u043A\u043B\u044E\u0447\u0438\u0442\u044C"}</button></div>
+        <div class="list-row"><div class="grow"><b>\u0421\u0438\u0441\u0442\u0435\u043C\u043D\u0430\u044F \u0440\u0430\u043C\u043A\u0430 \u043E\u043A\u043D\u0430</b><small>\u0422\u043E\u043B\u044C\u043A\u043E Electron; \u043F\u0440\u0438\u043B\u043E\u0436\u0435\u043D\u0438\u0435 \u043F\u0435\u0440\u0435\u0437\u0430\u043F\u0443\u0441\u0442\u0438\u0442 \u043E\u043A\u043D\u043E</small></div>
+          <button class="mini-btn ${s.nativeFrame ? "active" : ""}" id="wndFrame">${s.nativeFrame ? "\u0412\u043A\u043B" : "\u0412\u044B\u043A\u043B"}</button></div>
+        <div class="list-row"><div class="grow"><b>\u041C\u0435\u043D\u044E \u043F\u0440\u043E\u0435\u043A\u0442\u043E\u0432 \u043F\u0440\u0438 \u0437\u0430\u043F\u0443\u0441\u043A\u0435</b><small>\u0412\u0441\u0442\u0440\u0435\u0447\u0430\u0442\u044C \u0441\u043F\u0438\u0441\u043E\u043A \u043F\u0440\u043E\u0435\u043A\u0442\u043E\u0432, \u0430 \u043D\u0435 \u043F\u0443\u0441\u0442\u043E\u0439 \u0440\u0435\u0434\u0430\u043A\u0442\u043E\u0440</small></div>
+          <label class="chk"><input type="checkbox" data-set="showLauncher" ${s.showLauncher ? "checked" : ""}> \u043F\u043E\u043A\u0430\u0437\u044B\u0432\u0430\u0442\u044C</label></div>
       </div>
-      <h4 style="margin:12px 0 4px">\u0420\u0430\u0437\u0440\u0435\u0448\u0435\u043D\u0438\u044F sandbox \u043F\u0440\u0435\u0434\u043F\u0440\u043E\u0441\u043C\u043E\u0442\u0440\u0430</h4>
-      <p class="muted" style="font-size:10.5px;margin:0 0 6px">\u041F\u043E \u0443\u043C\u043E\u043B\u0447\u0430\u043D\u0438\u044E \u0432\u044B\u043A\u043B\u044E\u0447\u0435\u043D\u044B \u2014 \u0432\u043A\u043B\u044E\u0447\u0430\u0439\u0442\u0435 \u0442\u043E\u043B\u044C\u043A\u043E \u0434\u043B\u044F \u0434\u043E\u0432\u0435\u0440\u0435\u043D\u043D\u044B\u0445 \u043F\u0440\u043E\u0435\u043A\u0442\u043E\u0432. \u041E\u043F\u0446\u0438\u0438 \u0440\u0430\u0441\u0448\u0438\u0440\u044F\u044E\u0442 \u043F\u0440\u0430\u0432\u0430 \u043A\u043E\u0434\u0430 \u0438\u0437 \u043E\u0442\u043A\u0440\u044B\u0442\u043E\u0439 \u0441\u0441\u044B\u043B\u043A\u0438.</p>
-      <div class="rowflex" id="sandboxOpts">
-        ${[["forms", "\u0424\u043E\u0440\u043C\u044B"], ["popups", "\u041D\u043E\u0432\u044B\u0435 \u043E\u043A\u043D\u0430"], ["modals", "\u041C\u043E\u0434\u0430\u043B\u044C\u043D\u044B\u0435 \u043E\u043A\u043D\u0430"], ["downloads", "\u0421\u043A\u0430\u0447\u0438\u0432\u0430\u043D\u0438\u044F"], ["pointerLock", "Pointer lock"], ["orientationLock", "\u041E\u0440\u0438\u0435\u043D\u0442\u0430\u0446\u0438\u044F"]].map(([k, l]) => `<label class="chk"><input type="checkbox" data-sandbox="${k}" ${s.sandboxPermissions?.[k] ? "checked" : ""}> ${l}</label>`).join("")}
-      </div>
-      <div class="beginner mt8">\u041F\u0440\u0435\u0434\u043F\u0440\u043E\u0441\u043C\u043E\u0442\u0440 \u0440\u0430\u0431\u043E\u0442\u0430\u0435\u0442 \u0432 \u0438\u0437\u043E\u043B\u0438\u0440\u043E\u0432\u0430\u043D\u043D\u043E\u043C iframe (<code class="inline">sandbox</code> \u0431\u0435\u0437 <code class="inline">allow-same-origin</code>): cookies, localStorage \u0438 \u0441\u0435\u0442\u044C \u043A\u043E\u043D\u0442\u0440\u043E\u043B\u0438\u0440\u0443\u044E\u0442\u0441\u044F \u043C\u043E\u0441\u0442\u043E\u043C \u0440\u0435\u0434\u0430\u043A\u0442\u043E\u0440\u0430. \u0421\u043E\u043E\u0431\u0449\u0435\u043D\u0438\u044F \u043F\u0440\u0438\u043D\u0438\u043C\u0430\u044E\u0442\u0441\u044F \u0442\u043E\u043B\u044C\u043A\u043E \u043E\u0442 \u0442\u0435\u043A\u0443\u0449\u0435\u0433\u043E \u0434\u043E\u043A\u0443\u043C\u0435\u043D\u0442\u0430 \u043F\u043E \u043E\u0434\u043D\u043E\u0440\u0430\u0437\u043E\u0432\u043E\u043C\u0443 \u0438\u0434\u0435\u043D\u0442\u0438\u0444\u0438\u043A\u0430\u0442\u043E\u0440\u0443.</div>`,
-      keys: `<p class="muted">\u041A\u043B\u0438\u043A\u043D\u0438\u0442\u0435 \u043F\u043E \u043F\u043E\u043B\u044E \u0438 \u043D\u0430\u0436\u043C\u0438\u0442\u0435 \u0441\u043E\u0447\u0435\u0442\u0430\u043D\u0438\u0435 \u043A\u043B\u0430\u0432\u0438\u0448. \u0418\u0437\u043C\u0435\u043D\u0435\u043D\u0438\u044F \u043F\u0440\u0438\u043C\u0435\u043D\u044F\u044E\u0442\u0441\u044F \u0441\u0440\u0430\u0437\u0443.</p>
-      <div class="field-row">${Object.entries(s.keybindings).map(([k, v]) => `<div class="field"><label>${esc(commandTitle(k))}</label><input data-key="${k}" value="${esc(v)}" readonly style="cursor:pointer"></div>`).join("")}</div>`,
+      <div class="field-row mt8">${field("\u041F\u043E\u0440\u0442 Live Server", "livePort", "number", 'min="1024" max="65535"')}</div>
+      <div class="rowflex mt8"><button class="mini-btn" id="wndSite">\u0421\u0430\u0439\u0442 \u0432 \u043E\u043A\u043D\u0435</button>
+        <button class="mini-btn" id="wndThree">3D \u0432 \u043E\u043A\u043D\u0435</button>
+        <button class="mini-btn" id="wndCloseAll">\u0417\u0430\u043A\u0440\u044B\u0442\u044C \u0432\u0441\u0435 \u043E\u043A\u043D\u0430</button>
+        <button class="mini-btn" id="wndWelcome">\u041F\u043E\u043A\u0430\u0437\u0430\u0442\u044C \u043F\u0440\u0438\u0432\u0435\u0442\u0441\u0442\u0432\u0438\u0435</button></div>`,
       theme: `<div class="field-row">
         <div class="field"><label>\u0422\u0435\u043C\u0430</label><select data-set="theme">
           ${["auto", "dark", "light", "contrast"].map((v) => `<option value="${v}" ${s.theme === v ? "selected" : ""}>${v}</option>`).join("")}</select></div>
@@ -49794,67 +51052,166 @@ ${p.map((x2, i4) => `  --brand-${i4 + 1}: ${x2};`).join("\n")}
         <div class="field"><label>\u041F\u043B\u043E\u0442\u043D\u043E\u0441\u0442\u044C</label><select data-set="density">
           <option value="comfy" ${s.density === "comfy" ? "selected" : ""}>\u043F\u0440\u043E\u0441\u0442\u043E\u0440\u043D\u043E</option>
           <option value="compact" ${s.density === "compact" ? "selected" : ""}>\u043A\u043E\u043C\u043F\u0430\u043A\u0442\u043D\u043E</option></select></div>
-      </div><div class="gen-preview" style="background:linear-gradient(135deg,var(--accent),var(--accent2));border-radius:16px">\u041F\u0440\u0435\u0434\u043F\u0440\u043E\u0441\u043C\u043E\u0442\u0440 \u0430\u043A\u0446\u0435\u043D\u0442\u0430</div>`,
+      </div><div class="gen-preview" style="background:var(--accent);color:var(--accent-ink);border:0">\u0422\u0430\u043A \u0432\u044B\u0433\u043B\u044F\u0434\u0438\u0442 \u0430\u043A\u0446\u0435\u043D\u0442 \u0438\u043D\u0442\u0435\u0440\u0444\u0435\u0439\u0441\u0430</div>
+      <div class="beginner">\u041F\u043B\u043E\u0441\u043A\u0438\u0435 \u043F\u043E\u0432\u0435\u0440\u0445\u043D\u043E\u0441\u0442\u0438, \u0431\u0435\u0437 \u043D\u0435\u043E\u043D\u043E\u0432\u044B\u0445 \u0441\u0432\u0435\u0447\u0435\u043D\u0438\u0439 \u0438 \u0433\u0440\u0430\u0434\u0438\u0435\u043D\u0442\u043D\u044B\u0445 \u043A\u043D\u043E\u043F\u043E\u043A. \u0426\u0432\u0435\u0442 \u043C\u0435\u043D\u044F\u0435\u0442\u0441\u044F \u043C\u0433\u043D\u043E\u0432\u0435\u043D\u043D\u043E.</div>`,
       storage: `<div class="list-rows">
         <div class="list-row"><div class="grow"><b>\u0420\u0430\u0437\u043C\u0435\u0440 \u043F\u0440\u043E\u0435\u043A\u0442\u0430</b><small>${fmtBytes(Object.values(state.files).reduce((n, f) => n + f.content.length, 0))}</small></div></div>
         <div class="list-row"><div class="grow"><b>\u0424\u0430\u0439\u043B\u043E\u0432</b><small>${listFiles().length}</small></div></div>
-        <div class="list-row"><div class="grow"><b>\u0421\u043D\u0430\u043F\u0448\u043E\u0442\u043E\u0432</b><small>${state.snapshots.length}</small></div></div></div>
-      <div class="tabs-line mt8"><button id="setExport">\u2B07 \u042D\u043A\u0441\u043F\u043E\u0440\u0442 \u043D\u0430\u0441\u0442\u0440\u043E\u0435\u043A</button><button id="setImport">\u2B06 \u0418\u043C\u043F\u043E\u0440\u0442</button>
-        <button id="setReset">\u21BA \u0421\u0431\u0440\u043E\u0441</button><button id="setSave">\u{1F4BE} \u0421\u043E\u0445\u0440\u0430\u043D\u0438\u0442\u044C \u0441\u0435\u0439\u0447\u0430\u0441</button></div>`,
-      about: `<div style="text-align:center;padding:10px"><div class="brand-mark" style="margin:auto;width:60px;height:60px;border-radius:20px;font-size:28px">\u26A1</div>
-      <h2 style="margin:12px 0 2px">Runlet Studio 1.0</h2><p class="muted">\u0420\u0435\u0434\u0430\u043A\u0442\u043E\u0440 HTML / CSS / JS \u043D\u0430 Electron \u0441 Python-\u0434\u0432\u0438\u0436\u043A\u043E\u043C \u0430\u043D\u0430\u043B\u0438\u0437\u0430 \u043A\u043E\u0434\u0430.</p></div>
-      <div class="list-rows"><div class="list-row"><b>\u0414\u0432\u0438\u0436\u043E\u043A</b><div class="grow" style="text-align:right">${esc(state.engine)}</div></div>
-      <div class="list-row"><b>\u0420\u0435\u0430\u043B\u0438\u0437\u043E\u0432\u0430\u043D\u043E \u0438\u0434\u0435\u0439</b><div class="grow" style="text-align:right">${coverage().done} / ${coverage().total}</div></div>
-      <div class="list-row"><b>\u041F\u043B\u0430\u0442\u0444\u043E\u0440\u043C\u0430</b><div class="grow" style="text-align:right">${window.runlet?.platform || navigator.platform}</div></div></div>
-      <p class="muted mt8" style="font-size:11px">\u042F\u0434\u0440\u043E \u0430\u043D\u0430\u043B\u0438\u0437\u0430: Python 3 (stdlib only). \u0420\u0435\u0434\u0430\u043A\u0442\u043E\u0440: CodeMirror 6. \u0421\u0431\u043E\u0440\u043A\u0430: esbuild + Electron.</p>`
+        <div class="list-row"><div class="grow"><b>\u041F\u0440\u043E\u0435\u043A\u0442\u043E\u0432 \u0432 \u043C\u0435\u043D\u044E</b><small>${listProjects().length}</small></div></div></div>
+      <div class="tabs-line mt8"><button id="setExport">\u042D\u043A\u0441\u043F\u043E\u0440\u0442 \u043D\u0430\u0441\u0442\u0440\u043E\u0435\u043A</button><button id="setImport">\u0418\u043C\u043F\u043E\u0440\u0442 \u043D\u0430\u0441\u0442\u0440\u043E\u0435\u043A</button>
+        <button id="setReset">\u0421\u0431\u0440\u043E\u0441 \u043D\u0430\u0441\u0442\u0440\u043E\u0435\u043A</button><button id="setSave">\u0421\u043E\u0445\u0440\u0430\u043D\u0438\u0442\u044C \u0441\u0435\u0439\u0447\u0430\u0441</button></div>`,
+      about: `<div style="display:flex;gap:12px;align-items:center;padding:6px 0 14px">
+        <div class="brand-mark" style="width:44px;height:44px;border-radius:12px">${icon("code", 24)}</div>
+        <div><h2 style="margin:0;font-size:16px">Runlet Studio 2.0</h2>
+        <p class="muted" style="margin:3px 0 0;font-size:11px">\u0420\u0435\u0434\u0430\u043A\u0442\u043E\u0440 \u0441\u0430\u0439\u0442\u043E\u0432: HTML, CSS, JS, 3D \u0438 \u043B\u043E\u043A\u0430\u043B\u044C\u043D\u044B\u0439 Live Server.</p></div></div>
+      <div class="list-rows"><div class="list-row"><b>\u0410\u043D\u0430\u043B\u0438\u0437</b><div class="grow" style="text-align:right">${esc(state.engine)}</div></div>
+        <div class="list-row"><b>\u041E\u043A\u043E\u043D</b><div class="grow" style="text-align:right">${ctx.windowCount?.() ?? 0}</div></div>
+        <div class="list-row"><b>\u041F\u043B\u0430\u0442\u0444\u043E\u0440\u043C\u0430</b><div class="grow" style="text-align:right">${window.runlet?.platform || navigator.platform}</div></div></div>
+      <p class="muted mt8" style="font-size:11px">Python 3 (stdlib), CodeMirror 6, esbuild, Electron. \u0418\u043A\u043E\u043D\u043A\u0438 \u2014 \u0432\u0441\u0442\u0440\u043E\u0435\u043D\u043D\u044B\u0439 SVG-\u043D\u0430\u0431\u043E\u0440.</p>`
     };
+    const tabs = { editor: "\u0420\u0435\u0434\u0430\u043A\u0442\u043E\u0440", preview: "\u041F\u0440\u0435\u0434\u043F\u0440\u043E\u0441\u043C\u043E\u0442\u0440", keys: "\u0411\u0438\u043D\u0434\u044B", buttons: "\u041A\u043D\u043E\u043F\u043A\u0438", windows: "\u041E\u043A\u043D\u0430", theme: "\u0412\u0438\u0434", storage: "\u0425\u0440\u0430\u043D\u0438\u043B\u0438\u0449\u0435", about: "\u041E \u043F\u0440\u043E\u0433\u0440\u0430\u043C\u043C\u0435" };
     modal({
-      title: "\u2699 \u041D\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0438 Runlet",
+      title: "\u041D\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0438 Runlet",
       wide: true,
       okText: "\u0413\u043E\u0442\u043E\u0432\u043E",
-      body: `<div class="tabs-line" id="setTabs">${Object.entries({ editor: "\u0420\u0435\u0434\u0430\u043A\u0442\u043E\u0440", preview: "\u041F\u0440\u0435\u0434\u043F\u0440\u043E\u0441\u043C\u043E\u0442\u0440", keys: "\u0413\u043E\u0440\u044F\u0447\u0438\u0435 \u043A\u043B\u0430\u0432\u0438\u0448\u0438", theme: "\u0412\u043D\u0435\u0448\u043D\u0438\u0439 \u0432\u0438\u0434", storage: "\u0425\u0440\u0430\u043D\u0438\u043B\u0438\u0449\u0435", about: "\u041E \u043F\u0440\u043E\u0433\u0440\u0430\u043C\u043C\u0435" }).map(([k, v]) => `<button data-st="${k}" class="${k === tab ? "active" : ""}">${v}</button>`).join("")}</div><div id="setBody">${pages[tab]}</div>`,
+      body: `<div class="tabs-line" id="setTabs">${Object.entries(tabs).map(([k, v]) => `<button data-st="${k}" class="${k === tab ? "active" : ""}">${v}</button>`).join("")}</div><div id="setBody">${pages[tab] || pages.editor}</div>`,
       onMount: (root) => {
         const body = root.querySelector("#setBody");
+        const captureKey = (cb) => {
+          const h = (e) => {
+            e.preventDefault();
+            e.stopImmediatePropagation();
+            window.removeEventListener("keydown", h, true);
+            cb(e);
+          };
+          window.addEventListener("keydown", h, true);
+        };
         const mount = (t2) => {
-          body.innerHTML = pages[t2];
-          body.querySelectorAll("[data-set]").forEach((inp) => {
-            inp.addEventListener("change", () => {
-              const k = inp.dataset.set;
-              const v = inp.type === "checkbox" ? inp.checked : inp.type === "number" ? +inp.value : inp.value;
-              state.settings[k] = v;
-              applySettings();
-            });
-            inp.addEventListener("input", () => {
-              if (inp.type === "color") {
-                state.settings.accent = inp.value;
-                applyTheme();
-              }
-            });
-          });
-          body.querySelectorAll("[data-key]").forEach((inp) => {
-            inp.addEventListener("keydown", (e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              if (e.key === "Escape") {
-                inp.value = state.settings.keybindings[inp.dataset.key];
-                return;
-              }
-              inp.value = keyEventToString(e);
-              state.settings.keybindings[inp.dataset.key] = inp.value;
-              applySettings();
-              toast("\u0413\u043E\u0440\u044F\u0447\u0430\u044F \u043A\u043B\u0430\u0432\u0438\u0448\u0430 \u043E\u0431\u043D\u043E\u0432\u043B\u0435\u043D\u0430", "ok");
-            });
-          });
-          body.querySelectorAll("[data-sandbox]").forEach((inp) => {
-            inp.addEventListener("change", () => {
-              state.settings.sandboxPermissions = { ...state.settings.sandboxPermissions || {}, [inp.dataset.sandbox]: inp.checked };
-              applySettings();
-            });
-          });
+          body.innerHTML = pages[t2] || pages.editor;
+          body.querySelectorAll("[data-set]").forEach((inp) => inp.addEventListener("change", () => {
+            const k = inp.dataset.set;
+            const v = inp.type === "checkbox" ? inp.checked : inp.type === "number" ? +inp.value : inp.value;
+            state.settings[k] = v;
+            applySettings();
+          }));
+          body.querySelectorAll("[data-sandbox]").forEach((inp) => inp.addEventListener("change", () => {
+            state.settings.sandboxPermissions = { ...state.settings.sandboxPermissions || {}, [inp.dataset.sandbox]: inp.checked };
+            applySettings();
+          }));
           body.querySelectorAll("[data-preset]").forEach((b) => b.onclick = () => {
             applyPreset(b.dataset.preset);
             closeModal();
             settingsModal(t2);
+          });
+          body.querySelectorAll("[data-rebind]").forEach((b) => b.onclick = () => {
+            const id2 = b.dataset.rebind, old = b.textContent;
+            b.textContent = "\u041D\u0430\u0436\u043C\u0438\u0442\u0435 \u043A\u043B\u0430\u0432\u0438\u0448\u0438\u2026";
+            b.classList.add("active");
+            captureKey((e) => {
+              if (e.key === "Escape") {
+                b.textContent = old;
+                b.classList.remove("active");
+                return;
+              }
+              const combo = keyEventToString(e);
+              state.settings.keybindings[id2] = combo;
+              applySettings();
+              toast(`${deEmoji(commandTitle(id2))}: ${combo}`, "ok");
+              b.textContent = old;
+              b.classList.remove("active");
+              const k = body.querySelector(`[data-kval="${id2}"]`);
+              if (k) k.textContent = combo;
+            });
+          });
+          body.querySelectorAll("[data-checkbind]").forEach((b) => b.onclick = () => {
+            const id2 = b.dataset.checkbind;
+            const expected = state.settings.keybindings[id2];
+            const box = document.createElement("div");
+            box.style.cssText = "position:fixed;z-index:4000;left:50%;top:50%;transform:translate(-50%,-50%);background:var(--card-solid);border:1px solid var(--accent);border-radius:12px;padding:18px 24px;box-shadow:var(--shadow);text-align:center;font:13px var(--sans);color:var(--text)";
+            box.innerHTML = `<b>\u041F\u0440\u043E\u0432\u0435\u0440\u043A\u0430 \u0431\u0438\u043D\u0434\u0430</b><p style="color:var(--muted);font-size:11px;margin:8px 0">\u041D\u0430\u0436\u043C\u0438\u0442\u0435 <kbd>${esc(expected)}</kbd></p><div id="kcRes" class="muted">\u041E\u0436\u0438\u0434\u0430\u043D\u0438\u0435\u2026</div>`;
+            document.body.appendChild(box);
+            captureKey((e) => {
+              const got = keyEventToString(e);
+              const res = box.querySelector("#kcRes");
+              const okk = got === expected;
+              res.textContent = okk ? "\u0421\u043E\u0432\u043F\u0430\u0434\u0430\u0435\u0442 \u2014 \u0431\u0438\u043D\u0434 \u0440\u0430\u0431\u043E\u0442\u0430\u0435\u0442" : `\u0412\u044B \u043D\u0430\u0436\u0430\u043B\u0438 ${got}, \u043E\u0436\u0438\u0434\u0430\u043B\u043E\u0441\u044C ${expected}`;
+              res.style.color = okk ? "var(--ok)" : "var(--err)";
+              setTimeout(() => box.remove(), 1600);
+            });
+          });
+          body.querySelector("#keysReset")?.addEventListener("click", () => {
+            state.settings.keybindings = JSON.parse(JSON.stringify(DEFAULT_SETTINGS.keybindings));
+            applySettings();
+            closeModal();
+            settingsModal("keys");
+            toast("\u0411\u0438\u043D\u0434\u044B \u0441\u0431\u0440\u043E\u0448\u0435\u043D\u044B", "ok");
+          });
+          const keyOf = (g2) => g2 === "primary" ? "toolbarButtons" : "toolbarSecondary";
+          const rerender = () => {
+            closeModal();
+            settingsModal("buttons");
+          };
+          body.querySelectorAll("[data-slot]").forEach((sel) => sel.addEventListener("change", () => {
+            const g2 = sel.dataset.slot, arr = [...state.settings[keyOf(g2)] || []];
+            arr[+sel.dataset.i] = sel.value;
+            state.settings[keyOf(g2)] = arr;
+            applySettings();
+            renderToolbar();
+            toast("\u041A\u043D\u043E\u043F\u043A\u0430 \u0437\u0430\u043C\u0435\u043D\u0435\u043D\u0430", "ok");
+          }));
+          const move = (g2, i4, d) => {
+            const arr = [...state.settings[keyOf(g2)] || []];
+            const j = i4 + d;
+            if (j < 0 || j >= arr.length) return;
+            [arr[i4], arr[j]] = [arr[j], arr[i4]];
+            state.settings[keyOf(g2)] = arr;
+            applySettings();
+            renderToolbar();
+            rerender();
+          };
+          body.querySelectorAll("[data-slotup]").forEach((b) => b.onclick = () => move(b.dataset.slotup, +b.dataset.i, -1));
+          body.querySelectorAll("[data-slotdown]").forEach((b) => b.onclick = () => move(b.dataset.slotdown, +b.dataset.i, 1));
+          body.querySelectorAll("[data-slotdel]").forEach((b) => b.onclick = () => {
+            const g2 = b.dataset.slotdel, arr = [...state.settings[keyOf(g2)] || []];
+            arr.splice(+b.dataset.i, 1);
+            state.settings[keyOf(g2)] = arr;
+            applySettings();
+            renderToolbar();
+            rerender();
+          });
+          for (const [selId, btnId, group] of [["#tbAddPrimary", "#tbAddPrimaryBtn", "primary"], ["#tbAddSecondary", "#tbAddSecondaryBtn", "secondary"]]) {
+            body.querySelector(btnId)?.addEventListener("click", () => {
+              const id2 = body.querySelector(selId).value;
+              const arr = [...state.settings[keyOf(group)] || [], id2].slice(0, 14);
+              state.settings[keyOf(group)] = arr;
+              applySettings();
+              renderToolbar();
+              rerender();
+            });
+          }
+          body.querySelector("#tbReset")?.addEventListener("click", () => {
+            state.settings.toolbarButtons = [...DEFAULT_SETTINGS.toolbarButtons];
+            state.settings.toolbarSecondary = [...DEFAULT_SETTINGS.toolbarSecondary];
+            applySettings();
+            renderToolbar();
+            rerender();
+          });
+          body.querySelector("#wndToggle")?.addEventListener("click", () => {
+            ctx.toggleWindows?.();
+            closeModal();
+          });
+          body.querySelector("#wndFrame")?.addEventListener("click", () => {
+            state.settings.nativeFrame = !state.settings.nativeFrame;
+            applySettings();
+            ctx.setNativeFrame?.(state.settings.nativeFrame);
+            closeModal();
+          });
+          body.querySelector("#wndSite")?.addEventListener("click", () => ctx.openSiteWindow?.());
+          body.querySelector("#wndThree")?.addEventListener("click", () => ctx.openThreeWindow?.());
+          body.querySelector("#wndCloseAll")?.addEventListener("click", () => closeAllWindows());
+          body.querySelector("#wndWelcome")?.addEventListener("click", () => {
+            closeModal();
+            showWelcome();
           });
           body.querySelector("#setExport")?.addEventListener("click", () => download("runlet-settings.json", exportSettings(), "application/json"));
           body.querySelector("#setImport")?.addEventListener("click", () => {
@@ -49926,22 +51283,24 @@ ${p.map((x2, i4) => `  --brand-${i4 + 1}: ${x2};`).join("\n")}
     }, true);
   }
   function shortcutsModal() {
-    const rows = Object.entries(state.settings.keybindings).map(([k, v]) => `<div class="kv"><span>${esc(commandTitle(k))}</span><b><kbd>${esc(v)}</kbd></b></div>`).join("");
+    const rows = Object.entries(state.settings.keybindings).map(([k, v]) => `<div class="kv"><span>${esc(deEmoji(commandTitle(k)))}</span><b><kbd>${esc(v)}</kbd></b></div>`).join("");
     modal({
-      title: "\u2328 \u0413\u043E\u0440\u044F\u0447\u0438\u0435 \u043A\u043B\u0430\u0432\u0438\u0448\u0438",
-      wide: false,
+      title: "\u0413\u043E\u0440\u044F\u0447\u0438\u0435 \u043A\u043B\u0430\u0432\u0438\u0448\u0438",
+      narrow: true,
       okText: "\u041D\u0430\u0441\u0442\u0440\u043E\u0438\u0442\u044C",
-      body: `<div class="debug-steps">${rows}</div><p class="muted mt8">\u0412 \u0440\u0435\u0434\u0430\u043A\u0442\u043E\u0440\u0435 \u0442\u0430\u043A\u0436\u0435 \u0440\u0430\u0431\u043E\u0442\u0430\u044E\u0442: Ctrl+F (\u043F\u043E\u0438\u0441\u043A), Ctrl+Z/Y (undo/redo), Alt+\u043A\u043B\u0438\u043A (\u0432\u0435\u0440\u0442\u0438\u043A\u0430\u043B\u044C\u043D\u044B\u0439 \u043A\u0443\u0440\u0441\u043E\u0440), Ctrl+D (\u043C\u0443\u043B\u044C\u0442\u0438\u043A\u0443\u0440\u0441\u043E\u0440), Tab (Emmet/\u0441\u043D\u0438\u043F\u043F\u0435\u0442).</p>`,
+      body: `<div class="debug-steps">${rows}</div>
+      <p class="muted mt8" style="font-size:11px">\u041F\u0435\u0440\u0435\u043D\u0430\u0437\u043D\u0430\u0447\u0438\u0442\u044C \u0438 \u043F\u0440\u043E\u0432\u0435\u0440\u0438\u0442\u044C \u0431\u0438\u043D\u0434\u044B \u043C\u043E\u0436\u043D\u043E \u0432 \u041D\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0438 \u2192 \u0411\u0438\u043D\u0434\u044B.
+      \u0412 \u0440\u0435\u0434\u0430\u043A\u0442\u043E\u0440\u0435 \u0442\u0430\u043A\u0436\u0435 \u0440\u0430\u0431\u043E\u0442\u0430\u044E\u0442 Ctrl+F, Ctrl+Z/Y, Ctrl+D, Alt+\u043A\u043B\u0438\u043A.</p>`,
       onOk: () => {
-        setTimeout(() => settingsModal("keys"), 100);
+        setTimeout(() => settingsModal("keys"), 80);
       }
     });
   }
   function initWindowControls() {
     if (!window.runlet?.isElectron) return;
-    const host = $("#winControls");
+    const host2 = $("#winControls");
     for (const [label, act] of [["\u2014", "minimize"], ["\u25A1", "maximize"], ["\xD7", "close"]]) {
-      host.appendChild(el("button", {
+      host2.appendChild(el("button", {
         class: act === "close" ? "wc-close" : "",
         text: label,
         onclick: () => window.runlet.windowControl(act)
@@ -49949,109 +51308,137 @@ ${p.map((x2, i4) => `  --brand-${i4 + 1}: ${x2};`).join("\n")}
     }
     $("#titlebar")?.classList.add("electron");
   }
+  function showWelcome() {
+    const cards = [
+      ["code", "\u0422\u0440\u0438 \u043F\u0430\u043D\u0435\u043B\u0438", "HTML, CSS \u0438 JS \u0440\u044F\u0434\u043E\u043C. \u041F\u0438\u0448\u0435\u0442\u0435 \u043A\u043E\u0434 \u2014 \u043E\u043D \u0441\u0440\u0430\u0437\u0443 \u0441\u043E\u0445\u0440\u0430\u043D\u044F\u0435\u0442\u0441\u044F \u0432 \u043F\u0440\u043E\u0435\u043A\u0442\u0435."],
+      ["monitor", "\u041F\u0440\u0435\u0434\u043F\u0440\u043E\u0441\u043C\u043E\u0442\u0440", "\u0421\u043F\u0440\u0430\u0432\u0430 \u0440\u0435\u0437\u0443\u043B\u044C\u0442\u0430\u0442: \u0434\u0435\u0441\u043A\u0442\u043E\u043F, \u043F\u043B\u0430\u043D\u0448\u0435\u0442 \u0438\u043B\u0438 \u0442\u0435\u043B\u0435\u0444\u043E\u043D, \u043F\u043B\u044E\u0441 \u043E\u043A\u043D\u043E \u0441\u0430\u0439\u0442\u0430."],
+      ["chart", "\u0410\u043D\u0430\u043B\u0438\u0437 \u043A\u043E\u0434\u0430", "Python-\u0434\u0432\u0438\u0436\u043E\u043A \u043E\u0431\u044A\u044F\u0441\u043D\u044F\u0435\u0442, \u0447\u0442\u043E \u0434\u0435\u043B\u0430\u0435\u0442 \u043A\u043E\u0434, \u0438 \u043F\u043E\u0434\u0441\u0432\u0435\u0447\u0438\u0432\u0430\u0435\u0442 \u043E\u0448\u0438\u0431\u043A\u0438."],
+      ["server", "Live Server", "\u0417\u0430\u043F\u0443\u0441\u043A\u0430\u0435\u0442 \u0441\u0430\u0439\u0442 \u043F\u043E \u043D\u0430\u0441\u0442\u043E\u044F\u0449\u0435\u043C\u0443 \u0430\u0434\u0440\u0435\u0441\u0443 \u0441 \u0430\u0432\u0442\u043E\u043E\u0431\u043D\u043E\u0432\u043B\u0435\u043D\u0438\u0435\u043C \u0441\u0442\u0440\u0430\u043D\u0438\u0446\u044B."],
+      ["cube", "3D-\u0440\u0435\u0434\u0430\u043A\u0442\u043E\u0440", "\u0421\u0442\u0430\u0432\u044C\u0442\u0435 \u043A\u0443\u0431, \u0441\u0444\u0435\u0440\u0443 \u0438\u043B\u0438 \u0442\u043E\u0440, \u043C\u0435\u043D\u044F\u0439\u0442\u0435 \u0440\u0430\u0437\u043C\u0435\u0440 \u0438 \u044D\u043A\u0441\u043F\u043E\u0440\u0442\u0438\u0440\u0443\u0439\u0442\u0435 \u0441\u0446\u0435\u043D\u0443."],
+      ["window", "\u041E\u043A\u043E\u043D\u043D\u044B\u0439 \u0440\u0435\u0436\u0438\u043C", "\u041B\u044E\u0431\u0443\u044E \u043F\u0430\u043D\u0435\u043B\u044C \u043C\u043E\u0436\u043D\u043E \u0432\u044B\u043D\u0435\u0441\u0442\u0438 \u0432 \u043E\u0442\u0434\u0435\u043B\u044C\u043D\u043E\u0435 \u043F\u043B\u0430\u0432\u0430\u044E\u0449\u0435\u0435 \u043E\u043A\u043D\u043E."]
+    ];
+    modal({
+      title: "\u0414\u043E\u0431\u0440\u043E \u043F\u043E\u0436\u0430\u043B\u043E\u0432\u0430\u0442\u044C \u0432 Runlet",
+      wide: true,
+      okText: "\u041F\u043E\u043D\u044F\u0442\u043D\u043E",
+      body: `<p class="muted" style="font-size:12px;margin:0 0 14px">\u041A\u043E\u0440\u043E\u0442\u043A\u043E \u043E \u0442\u043E\u043C, \u043A\u0430\u043A \u0437\u0434\u0435\u0441\u044C \u0432\u0441\u0451 \u0443\u0441\u0442\u0440\u043E\u0435\u043D\u043E.</p>
+      <div class="welcome-grid">${cards.map(([i4, t2, d]) => `<div class="welcome-card">${icon(i4, 20)}<b>${t2}</b><span>${d}</span></div>`).join("")}</div>
+      <div class="beginner mt8">\u0421\u043E\u0432\u0435\u0442: Ctrl+Shift+P \u043E\u0442\u043A\u0440\u044B\u0432\u0430\u0435\u0442 \u043F\u0430\u043B\u0438\u0442\u0440\u0443 \u043A\u043E\u043C\u0430\u043D\u0434, Ctrl+Enter \u2014 \u0437\u0430\u043F\u0443\u0441\u043A \u043F\u0440\u0435\u0434\u043F\u0440\u043E\u0441\u043C\u043E\u0442\u0440\u0430,
+      Ctrl+Shift+A \u2014 \u0430\u043D\u0430\u043B\u0438\u0437 \u043A\u043E\u0434\u0430. \u0412\u0441\u0435 \u0441\u043E\u0447\u0435\u0442\u0430\u043D\u0438\u044F \u043C\u0435\u043D\u044F\u044E\u0442\u0441\u044F \u0432 \u043D\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0430\u0445.</div>
+      <div class="rowflex mt8"><button class="mini-btn" id="wcTour">\u041F\u043E\u043A\u0430\u0437\u0430\u0442\u044C \u0442\u0443\u0440 \u043F\u043E \u0438\u043D\u0442\u0435\u0440\u0444\u0435\u0439\u0441\u0443</button>
+        <button class="mini-btn" id="wcProjects">\u041E\u0442\u043A\u0440\u044B\u0442\u044C \u043C\u0435\u043D\u044E \u043F\u0440\u043E\u0435\u043A\u0442\u043E\u0432</button></div>`,
+      onMount: (root) => {
+        root.querySelector("#wcTour").onclick = () => {
+          closeModal();
+          startTour();
+        };
+        root.querySelector("#wcProjects").onclick = () => {
+          closeModal();
+          showStartScreen();
+        };
+      },
+      onOk: () => {
+        state.settings.welcomeSeen = true;
+        applySettings();
+      }
+    });
+  }
   function showStartScreen() {
     const screen = $("#startScreen");
-    const templates = [
-      { id: "demo", ico: "\u26A1", name: "\u0414\u0435\u043C\u043E-\u043F\u0440\u043E\u0435\u043A\u0442", desc: "\u041A\u0440\u0430\u0441\u0438\u0432\u0430\u044F \u043A\u0430\u0440\u0442\u043E\u0447\u043A\u0430 \u0441\u043E \u0441\u0447\u0451\u0442\u0447\u0438\u043A\u043E\u043C \u043A\u043B\u0438\u043A\u043E\u0432 \u2014 \u0432\u0441\u0451 \u0443\u0436\u0435 \u043D\u0430\u0441\u0442\u0440\u043E\u0435\u043D\u043E." },
-      { id: "blank", ico: "\u{1F4C4}", name: "\u041F\u0443\u0441\u0442\u043E\u0439 \u043F\u0440\u043E\u0435\u043A\u0442", desc: "\u0427\u0438\u0441\u0442\u044B\u0439 HTML5-\u0441\u043A\u0435\u043B\u0435\u0442 + style.css + script.js." },
-      { id: "landing", ico: "\u{1F680}", name: "\u041B\u0435\u043D\u0434\u0438\u043D\u0433", desc: "Hero-\u0441\u0435\u043A\u0446\u0438\u044F, \u043D\u0430\u0432\u0438\u0433\u0430\u0446\u0438\u044F, \u043A\u0430\u0440\u0442\u043E\u0447\u043A\u0438 \u0438 \u0444\u0443\u0442\u0435\u0440." },
-      { id: "form", ico: "\u{1F4DD}", name: "\u0424\u043E\u0440\u043C\u0430", desc: "\u0424\u043E\u0440\u043C\u0430 \u0441 \u0432\u0430\u043B\u0438\u0434\u0430\u0446\u0438\u0435\u0439 \u0438 \u0434\u043E\u0441\u0442\u0443\u043F\u043D\u044B\u043C\u0438 label." },
-      { id: "game", ico: "\u{1F3AE}", name: "\u041C\u0438\u043D\u0438-\u0438\u0433\u0440\u0430", desc: "Canvas + requestAnimationFrame + \u043E\u0447\u043A\u0438." },
-      { id: "import", ico: "\u{1F4E5}", name: "\u0418\u043C\u043F\u043E\u0440\u0442", desc: "ZIP, \u043E\u0434\u0438\u043D\u043E\u0447\u043D\u044B\u0439 HTML \u0438\u043B\u0438 \u0441\u0441\u044B\u043B\u043A\u0430." }
+    const steps = [
+      ["code", "\u041F\u0438\u0448\u0438\u0442\u0435 \u043A\u043E\u0434", "HTML, CSS \u0438 JS \u0432 \u0442\u0440\u0451\u0445 \u043F\u0430\u043D\u0435\u043B\u044F\u0445."],
+      ["monitor", "\u0421\u043C\u043E\u0442\u0440\u0438\u0442\u0435 \u0440\u0435\u0437\u0443\u043B\u044C\u0442\u0430\u0442", "\u041F\u0440\u0435\u0434\u043F\u0440\u043E\u0441\u043C\u043E\u0442\u0440 \u0438\u043B\u0438 \u043E\u0442\u0434\u0435\u043B\u044C\u043D\u043E\u0435 \u043E\u043A\u043D\u043E \u0441\u0430\u0439\u0442\u0430."],
+      ["chart", "\u041F\u0440\u043E\u0432\u0435\u0440\u044F\u0439\u0442\u0435", "\u0410\u043D\u0430\u043B\u0438\u0437 \u043E\u0431\u044A\u044F\u0441\u043D\u0438\u0442 \u043A\u043E\u0434 \u0438 \u043D\u0430\u0439\u0434\u0451\u0442 \u043E\u0448\u0438\u0431\u043A\u0438."],
+      ["archive", "\u0421\u043E\u0445\u0440\u0430\u043D\u044F\u0439\u0442\u0435", "\u041F\u0440\u043E\u0435\u043A\u0442\u044B \u044D\u043A\u0441\u043F\u043E\u0440\u0442\u0438\u0440\u0443\u044E\u0442\u0441\u044F \u0438 \u0438\u043C\u043F\u043E\u0440\u0442\u0438\u0440\u0443\u044E\u0442\u0441\u044F."]
     ];
-    screen.innerHTML = `<div class="start-card">
-    <span class="pill pill-accent">Runlet Studio \xB7 Electron + Python analysis</span>
-    <h1>\u041F\u0438\u0448\u0438 \u043A\u043E\u0434. <span>\u041F\u043E\u043D\u0438\u043C\u0430\u0439 \u043A\u043E\u0434.</span></h1>
-    <p class="lead">\u0422\u0440\u0438 \u043F\u0430\u043D\u0435\u043B\u0438, \u0436\u0438\u0432\u043E\u0439 \u043F\u0440\u0435\u0434\u043F\u0440\u043E\u0441\u043C\u043E\u0442\u0440 \u0438 \u0434\u0432\u0438\u0436\u043E\u043A, \u043A\u043E\u0442\u043E\u0440\u044B\u0439 \u043E\u0431\u044A\u044F\u0441\u043D\u0438\u0442, \u0447\u0442\u043E \u0441\u043A\u043E\u0440\u0435\u0435 \u0432\u0441\u0435\u0433\u043E \u0434\u0435\u043B\u0430\u0435\u0442 \u0432\u0430\u0448 \u043A\u043E\u0434 \u0438 \u0433\u0434\u0435 \u043E\u0448\u0438\u0431\u043A\u0438.</p>
-    <div class="feature-strip"><span>\u{1F40D} Python-\u0430\u043D\u0430\u043B\u0438\u0437</span><span>\u26A1 \u0436\u0438\u0432\u043E\u0439 \u043F\u0440\u0435\u0434\u043F\u0440\u043E\u0441\u043C\u043E\u0442\u0440</span><span>\u{1F9E0} \u043E\u0431\u044A\u044F\u0441\u043D\u0435\u043D\u0438\u0435 \u043F\u043E\u0432\u0435\u0434\u0435\u043D\u0438\u044F</span>
-      <span>\u{1F6E0} \u0430\u0432\u0442\u043E\u0438\u0441\u043F\u0440\u0430\u0432\u043B\u0435\u043D\u0438\u044F</span><span>\u{1F3A8} CSS-\u043B\u0430\u0431\u043E\u0440\u0430\u0442\u043E\u0440\u0438\u044F</span><span>\u{1F393} \u0443\u0440\u043E\u043A\u0438</span></div>
-    <div class="grid-cards">${templates.map((t2) => `<div class="tile" data-tpl="${t2.id}"><div class="tile-ico">${t2.ico}</div>
-      <b>${t2.name}</b><small>${t2.desc}</small></div>`).join("")}</div>
-    <div class="rowflex mt8"><label class="chk"><input type="checkbox" id="noStart"> \u0431\u043E\u043B\u044C\u0448\u0435 \u043D\u0435 \u043F\u043E\u043A\u0430\u0437\u044B\u0432\u0430\u0442\u044C</label>
-      <div style="flex:1"></div><button class="btn btn-ghost" id="startSkip">\u2715 \u041F\u0440\u043E\u0441\u0442\u043E \u043E\u0442\u043A\u0440\u044B\u0442\u044C \u0440\u0435\u0434\u0430\u043A\u0442\u043E\u0440</button>
-      <button class="btn btn-analyze" id="startTour">\u{1F680} \u0411\u044B\u0441\u0442\u0440\u044B\u0439 \u0442\u0443\u0440</button></div>
+    let chosen = "starter";
+    screen.innerHTML = `<div class="launch">
+    <div class="launch-side">
+      <div class="launch-logo"><div class="brand-mark">${icon("code", 22)}</div><div><b>Runlet</b><br><span>studio 2.0</span></div></div>
+      <h1 class="launch-title">\u0420\u0435\u0434\u0430\u043A\u0442\u043E\u0440 \u0441\u0430\u0439\u0442\u043E\u0432,<br>\u0432 \u043A\u043E\u0442\u043E\u0440\u043E\u043C \u0432\u0441\u0451 \u043F\u043E\u043D\u044F\u0442\u043D\u043E.</h1>
+      <p class="launch-lead">\u041F\u0440\u043E\u0435\u043A\u0442\u044B, \u0436\u0438\u0432\u043E\u0439 \u043F\u0440\u0435\u0434\u043F\u0440\u043E\u0441\u043C\u043E\u0442\u0440, \u043B\u043E\u043A\u0430\u043B\u044C\u043D\u044B\u0439 \u0441\u0435\u0440\u0432\u0435\u0440, 3D \u0438 \u0430\u043D\u0430\u043B\u0438\u0437 \u043A\u043E\u0434\u0430 \u2014 \u0432 \u043E\u0434\u043D\u043E\u043C \u043E\u043A\u043D\u0435 \u0431\u0435\u0437 \u043B\u0438\u0448\u043D\u0435\u0433\u043E \u0448\u0443\u043C\u0430.</p>
+      <div class="launch-steps">${steps.map(([i4, t2, d]) => `<div class="launch-step"><div class="launch-step-i">${icon(i4, 16)}</div>
+        <div><b>${t2}</b><span>${d}</span></div></div>`).join("")}</div>
+      <div class="launch-foot"><button class="btn btn-ghost" id="launchWelcome">\u041A\u0430\u043A \u0440\u0430\u0431\u043E\u0442\u0430\u0442\u044C</button>
+        <button class="btn btn-ghost" id="launchTour">\u0422\u0443\u0440</button></div>
+    </div>
+    <div class="launch-main">
+      <div class="launch-head"><div><h2>\u041F\u0440\u043E\u0435\u043A\u0442\u044B</h2><p>\u0421\u043E\u0437\u0434\u0430\u0439\u0442\u0435 \u043D\u043E\u0432\u044B\u0439 \u0438\u043B\u0438 \u043E\u0442\u043A\u0440\u043E\u0439\u0442\u0435 \u0441\u0443\u0449\u0435\u0441\u0442\u0432\u0443\u044E\u0449\u0438\u0439.</p></div>
+        <button class="mini-btn" id="launchImportAll">${icon("upload", 13)} \u0418\u043C\u043F\u043E\u0440\u0442</button></div>
+      <div class="launch-create">
+        <input id="prjName" placeholder="\u041D\u0430\u0437\u0432\u0430\u043D\u0438\u0435 \u043F\u0440\u043E\u0435\u043A\u0442\u0430" maxlength="80" value="\u041D\u043E\u0432\u044B\u0439 \u0441\u0430\u0439\u0442">
+        <select id="prjTemplate">${TEMPLATES.map((t2) => `<option value="${t2.id}" ${t2.id === chosen ? "selected" : ""}>${t2.name}</option>`).join("")}</select>
+        <button class="btn btn-accent" id="prjCreate">${icon("plus", 15)} \u0421\u043E\u0437\u0434\u0430\u0442\u044C</button>
+      </div>
+      <div class="template-grid" id="prjTemplates">${TEMPLATES.map((t2) => `<div class="template-card ${t2.id === chosen ? "active" : ""}" data-tpl="${t2.id}">${icon(t2.icon, 17)}<b>${t2.name}</b><small>${t2.desc}</small></div>`).join("")}</div>
+      <div class="launch-head"><div><h2 style="font-size:13px">\u041C\u043E\u0438 \u043F\u0440\u043E\u0435\u043A\u0442\u044B</h2></div>
+        <div class="rowflex"><button class="mini-btn" id="prjExportAll">${icon("download", 13)} \u042D\u043A\u0441\u043F\u043E\u0440\u0442 \u0432\u0441\u0435\u0445</button>
+          <button class="mini-btn" id="prjExport">${icon("archive", 13)} \u042D\u043A\u0441\u043F\u043E\u0440\u0442</button></div></div>
+      <div class="launch-projects" id="prjList"></div>
+      <div class="rowflex mt8" style="justify-content:flex-end">
+        <label class="chk"><input type="checkbox" id="prjShow" ${state.settings.showLauncher ? "checked" : ""}> \u043F\u043E\u043A\u0430\u0437\u044B\u0432\u0430\u0442\u044C \u044D\u0442\u043E \u043C\u0435\u043D\u044E \u043F\u0440\u0438 \u0437\u0430\u043F\u0443\u0441\u043A\u0435</label>
+        <button class="btn btn-ghost" id="prjDirect">\u041E\u0442\u043A\u0440\u044B\u0442\u044C \u0440\u0435\u0434\u0430\u043A\u0442\u043E\u0440</button></div>
+    </div>
   </div>`;
     screen.classList.add("show");
-    screen.querySelectorAll("[data-tpl]").forEach((t2) => t2.onclick = () => {
-      state.settings.firstRun = !screen.querySelector("#noStart").checked;
+    const list2 = screen.querySelector("#prjList");
+    const open = (id2) => {
+      state.settings.showLauncher = screen.querySelector("#prjShow").checked;
       applySettings();
-      startTemplate(t2.dataset.tpl);
+      openProject(id2);
       screen.classList.remove("show");
+      if (!state.settings.welcomeSeen) setTimeout(showWelcome, 350);
+    };
+    renderProjectRows(list2, open);
+    screen.querySelectorAll("[data-tpl]").forEach((c) => c.onclick = () => {
+      chosen = c.dataset.tpl;
+      screen.querySelectorAll("[data-tpl]").forEach((x2) => x2.classList.toggle("active", x2 === c));
+      screen.querySelector("#prjTemplate").value = chosen;
     });
-    screen.querySelector("#startTour").onclick = () => {
-      state.settings.firstRun = false;
-      applySettings();
+    screen.querySelector("#prjTemplate").onchange = (e) => {
+      chosen = e.target.value;
+      screen.querySelectorAll("[data-tpl]").forEach((x2) => x2.classList.toggle("active", x2.dataset.tpl === chosen));
+    };
+    const create = () => {
+      const name2 = screen.querySelector("#prjName").value.trim() || "\u041D\u043E\u0432\u044B\u0439 \u043F\u0440\u043E\u0435\u043A\u0442";
+      const rec = makeProject(name2, chosen);
+      open(rec.id);
+      toast("\u041F\u0440\u043E\u0435\u043A\u0442 \u0441\u043E\u0437\u0434\u0430\u043D: " + rec.name, "ok");
+    };
+    screen.querySelector("#prjCreate").onclick = create;
+    screen.querySelector("#prjName").addEventListener("keydown", (e) => {
+      if (e.key === "Enter") create();
+    });
+    screen.querySelector("#launchImportAll").onclick = () => $("#hiddenProjectInput")?.click();
+    screen.querySelector("#prjExportAll").onclick = () => exportAllProjects();
+    screen.querySelector("#prjExport").onclick = () => exportProject("");
+    screen.querySelector("#launchWelcome").onclick = () => showWelcome();
+    screen.querySelector("#launchTour").onclick = () => {
       screen.classList.remove("show");
       startTour();
     };
-    screen.querySelector("#startSkip").onclick = () => {
-      state.settings.firstRun = !screen.querySelector("#noStart").checked;
+    screen.querySelector("#prjDirect").onclick = () => {
+      state.settings.showLauncher = screen.querySelector("#prjShow").checked;
       applySettings();
+      const projects = listProjects();
+      if (projects.length) openProject(projects[0].id);
       screen.classList.remove("show");
-      setTimeout(() => runCommand("analyze"), 200);
+      if (!state.settings.welcomeSeen) setTimeout(showWelcome, 300);
     };
-  }
-  function startTemplate(id2) {
-    if (id2 === "import") {
-      runCommand("importZip");
-      return;
+    if (!screen.dataset.projectsWired) {
+      screen.dataset.projectsWired = "1";
+      on("projects:changed", () => {
+        if (screen.classList.contains("show") && list2.isConnected) renderProjectRows(list2, open);
+      });
     }
-    if (id2 === "demo") {
-      resetProject();
-      toast("\u0414\u0435\u043C\u043E-\u043F\u0440\u043E\u0435\u043A\u0442 \u0437\u0430\u0433\u0440\u0443\u0436\u0435\u043D", "ok");
-      return;
-    }
-    const blank = {
-      "index.html": `<!DOCTYPE html>
-<html lang="ru">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>\u041F\u0440\u043E\u0435\u043A\u0442</title>
-<link rel="stylesheet" href="style.css">
-</head>
-<body>
-  
-  <script src="script.js"><\/script>
-</body>
-</html>`,
-      "style.css": "/* \u0441\u0442\u0438\u043B\u0438 */\nbody { font-family: system-ui, sans-serif; margin: 0; padding: 24px; }\n",
-      "script.js": "// \u043A\u043E\u0434\n"
-    };
-    if (id2 === "blank") {
-      for (const [p, c] of Object.entries(blank)) write(p, c);
-    } else if (id2 === "landing") {
-      blank["index.html"] = blank["index.html"].replace("  \n", [
-        SNIPPETS.find((s) => s.id === "nav").code,
-        SNIPPETS.find((s) => s.id === "hero").code,
-        '<section class="cards">' + SNIPPETS.find((s) => s.id === "card").code.repeat(1) + "</section>",
-        SNIPPETS.find((s) => s.id === "footer").code
-      ].join("\n"));
-      blank["style.css"] += "\nbody{padding:0}.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:18px;padding:24px}\n";
-      for (const [p, c] of Object.entries(blank)) write(p, c);
-    } else if (id2 === "form") {
-      blank["index.html"] = blank["index.html"].replace("  \n", SNIPPETS.find((s) => s.id === "form").code);
-      blank["script.js"] = `document.querySelector('#myForm').addEventListener('submit', e => { e.preventDefault(); console.log('\u0424\u043E\u0440\u043C\u0430 \u043E\u0442\u043F\u0440\u0430\u0432\u043B\u0435\u043D\u0430', new FormData(e.target)); });`;
-      for (const [p, c] of Object.entries(blank)) write(p, c);
-    } else if (id2 === "game") {
-      blank["index.html"] = blank["index.html"].replace("  \n", '<canvas id="game" width="640" height="360" style="border-radius:20px;background:#10132a"></canvas>');
-      blank["script.js"] = `const c = document.querySelector('#game'), x = c.getContext('2d');
-let px = 60, py = 180, score = 0;
-function frame(){ x.clearRect(0,0,c.width,c.height); x.fillStyle='#7c6cf6'; x.fillRect(px,py,40,40); x.fillStyle='#fff'; x.font='20px sans-serif'; x.fillText('\u041E\u0447\u043A\u0438: '+score, 20, 30); px=(px+2)%c.width; score++; requestAnimationFrame(frame); }
-frame();`;
-      for (const [p, c] of Object.entries(blank)) write(p, c);
-    }
-    emit("project:restoreEditors");
-    runCommand("run");
-    toast("\u0428\u0430\u0431\u043B\u043E\u043D \u0437\u0430\u0433\u0440\u0443\u0436\u0435\u043D", "ok");
   }
   var TOUR = [
-    { sel: ".brand-mark", title: "Runlet Studio", text: "\u0420\u0435\u0434\u0430\u043A\u0442\u043E\u0440 HTML/CSS/JS \u043D\u0430 Electron. \u0412\u0441\u0451 \u0441\u043E\u0445\u0440\u0430\u043D\u044F\u0435\u0442\u0441\u044F \u0430\u0432\u0442\u043E\u043C\u0430\u0442\u0438\u0447\u0435\u0441\u043A\u0438." },
-    { sel: '.editor-pane[data-pane="html"]', title: "\u0422\u0440\u0438 \u043F\u0430\u043D\u0435\u043B\u0438 \u043A\u043E\u0434\u0430", text: "HTML, CSS \u0438 JS \u0440\u044F\u0434\u043E\u043C. \u0420\u0430\u0437\u0434\u0435\u043B\u0438\u0442\u0435\u043B\u0438 \u043C\u043E\u0436\u043D\u043E \u043F\u0435\u0440\u0435\u0442\u0430\u0441\u043A\u0438\u0432\u0430\u0442\u044C, \u043F\u0430\u043D\u0435\u043B\u0438 \u2014 \u0441\u0432\u043E\u0440\u0430\u0447\u0438\u0432\u0430\u0442\u044C \u0438 \u0440\u0430\u0437\u0432\u043E\u0440\u0430\u0447\u0438\u0432\u0430\u0442\u044C." },
-    { sel: ".btn-analyze", title: "\u0410\u043D\u0430\u043B\u0438\u0437 \u043A\u043E\u0434\u0430 \u{1F40D}", text: "\u0413\u043B\u0430\u0432\u043D\u0430\u044F \u0444\u0438\u0448\u043A\u0430: Python-\u0434\u0432\u0438\u0436\u043E\u043A \u043E\u0431\u044A\u044F\u0441\u043D\u0438\u0442, \u0447\u0442\u043E \u0434\u0435\u043B\u0430\u0435\u0442 \u043A\u043E\u0434, \u043D\u0430\u0439\u0434\u0451\u0442 \u043E\u0448\u0438\u0431\u043A\u0438 \u0438 \u043F\u0440\u0435\u0434\u043B\u043E\u0436\u0438\u0442 \u0438\u0441\u043F\u0440\u0430\u0432\u043B\u0435\u043D\u0438\u044F." },
-    { sel: "#inspectorTabs", title: "\u041F\u0430\u043D\u0435\u043B\u044C \u043E\u0431\u044A\u044F\u0441\u043D\u0435\u043D\u0438\u0439", text: "\u0417\u0434\u0435\u0441\u044C \u043E\u0442\u0447\u0451\u0442, \u043A\u043E\u043D\u0441\u043E\u043B\u044C, \u043E\u0442\u043B\u0430\u0434\u0447\u0438\u043A, DOM-\u0438\u043D\u0441\u043F\u0435\u043A\u0442\u043E\u0440, \u0441\u0435\u0442\u044C, \u0445\u0440\u0430\u043D\u0438\u043B\u0438\u0449\u0435 \u0438 \u0430\u0441\u0441\u0438\u0441\u0442\u0435\u043D\u0442." },
-    { sel: "#previewCard", title: "\u0416\u0438\u0432\u043E\u0439 \u043F\u0440\u0435\u0434\u043F\u0440\u043E\u0441\u043C\u043E\u0442\u0440", text: "\u0418\u0437\u043E\u043B\u0438\u0440\u043E\u0432\u0430\u043D\u043D\u044B\u0439 iframe \u0441 \u043F\u0435\u0440\u0435\u0445\u0432\u0430\u0442\u043E\u043C console, \u043E\u0448\u0438\u0431\u043E\u043A, alert \u0438 \u043F\u043E\u0434\u0434\u0435\u0440\u0436\u043A\u043E\u0439 \u0443\u0441\u0442\u0440\u043E\u0439\u0441\u0442\u0432." },
-    { sel: "#railTabs", title: "\u0424\u0430\u0439\u043B\u044B, \u0431\u0438\u0431\u043B\u0438\u043E\u0442\u0435\u043A\u0438, \u0443\u0440\u043E\u043A\u0438", text: "\u0412\u0438\u0440\u0442\u0443\u0430\u043B\u044C\u043D\u0430\u044F \u0424\u0421, ZIP, CDN-\u0431\u0438\u0431\u043B\u0438\u043E\u0442\u0435\u043A\u0438, \u043F\u043B\u0430\u0433\u0438\u043D\u044B \u0438 500 \u0438\u0434\u0435\u0439 \u0441 \u043A\u0430\u0440\u0442\u043E\u0439 \u043F\u043E\u043A\u0440\u044B\u0442\u0438\u044F." }
+    { sel: ".brand-mark", title: "Runlet Studio", text: "\u0420\u0435\u0434\u0430\u043A\u0442\u043E\u0440 \u0441\u0430\u0439\u0442\u043E\u0432 \u043D\u0430 Electron. \u041F\u0440\u043E\u0435\u043A\u0442\u044B \u0441\u043E\u0445\u0440\u0430\u043D\u044F\u044E\u0442\u0441\u044F \u0430\u0432\u0442\u043E\u043C\u0430\u0442\u0438\u0447\u0435\u0441\u043A\u0438." },
+    { sel: '.editor-pane[data-pane="html"]', title: "\u0422\u0440\u0438 \u043F\u0430\u043D\u0435\u043B\u0438 \u043A\u043E\u0434\u0430", text: "HTML, CSS \u0438 JS \u0440\u044F\u0434\u043E\u043C. \u0420\u0430\u0437\u0434\u0435\u043B\u0438\u0442\u0435\u043B\u0438 \u0442\u044F\u043D\u0443\u0442\u0441\u044F \u043C\u044B\u0448\u044C\u044E, \u043F\u0430\u043D\u0435\u043B\u0438 \u0441\u0432\u043E\u0440\u0430\u0447\u0438\u0432\u0430\u044E\u0442\u0441\u044F \u0438 \u043E\u0442\u043A\u0440\u044B\u0432\u0430\u044E\u0442\u0441\u044F \u0432 \u043E\u043A\u043D\u0430\u0445." },
+    { sel: "#deviceSwitch", title: "\u041F\u0440\u0435\u0434\u043F\u0440\u043E\u0441\u043C\u043E\u0442\u0440", text: "\u0414\u0435\u0441\u043A\u0442\u043E\u043F, \u043F\u043B\u0430\u043D\u0448\u0435\u0442 \u0438\u043B\u0438 \u0442\u0435\u043B\u0435\u0444\u043E\u043D. \u0421\u043F\u0440\u0430\u0432\u0430 \u2014 Live Server, \u043A\u043E\u0442\u043E\u0440\u044B\u0439 \u0437\u0430\u043F\u0443\u0441\u043A\u0430\u0435\u0442 \u0441\u0430\u0439\u0442 \u043F\u043E \u043D\u0430\u0441\u0442\u043E\u044F\u0449\u0435\u043C\u0443 \u0430\u0434\u0440\u0435\u0441\u0443." },
+    { sel: "#inspectorTabs", title: "\u0410\u043D\u0430\u043B\u0438\u0437 \u0438 \u043A\u043E\u043D\u0441\u043E\u043B\u044C", text: "Python-\u0434\u0432\u0438\u0436\u043E\u043A \u043E\u0431\u044A\u044F\u0441\u043D\u044F\u0435\u0442 \u043A\u043E\u0434 \u0438 \u043E\u0448\u0438\u0431\u043A\u0438; \u0440\u044F\u0434\u043E\u043C \u043A\u043E\u043D\u0441\u043E\u043B\u044C, \u043E\u0442\u043B\u0430\u0434\u0447\u0438\u043A \u0438 \u0438\u043D\u0441\u043F\u0435\u043A\u0442\u043E\u0440." },
+    { sel: "#railNav", title: "\u041F\u0440\u043E\u0435\u043A\u0442 \u0438 \u0438\u043D\u0441\u0442\u0440\u0443\u043C\u0435\u043D\u0442\u044B", text: "\u0424\u0430\u0439\u043B\u044B, \u043F\u043E\u0438\u0441\u043A, \u0431\u0438\u0431\u043B\u0438\u043E\u0442\u0435\u043A\u0438, \u0430\u0441\u0441\u0435\u0442\u044B, 3D-\u0440\u0435\u0434\u0430\u043A\u0442\u043E\u0440 \u0438 \u0443\u0440\u043E\u043A\u0438 \u2014 \u0432\u0441\u0451 \u0441\u0433\u0440\u0443\u043F\u043F\u0438\u0440\u043E\u0432\u0430\u043D\u043E." },
+    { sel: "#toolbarPrimary", title: "\u0421\u0432\u043E\u0438 \u043A\u043D\u043E\u043F\u043A\u0438", text: "\u041F\u0430\u043D\u0435\u043B\u044C \u0434\u0435\u0439\u0441\u0442\u0432\u0438\u0439 \u043D\u0430\u0441\u0442\u0440\u0430\u0438\u0432\u0430\u0435\u0442\u0441\u044F \u0432 \u041D\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0438 \u2192 \u041A\u043D\u043E\u043F\u043A\u0438: \u0432\u044B\u0431\u0435\u0440\u0438\u0442\u0435 \u043D\u0443\u0436\u043D\u044B\u0435 \u043A\u043E\u043C\u0430\u043D\u0434\u044B \u0438\u0437 \u0441\u043F\u0438\u0441\u043A\u0430." }
   ];
   function startTour() {
     tourIndex = 0;
@@ -50064,7 +51451,7 @@ frame();`;
     $("#tourLayer").innerHTML = "";
   }
   function drawTour() {
-    const layer2 = $("#tourLayer");
+    const layer3 = $("#tourLayer");
     const step2 = tourSteps[tourIndex];
     if (!step2) {
       endTour();
@@ -50072,28 +51459,28 @@ frame();`;
     }
     const target = $(step2.sel);
     const r = target?.getBoundingClientRect() || { left: innerWidth / 2 - 100, top: innerHeight / 2 - 60, width: 200, height: 120 };
-    layer2.innerHTML = `<div class="tour-spot" style="left:${r.left - 6}px;top:${r.top - 6}px;width:${r.width + 12}px;height:${r.height + 12}px"></div>
+    layer3.innerHTML = `<div class="tour-spot" style="left:${r.left - 6}px;top:${r.top - 6}px;width:${r.width + 12}px;height:${r.height + 12}px"></div>
     <div class="tour-box" style="left:${Math.min(innerWidth - 320, Math.max(12, r.left))}px;top:${Math.min(innerHeight - 180, r.bottom + 16)}px">
       <h4>${esc(step2.title)}</h4><p>${esc(step2.text)}</p>
       <div class="tour-nav"><button class="mini-btn" id="tourPrev">\u2190</button>
         <button class="mini-btn" id="tourNext">${tourIndex === tourSteps.length - 1 ? "\u0413\u043E\u0442\u043E\u0432\u043E" : "\u0414\u0430\u043B\u0435\u0435 \u2192"}</button>
         <button class="mini-btn" id="tourSkip">\u041F\u0440\u043E\u043F\u0443\u0441\u0442\u0438\u0442\u044C</button>
         <span class="tour-step">${tourIndex + 1}/${tourSteps.length}</span></div></div>`;
-    layer2.querySelector("#tourPrev").onclick = () => {
+    layer3.querySelector("#tourPrev").onclick = () => {
       tourIndex = Math.max(0, tourIndex - 1);
       drawTour();
     };
-    layer2.querySelector("#tourNext").onclick = () => {
+    layer3.querySelector("#tourNext").onclick = () => {
       tourIndex++;
       if (tourIndex >= tourSteps.length) endTour();
       else drawTour();
     };
-    layer2.querySelector("#tourSkip").onclick = endTour;
+    layer3.querySelector("#tourSkip").onclick = endTour;
   }
   function snippetsModal(cat = state.activePane) {
     const list2 = SNIPPETS.filter((s) => s.cat === cat).concat(state.userSnippets.filter((s) => s.cat === cat));
     modal({
-      title: `\u2726 \u0421\u043D\u0438\u043F\u043F\u0435\u0442\u044B \xB7 ${cat.toUpperCase()}`,
+      title: `\u0421\u043D\u0438\u043F\u043F\u0435\u0442\u044B \xB7 ${cat.toUpperCase()}`,
       wide: true,
       okText: "\u0417\u0430\u043A\u0440\u044B\u0442\u044C",
       body: `<div class="tabs-line" id="snipCats">${["html", "css", "js"].map((c) => `<button data-c="${c}" class="${c === cat ? "active" : ""}">${c.toUpperCase()}</button>`).join("")}
@@ -50113,7 +51500,7 @@ frame();`;
         root.querySelector("#newSnippet").onclick = () => {
           closeModal();
           modal({
-            title: "\u2605 \u041D\u043E\u0432\u044B\u0439 \u0441\u043D\u0438\u043F\u043F\u0435\u0442",
+            title: "\u041D\u043E\u0432\u044B\u0439 \u0441\u043D\u0438\u043F\u043F\u0435\u0442",
             wide: true,
             body: `<div class="field-row"><div class="field"><label>\u041D\u0430\u0437\u0432\u0430\u043D\u0438\u0435</label><input id="usName" value="\u041C\u043E\u0439 \u0441\u043D\u0438\u043F\u043F\u0435\u0442"></div>
             <div class="field"><label>\u042F\u0437\u044B\u043A</label><select id="usCat"><option>html</option><option>css</option><option>js</option></select></div></div>
@@ -50146,10 +51533,10 @@ frame();`;
       ["SVG-\u0438\u043A\u043E\u043D\u043A\u0438", () => Object.values(SVG_ICONS).join("\n")]
     ];
     modal({
-      title: "\u{1F9F0} HTML-\u0438\u043D\u0441\u0442\u0440\u0443\u043C\u0435\u043D\u0442\u044B",
+      title: "HTML-\u0438\u043D\u0441\u0442\u0440\u0443\u043C\u0435\u043D\u0442\u044B",
       wide: true,
       okText: "\u0417\u0430\u043A\u0440\u044B\u0442\u044C",
-      body: `<div class="grid-cards" id="htmlGens">${gens.map(([n, f], i4) => `<div class="tile" data-hg="${i4}"><div class="tile-ico">\u{1F9E9}</div><b>${n}</b><small>\u0412\u0441\u0442\u0430\u0432\u0438\u0442\u044C \u0432 HTML</small></div>`).join("")}</div>
+      body: `<div class="grid-cards" id="htmlGens">${gens.map(([n, f], i4) => `<div class="tile" data-hg="${i4}"><div class="tile-ico"></div><b>${n}</b><small>\u0412\u0441\u0442\u0430\u0432\u0438\u0442\u044C \u0432 HTML</small></div>`).join("")}</div>
       <div class="field mt8"><label>\u0420\u0435\u0437\u0443\u043B\u044C\u0442\u0430\u0442</label><textarea id="htmlGenOut" rows="8" style="font:11px var(--mono)"></textarea></div>
       <div class="rowflex"><button class="mini-btn" id="htmlGenInsert">\u0412\u0441\u0442\u0430\u0432\u0438\u0442\u044C \u0432 HTML</button><button class="mini-btn" id="htmlGenCopy">\u041A\u043E\u043F\u0438\u0440\u043E\u0432\u0430\u0442\u044C</button></div>`,
       onMount: (root) => {
@@ -50167,25 +51554,25 @@ frame();`;
     });
   }
   function cssLabModal() {
-    const g = generators;
+    const g2 = generators;
     const defs = [
-      { id: "gradient", name: "\u0413\u0440\u0430\u0434\u0438\u0435\u043D\u0442", controls: [["a", "color", "#7c6cf6"], ["b", "color", "#b06cf6"], ["angle", "range", 135], ["type", "select", ["linear", "radial"]]], fn: (v) => g.gradient(v.a, v.b, v.angle, v.type) },
-      { id: "shadow", name: "Box-shadow", controls: [["y", "range", 12], ["blur", "range", 30], ["alpha", "range", 25], ["inset", "check", false]], fn: (v) => g.boxShadow(0, v.y, v.blur, 0, "#000000", v.alpha / 100, v.inset) },
-      { id: "textShadow", name: "Text-shadow", controls: [["y", "range", 2], ["blur", "range", 8]], fn: (v) => g.textShadow(0, v.y, v.blur, "#00000066") },
-      { id: "radius", name: "Border-radius", controls: [["tl", "range", 18], ["tr", "range", 18], ["br", "range", 18], ["bl", "range", 18]], fn: (v) => g.radius(v.tl, v.tr, v.br, v.bl) },
-      { id: "transform", name: "Transform", controls: [["scale", "range", 100], ["rotate", "range", 0], ["tx", "range", 0]], fn: (v) => g.transform(v.scale / 100, v.rotate, v.tx, 0) },
-      { id: "transition", name: "Transition", controls: [["prop", "text", "all"], ["dur", "range", 3]], fn: (v) => g.transition(v.prop, v.dur / 10, "ease", 0) },
-      { id: "animation", name: "Animation + keyframes", controls: [["name", "text", "pop"], ["dur", "range", 6]], fn: (v) => g.animation(v.name, v.dur / 10, 1) },
-      { id: "filter", name: "Filter", controls: [["blur", "range", 0], ["brightness", "range", 100], ["grayscale", "range", 0]], fn: (v) => g.filter(v.blur, v.brightness, 100, v.grayscale, 0) },
-      { id: "backdrop", name: "Backdrop-filter", controls: [["blur", "range", 12]], fn: (v) => g.backdrop(v.blur, 140) },
-      { id: "clip", name: "Clip-path", controls: [["shape", "select", ["circle", "ellipse", "polygon", "inset", "triangle"]], ["v", "range", 50]], fn: (v) => g.clipPath(v.shape, v.v) },
-      { id: "grid", name: "Grid", controls: [["cols", "range", 3], ["gap", "range", 16]], fn: (v) => g.grid(v.cols, v.gap) },
-      { id: "flex", name: "Flexbox", controls: [["dir", "select", ["row", "column"]], ["justify", "select", ["center", "flex-start", "space-between"]], ["gap", "range", 12]], fn: (v) => g.flex(v.dir, v.justify, "center", v.gap) },
-      { id: "vars", name: "CSS-\u043F\u0435\u0440\u0435\u043C\u0435\u043D\u043D\u044B\u0435", controls: [["base", "color", "#7c6cf6"]], fn: (v) => g.variables(v.base) },
-      { id: "fontface", name: "@font-face", controls: [["name", "text", "MyFont"], ["path", "text", "fonts/myfont.woff2"]], fn: (v) => g.fontFace(v.name, v.path) }
+      { id: "gradient", name: "\u0413\u0440\u0430\u0434\u0438\u0435\u043D\u0442", controls: [["a", "color", "#7c6cf6"], ["b", "color", "#b06cf6"], ["angle", "range", 135], ["type", "select", ["linear", "radial"]]], fn: (v) => g2.gradient(v.a, v.b, v.angle, v.type) },
+      { id: "shadow", name: "Box-shadow", controls: [["y", "range", 12], ["blur", "range", 30], ["alpha", "range", 25], ["inset", "check", false]], fn: (v) => g2.boxShadow(0, v.y, v.blur, 0, "#000000", v.alpha / 100, v.inset) },
+      { id: "textShadow", name: "Text-shadow", controls: [["y", "range", 2], ["blur", "range", 8]], fn: (v) => g2.textShadow(0, v.y, v.blur, "#00000066") },
+      { id: "radius", name: "Border-radius", controls: [["tl", "range", 18], ["tr", "range", 18], ["br", "range", 18], ["bl", "range", 18]], fn: (v) => g2.radius(v.tl, v.tr, v.br, v.bl) },
+      { id: "transform", name: "Transform", controls: [["scale", "range", 100], ["rotate", "range", 0], ["tx", "range", 0]], fn: (v) => g2.transform(v.scale / 100, v.rotate, v.tx, 0) },
+      { id: "transition", name: "Transition", controls: [["prop", "text", "all"], ["dur", "range", 3]], fn: (v) => g2.transition(v.prop, v.dur / 10, "ease", 0) },
+      { id: "animation", name: "Animation + keyframes", controls: [["name", "text", "pop"], ["dur", "range", 6]], fn: (v) => g2.animation(v.name, v.dur / 10, 1) },
+      { id: "filter", name: "Filter", controls: [["blur", "range", 0], ["brightness", "range", 100], ["grayscale", "range", 0]], fn: (v) => g2.filter(v.blur, v.brightness, 100, v.grayscale, 0) },
+      { id: "backdrop", name: "Backdrop-filter", controls: [["blur", "range", 12]], fn: (v) => g2.backdrop(v.blur, 140) },
+      { id: "clip", name: "Clip-path", controls: [["shape", "select", ["circle", "ellipse", "polygon", "inset", "triangle"]], ["v", "range", 50]], fn: (v) => g2.clipPath(v.shape, v.v) },
+      { id: "grid", name: "Grid", controls: [["cols", "range", 3], ["gap", "range", 16]], fn: (v) => g2.grid(v.cols, v.gap) },
+      { id: "flex", name: "Flexbox", controls: [["dir", "select", ["row", "column"]], ["justify", "select", ["center", "flex-start", "space-between"]], ["gap", "range", 12]], fn: (v) => g2.flex(v.dir, v.justify, "center", v.gap) },
+      { id: "vars", name: "CSS-\u043F\u0435\u0440\u0435\u043C\u0435\u043D\u043D\u044B\u0435", controls: [["base", "color", "#7c6cf6"]], fn: (v) => g2.variables(v.base) },
+      { id: "fontface", name: "@font-face", controls: [["name", "text", "MyFont"], ["path", "text", "fonts/myfont.woff2"]], fn: (v) => g2.fontFace(v.name, v.path) }
     ];
     modal({
-      title: "\u25D0 CSS-\u043B\u0430\u0431\u043E\u0440\u0430\u0442\u043E\u0440\u0438\u044F",
+      title: "CSS-\u043B\u0430\u0431\u043E\u0440\u0430\u0442\u043E\u0440\u0438\u044F",
       wide: true,
       okText: "\u0412\u0441\u0442\u0430\u0432\u0438\u0442\u044C CSS",
       body: `<div class="tabs-line" id="cssGenTabs">${defs.map((d, i4) => `<button data-g="${i4}" class="${i4 === 0 ? "active" : ""}">${d.name}</button>`).join("")}</div>
@@ -50234,7 +51621,7 @@ frame();`;
         });
         root.querySelector("#cssCopy").onclick = () => copy(root.querySelector("#cssOut").value);
         root.querySelector("#cssPrefix").onclick = () => {
-          root.querySelector("#cssOut").value = g.autoprefix(root.querySelector("#cssOut").value);
+          root.querySelector("#cssOut").value = g2.autoprefix(root.querySelector("#cssOut").value);
         };
         root.querySelector("#cssContrast").onclick = () => ctx.runCommand("contrastTool");
         root.querySelector("#cssExtract").onclick = () => {
@@ -50250,7 +51637,7 @@ frame();`;
   }
   function jsToolsModal() {
     modal({
-      title: "\u2699 JS-\u0438\u043D\u0441\u0442\u0440\u0443\u043C\u0435\u043D\u0442\u044B",
+      title: "JS-\u0438\u043D\u0441\u0442\u0440\u0443\u043C\u0435\u043D\u0442\u044B",
       wide: true,
       okText: "\u0417\u0430\u043A\u0440\u044B\u0442\u044C",
       body: `<div class="tabs-line" id="jsToolTabs"><button class="active" data-jt="json">JSON</button>
@@ -50265,8 +51652,8 @@ frame();`;
             <button class="mini-btn" data-j="mock">\u041C\u043E\u043A-\u0434\u0430\u043D\u043D\u044B\u0435</button><button class="mini-btn" data-j="uuid">UUID</button></div>
           <pre id="jsOut" style="font:11px var(--mono);background:var(--code-bg);padding:10px;border-radius:12px;margin-top:10px;max-height:220px;overflow:auto"></pre>`,
           gen: `<div class="grid-cards">${[["\u0422\u0435\u0441\u0442\u044B", "tests"], ["\u0414\u043E\u043A\u0443\u043C\u0435\u043D\u0442\u0430\u0446\u0438\u044F", "docs"], ["README", "readme"], ["Changelog", "changelog"], ["\u041C\u043E\u043A-\u0434\u0430\u043D\u043D\u044B\u0435", "mock"], ["\u0421\u043B\u0443\u0447\u0430\u0439\u043D\u044B\u0439 \u0446\u0432\u0435\u0442", "color"]].map(([n, k]) => `<div class="tile" data-gen="${k}"><b>${n}</b><small>\u0421\u0433\u0435\u043D\u0435\u0440\u0438\u0440\u043E\u0432\u0430\u0442\u044C</small></div>`).join("")}</div><pre id="jsOut" style="font:11px var(--mono);background:var(--code-bg);padding:10px;border-radius:12px;margin-top:10px;max-height:260px;overflow:auto"></pre>`,
-          check: `<div class="rowflex"><button class="mini-btn" data-j="security">\u{1F512} \u0411\u0435\u0437\u043E\u043F\u0430\u0441\u043D\u043E\u0441\u0442\u044C</button>
-          <button class="mini-btn" data-j="perf">\u26A1 \u041F\u0435\u0440\u0444\u043E\u043C\u0430\u043D\u0441</button><button class="mini-btn" data-j="syntax">\u2713 \u0421\u0438\u043D\u0442\u0430\u043A\u0441\u0438\u0441</button></div>
+          check: `<div class="rowflex"><button class="mini-btn" data-j="security">\u0411\u0435\u0437\u043E\u043F\u0430\u0441\u043D\u043E\u0441\u0442\u044C</button>
+          <button class="mini-btn" data-j="perf">\u041F\u0435\u0440\u0444\u043E\u043C\u0430\u043D\u0441</button><button class="mini-btn" data-j="syntax">\u0421\u0438\u043D\u0442\u0430\u043A\u0441\u0438\u0441</button></div>
           <div id="jsOut" class="mt8"></div>`,
           convert: `<div class="field-row"><div class="field"><label>\u0417\u043D\u0430\u0447\u0435\u043D\u0438\u0435</label><input id="cvVal" value="16"></div>
           <div class="field"><label>\u0418\u0437</label><select id="cvFrom"><option>px</option><option>rem</option><option>%</option></select></div>
@@ -50339,7 +51726,7 @@ frame();`;
   }
   function colorToolDialog() {
     modal({
-      title: "\u{1F3A8} \u0426\u0432\u0435\u0442 \u0438 \u043A\u043E\u043D\u0442\u0440\u0430\u0441\u0442",
+      title: "\u0426\u0432\u0435\u0442 \u0438 \u043A\u043E\u043D\u0442\u0440\u0430\u0441\u0442",
       narrow: true,
       body: `<div class="field"><label>\u0426\u0432\u0435\u0442</label><input type="color" id="ctColor" value="#7c6cf6"></div>
       <div id="ctOut" class="debug-steps"></div><div id="ctPalette" class="rowflex mt8"></div>`,
@@ -50362,27 +51749,27 @@ frame();`;
   }
   function librarySearchDialog() {
     modal({
-      title: "\u{1F4DA} \u0411\u0438\u0431\u043B\u0438\u043E\u0442\u0435\u043A\u0438 \u0438 CDN",
+      title: "\u0411\u0438\u0431\u043B\u0438\u043E\u0442\u0435\u043A\u0438 \u0438 CDN",
       wide: true,
       okText: "\u0417\u0430\u043A\u0440\u044B\u0442\u044C",
       body: `<input id="libSearch2" placeholder="\u041F\u043E\u0438\u0441\u043A: tailwind, chart, react\u2026" style="width:100%;height:34px;border-radius:11px;border:1px solid var(--border);background:var(--code-bg);padding:0 12px;margin-bottom:10px">
       <div class="list-rows" id="libSearchRows"></div>`,
       onMount: (root) => {
         const rows = root.querySelector("#libSearchRows");
-        const draw = (q2) => {
+        const draw = (q) => {
           rows.innerHTML = "";
-          for (const l of CDN_LIBS.filter((x2) => (x2.name + x2.desc + x2.cat).toLowerCase().includes(q2.toLowerCase()))) {
+          for (const l of CDN_LIBS.filter((x2) => (x2.name + x2.desc + x2.cat).toLowerCase().includes(q.toLowerCase()))) {
             const row = el(
               "div",
               { class: "list-row" },
               el("div", { class: "grow" }, el("b", { text: l.name }), el("small", { text: l.desc + " \xB7 " + l.cat })),
-              el("button", { class: "mini-btn", text: state.deps.some((d) => (typeof d === "string" ? d : d.id) === l.id) ? "\u2713" : "+" })
+              el("button", { class: "mini-btn", text: state.deps.some((d) => (typeof d === "string" ? d : d.id) === l.id) ? "" : "+" })
             );
             row.querySelector("button").onclick = () => {
               state.deps.push({ id: l.id, version: l.versions[0], name: l.name, enabled: true });
               emit("deps:changed");
               toast("\u041F\u043E\u0434\u043A\u043B\u044E\u0447\u0435\u043D\u043E: " + l.name, "ok");
-              draw(q2);
+              draw(q);
             };
             rows.appendChild(row);
           }
@@ -50394,14 +51781,14 @@ frame();`;
   }
   function collaborationDialog() {
     modal({
-      title: "\u{1F465} \u0421\u043E\u0432\u043C\u0435\u0441\u0442\u043D\u0430\u044F \u0440\u0430\u0431\u043E\u0442\u0430",
+      title: "\u0421\u043E\u0432\u043C\u0435\u0441\u0442\u043D\u0430\u044F \u0440\u0430\u0431\u043E\u0442\u0430",
       wide: false,
       okText: "\u0417\u0430\u043A\u0440\u044B\u0442\u044C",
       body: `<div class="beginner">\u0421\u0438\u043D\u0445\u0440\u043E\u043D\u0438\u0437\u0430\u0446\u0438\u044F \u043C\u0435\u0436\u0434\u0443 \u0432\u043A\u043B\u0430\u0434\u043A\u0430\u043C\u0438 \u043E\u0434\u043D\u043E\u0433\u043E \u0431\u0440\u0430\u0443\u0437\u0435\u0440\u0430 \u0447\u0435\u0440\u0435\u0437 BroadcastChannel: \u0438\u0437\u043C\u0435\u043D\u0435\u043D\u0438\u044F \u0444\u0430\u0439\u043B\u043E\u0432, \u0447\u0430\u0442 \u0438 \u043A\u0443\u0440\u0441\u043E\u0440\u044B \u0432\u0438\u0434\u043D\u044B \u0432\u0441\u0435\u043C \u043E\u0442\u043A\u0440\u044B\u0442\u044B\u043C \u043E\u043A\u043D\u0430\u043C Runlet.</div>
       <div class="mt8"><b>\u0423\u0447\u0430\u0441\u0442\u043D\u0438\u043A\u0438:</b> <span id="collabPeers">\u0442\u043E\u043B\u044C\u043A\u043E \u0432\u044B</span></div>
       <div class="field mt8"><label>\u0427\u0430\u0442</label><div id="collabChat" style="height:140px;overflow:auto;background:var(--code-bg);border-radius:12px;padding:8px;font-size:11px"></div></div>
-      <div class="repl-bar"><input id="collabMsg" placeholder="\u0421\u043E\u043E\u0431\u0449\u0435\u043D\u0438\u0435\u2026"><button class="mini-btn" id="collabSend">\u27A4</button></div>
-      <div class="tabs-line mt8"><button id="collabInvite">\u2709 \u041F\u0440\u0438\u0433\u043B\u0430\u0441\u0438\u0442\u044C \u043F\u043E e-mail</button><button id="collabTeacher">\u0420\u0435\u0436\u0438\u043C \u043F\u0440\u0435\u043F\u043E\u0434\u0430\u0432\u0430\u0442\u0435\u043B\u044F</button></div>`,
+      <div class="repl-bar"><input id="collabMsg" placeholder="\u0421\u043E\u043E\u0431\u0449\u0435\u043D\u0438\u0435\u2026"><button class="mini-btn" id="collabSend">\u041E\u0442\u043F\u0440\u0430\u0432\u0438\u0442\u044C</button></div>
+      <div class="tabs-line mt8"><button id="collabInvite">\u041F\u0440\u0438\u0433\u043B\u0430\u0441\u0438\u0442\u044C \u043F\u043E e-mail</button><button id="collabTeacher">\u0420\u0435\u0436\u0438\u043C \u043F\u0440\u0435\u043F\u043E\u0434\u0430\u0432\u0430\u0442\u0435\u043B\u044F</button></div>`,
       onMount: (root) => {
         const chat = root.querySelector("#collabChat");
         const send2 = () => {
@@ -50424,115 +51811,294 @@ frame();`;
     });
   }
 
+  // app/src/core/liveserver.js
+  init_core();
+  init_state();
+  init_icons();
+  var status = { running: false, url: "", port: 5500, version: 0, mode: "local" };
+  var lastPayload = "";
+  function liveStatus() {
+    return { ...status };
+  }
+  function apiToken2() {
+    const m = document.querySelector('meta[name="runlet-api-token"]');
+    const t2 = m?.getAttribute("content") || "";
+    return /^[a-f0-9]{32,128}$/i.test(t2) ? t2 : "";
+  }
+  function projectPayload() {
+    const files = {};
+    let total = 0;
+    for (const [p, f] of Object.entries(state.files)) {
+      if (typeof p !== "string" || typeof f?.content !== "string") continue;
+      total += f.content.length;
+      if (total > 6 * 1024 * 1024) break;
+      files[p] = f.content;
+    }
+    return { files, entry: state.entry || "index.html" };
+  }
+  function updateBar() {
+    const st = $("#liveState"), url = $("#liveUrl");
+    if (st) {
+      st.classList.toggle("on", status.running);
+      st.innerHTML = `<i></i><span>${status.running ? "Live Server \u0432\u043A\u043B\u044E\u0447\u0451\u043D" : "Live Server \u0432\u044B\u043A\u043B"}</span>`;
+    }
+    if (url) {
+      url.textContent = status.running ? status.url : "\u2014";
+      url.title = status.running ? status.url : "";
+    }
+    emit("live:changed", { ...status });
+  }
+  async function startLiveServer() {
+    const payload = projectPayload();
+    try {
+      if (window.runlet?.liveStart) {
+        const port = state.settings.livePort || 5500;
+        const res = await window.runlet.liveStart({ port, project: payload });
+        if (!res?.ok) throw new Error(res?.error || "\u043D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u0437\u0430\u043F\u0443\u0441\u0442\u0438\u0442\u044C \u0441\u0435\u0440\u0432\u0435\u0440");
+        status.running = true;
+        status.url = res.url;
+        status.port = res.port || port;
+        status.mode = "electron";
+      } else {
+        const res = await fetch("/api/live/project", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json", ...apiToken2() ? { "X-Runlet-Token": apiToken2() } : {} },
+          body: JSON.stringify(payload)
+        });
+        const j = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(j.error || "HTTP " + res.status);
+        status.running = true;
+        status.url = new URL(j.url || "/live/", location.href).href;
+        status.port = j.port || 0;
+        status.mode = "browser";
+      }
+      lastPayload = JSON.stringify(payload);
+      updateBar();
+      toast("Live Server \u0437\u0430\u043F\u0443\u0449\u0435\u043D: " + status.url, "ok");
+      emit("live:started", { ...status });
+      return status;
+    } catch (e) {
+      status.running = false;
+      updateBar();
+      toast("Live Server: " + e.message, "err");
+      return status;
+    }
+  }
+  async function stopLiveServer() {
+    try {
+      if (window.runlet?.liveStop) await window.runlet.liveStop();
+      else await fetch("/api/live/project", {
+        method: "DELETE",
+        headers: { ...apiToken2() ? { "X-Runlet-Token": apiToken2() } : {} }
+      });
+    } catch (_) {
+    }
+    status.running = false;
+    status.url = "";
+    lastPayload = "";
+    updateBar();
+    emit("live:stopped", { ...status });
+    toast("Live Server \u043E\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D", "info");
+    return status;
+  }
+  function toggleLiveServer() {
+    return status.running ? stopLiveServer() : startLiveServer();
+  }
+  async function pushLiveFiles() {
+    if (!status.running) return;
+    const payload = projectPayload();
+    const packed = JSON.stringify(payload);
+    if (packed === lastPayload) return;
+    lastPayload = packed;
+    try {
+      if (window.runlet?.liveUpdate) {
+        const res = await window.runlet.liveUpdate({ project: payload });
+        if (res?.ok) status.version = res.version || status.version + 1;
+      } else {
+        const res = await fetch("/api/live/project", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json", ...apiToken2() ? { "X-Runlet-Token": apiToken2() } : {} },
+          body: packed
+        });
+        const j = await res.json().catch(() => ({}));
+        if (res.ok) status.version = j.version || status.version + 1;
+      }
+    } catch (e) {
+    }
+  }
+  function openSiteWindow2() {
+    if (status.running && status.url) return ctx.openSiteWindowRaw?.(status.url, null);
+    toast("Live Server \u0432\u044B\u043A\u043B\u044E\u0447\u0435\u043D \u2014 \u043E\u0442\u043A\u0440\u044B\u0432\u0430\u044E \u043F\u0440\u0435\u0434\u043F\u0440\u043E\u0441\u043C\u043E\u0442\u0440 \u0432 \u043E\u043A\u043D\u0435", "info");
+    return ctx.openSiteWindowRaw?.(null, ctx.srcdoc?.());
+  }
+  function openSiteExternal() {
+    if (!status.running || !status.url) {
+      toast("\u0421\u043D\u0430\u0447\u0430\u043B\u0430 \u0437\u0430\u043F\u0443\u0441\u0442\u0438\u0442\u0435 Live Server", "warn");
+      return;
+    }
+    if (window.runlet?.liveExternal) {
+      window.runlet.liveExternal(status.port).then((ok) => {
+        if (!ok) toast("\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u043E\u0442\u043A\u0440\u044B\u0442\u044C \u0431\u0440\u0430\u0443\u0437\u0435\u0440", "err");
+      });
+    } else {
+      const w = window.open(status.url, "_blank", "noopener,noreferrer");
+      if (!w) toast("\u0411\u0440\u0430\u0443\u0437\u0435\u0440 \u0437\u0430\u0431\u043B\u043E\u043A\u0438\u0440\u043E\u0432\u0430\u043B \u043D\u043E\u0432\u043E\u0435 \u043E\u043A\u043D\u043E", "err");
+    }
+  }
+  function liveServerDialog() {
+    const port = state.settings.livePort || 5500;
+    ctx.modal({
+      title: "Live Server",
+      narrow: true,
+      body: `<div class="beginner">\u041B\u043E\u043A\u0430\u043B\u044C\u043D\u044B\u0439 \u0441\u0435\u0440\u0432\u0435\u0440 \u043E\u0442\u0434\u0430\u0451\u0442 \u0444\u0430\u0439\u043B\u044B \u043F\u0440\u043E\u0435\u043A\u0442\u0430 \u043F\u043E \u043D\u0430\u0441\u0442\u043E\u044F\u0449\u0438\u043C \u0430\u0434\u0440\u0435\u0441\u0430\u043C.
+      \u041E\u0442\u043D\u043E\u0441\u0438\u0442\u0435\u043B\u044C\u043D\u044B\u0435 \u043F\u0443\u0442\u0438, ES-\u043C\u043E\u0434\u0443\u043B\u0438 \u0438 <code class="inline">fetch()</code> \u0440\u0430\u0431\u043E\u0442\u0430\u044E\u0442 \u043A\u0430\u043A \u043D\u0430 \u0440\u0435\u0430\u043B\u044C\u043D\u043E\u043C \u0441\u0430\u0439\u0442\u0435.
+      \u041F\u0440\u0438 \u0438\u0437\u043C\u0435\u043D\u0435\u043D\u0438\u0438 \u043A\u043E\u0434\u0430 \u0441\u0442\u0440\u0430\u043D\u0438\u0446\u0430 \u043E\u0431\u043D\u043E\u0432\u043B\u044F\u0435\u0442\u0441\u044F \u0441\u0430\u043C\u0430.</div>
+      <div class="field mt8"><label>\u041F\u043E\u0440\u0442 (Electron)</label><input id="livePort" type="number" value="${port}" min="1024" max="65535"></div>
+      <div class="list-rows mt8">
+        <div class="list-row"><b>\u0421\u0442\u0430\u0442\u0443\u0441</b><div class="grow" style="text-align:right">${status.running ? "\u0432\u043A\u043B\u044E\u0447\u0451\u043D" : "\u0432\u044B\u043A\u043B\u044E\u0447\u0435\u043D"}</div></div>
+        <div class="list-row"><b>\u0410\u0434\u0440\u0435\u0441</b><div class="grow" style="text-align:right;font:10px var(--mono)">${status.running ? status.url : "\u2014"}</div></div>
+      </div>
+      <div class="rowflex mt8"><button class="mini-btn" id="liveToggle">${status.running ? "\u041E\u0441\u0442\u0430\u043D\u043E\u0432\u0438\u0442\u044C" : "\u0417\u0430\u043F\u0443\u0441\u0442\u0438\u0442\u044C"}</button>
+        <button class="mini-btn" id="liveOpen">\u041E\u0442\u043A\u0440\u044B\u0442\u044C \u0432 \u043E\u043A\u043D\u0435</button><button class="mini-btn" id="liveExt">\u0412 \u0431\u0440\u0430\u0443\u0437\u0435\u0440\u0435</button></div>`,
+      okText: "\u0413\u043E\u0442\u043E\u0432\u043E",
+      onMount: (root) => {
+        root.querySelector("#liveToggle").onclick = async () => {
+          const p = +root.querySelector("#livePort").value || 5500;
+          state.settings.livePort = Math.max(1024, Math.min(65535, p));
+          ctx.applySettings?.();
+          await toggleLiveServer();
+          ctx.closeModal?.();
+        };
+        root.querySelector("#liveOpen").onclick = () => {
+          openSiteWindow2();
+          ctx.closeModal?.();
+        };
+        root.querySelector("#liveExt").onclick = () => {
+          openSiteExternal();
+          ctx.closeModal?.();
+        };
+      }
+    });
+  }
+  function initLiveServer() {
+    updateBar();
+    on("files:changed", debounce(() => pushLiveFiles(), 450));
+    on("project:opened", () => {
+      if (status.running) pushLiveFiles();
+    });
+    ctx.liveStatus = liveStatus;
+    ctx.openSiteWindow = openSiteWindow2;
+    ctx.pushLiveFiles = pushLiveFiles;
+    emit("live:ready");
+  }
+
   // app/src/core/commands.js
+  init_threeD();
+  init_icons();
   var K = (id2) => state.settings.keybindings[id2] || "";
-  function cmd2(id2, title, group, icon, fn, opts = {}) {
-    registerCommand(id2, { title, group, icon, key: K(id2), hint: opts.hint, hidden: opts.hidden, run: fn });
+  function cmd2(id2, title, group, icon2, fn, opts = {}) {
+    registerCommand(id2, { title, group, icon: icon2, key: K(id2), hint: opts.hint, hidden: opts.hidden, run: fn });
   }
   function initCommands() {
-    cmd2("run", "\u0417\u0430\u043F\u0443\u0441\u0442\u0438\u0442\u044C \u043F\u0440\u0435\u0434\u043F\u0440\u043E\u0441\u043C\u043E\u0442\u0440", "\u041E\u0441\u043D\u043E\u0432\u043D\u043E\u0435", "\u25B6", () => {
+    cmd2("run", "\u0417\u0430\u043F\u0443\u0441\u0442\u0438\u0442\u044C \u043F\u0440\u0435\u0434\u043F\u0440\u043E\u0441\u043C\u043E\u0442\u0440", "\u041E\u0441\u043D\u043E\u0432\u043D\u043E\u0435", "play", () => {
       run("full");
       toast("\u041F\u0440\u0435\u0434\u043F\u0440\u043E\u0441\u043C\u043E\u0442\u0440 \u043E\u0431\u043D\u043E\u0432\u043B\u0451\u043D", "ok");
     });
-    cmd2("analyze", "\u041F\u0440\u043E\u0430\u043D\u0430\u043B\u0438\u0437\u0438\u0440\u043E\u0432\u0430\u0442\u044C \u043A\u043E\u0434", "\u041E\u0441\u043D\u043E\u0432\u043D\u043E\u0435", "\u{1F9E0}", () => runAnalysis2());
-    cmd2("analysisReport", "\u041F\u043E\u043B\u043D\u044B\u0439 \u043E\u0442\u0447\u0451\u0442 \u0430\u043D\u0430\u043B\u0438\u0437\u0430", "\u041E\u0441\u043D\u043E\u0432\u043D\u043E\u0435", "\u{1F4CA}", () => fullAnalysisReport());
-    cmd2("fixAll", "\u0418\u0441\u043F\u0440\u0430\u0432\u0438\u0442\u044C \u0431\u0435\u0437\u043E\u043F\u0430\u0441\u043D\u044B\u0435 \u043E\u0448\u0438\u0431\u043A\u0438", "\u041E\u0441\u043D\u043E\u0432\u043D\u043E\u0435", "\u{1F6E0}", () => fixAllSafe());
-    cmd2("palette", "\u041F\u0430\u043B\u0438\u0442\u0440\u0430 \u043A\u043E\u043C\u0430\u043D\u0434", "\u041E\u0441\u043D\u043E\u0432\u043D\u043E\u0435", "\u2318", () => commandPalette());
-    cmd2("format", "\u0424\u043E\u0440\u043C\u0430\u0442\u0438\u0440\u043E\u0432\u0430\u0442\u044C \u0430\u043A\u0442\u0438\u0432\u043D\u044B\u0439 \u0444\u0430\u0439\u043B", "\u041E\u0441\u043D\u043E\u0432\u043D\u043E\u0435", "\u2318", () => formatDoc());
-    cmd2("save", "\u0421\u043E\u0445\u0440\u0430\u043D\u0438\u0442\u044C \u043F\u0440\u043E\u0435\u043A\u0442", "\u041E\u0441\u043D\u043E\u0432\u043D\u043E\u0435", "\u{1F4BE}", () => {
+    cmd2("analyze", "\u041F\u0440\u043E\u0430\u043D\u0430\u043B\u0438\u0437\u0438\u0440\u043E\u0432\u0430\u0442\u044C \u043A\u043E\u0434", "\u041E\u0441\u043D\u043E\u0432\u043D\u043E\u0435", "chart", () => runAnalysis2());
+    cmd2("analysisReport", "\u041F\u043E\u043B\u043D\u044B\u0439 \u043E\u0442\u0447\u0451\u0442 \u0430\u043D\u0430\u043B\u0438\u0437\u0430", "\u041E\u0441\u043D\u043E\u0432\u043D\u043E\u0435", "chart", () => fullAnalysisReport());
+    cmd2("fixAll", "\u0418\u0441\u043F\u0440\u0430\u0432\u0438\u0442\u044C \u0431\u0435\u0437\u043E\u043F\u0430\u0441\u043D\u044B\u0435 \u043E\u0448\u0438\u0431\u043A\u0438", "\u041E\u0441\u043D\u043E\u0432\u043D\u043E\u0435", "wand", () => fixAllSafe());
+    cmd2("palette", "\u041F\u0430\u043B\u0438\u0442\u0440\u0430 \u043A\u043E\u043C\u0430\u043D\u0434", "\u041E\u0441\u043D\u043E\u0432\u043D\u043E\u0435", "format", () => commandPalette());
+    cmd2("format", "\u0424\u043E\u0440\u043C\u0430\u0442\u0438\u0440\u043E\u0432\u0430\u0442\u044C \u0430\u043A\u0442\u0438\u0432\u043D\u044B\u0439 \u0444\u0430\u0439\u043B", "\u041E\u0441\u043D\u043E\u0432\u043D\u043E\u0435", "format", () => formatDoc());
+    cmd2("save", "\u0421\u043E\u0445\u0440\u0430\u043D\u0438\u0442\u044C \u043F\u0440\u043E\u0435\u043A\u0442", "\u041E\u0441\u043D\u043E\u0432\u043D\u043E\u0435", "save", () => {
       persistNow();
       toast("\u041F\u0440\u043E\u0435\u043A\u0442 \u0441\u043E\u0445\u0440\u0430\u043D\u0451\u043D", "ok");
     });
-    cmd2("download", "\u0421\u043A\u0430\u0447\u0430\u0442\u044C \u043F\u0440\u043E\u0435\u043A\u0442 (ZIP)", "\u041E\u0441\u043D\u043E\u0432\u043D\u043E\u0435", "\u2B07", () => exportZip());
-    cmd2("settings", "\u041D\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0438", "\u041E\u0441\u043D\u043E\u0432\u043D\u043E\u0435", "\u2699", () => settingsModal());
-    cmd2("shortcuts", "\u0413\u043E\u0440\u044F\u0447\u0438\u0435 \u043A\u043B\u0430\u0432\u0438\u0448\u0438", "\u041E\u0441\u043D\u043E\u0432\u043D\u043E\u0435", "\u2328", () => shortcutsModal());
-    cmd2("theme", "\u0421\u043C\u0435\u043D\u0438\u0442\u044C \u0442\u0435\u043C\u0443", "\u041E\u0441\u043D\u043E\u0432\u043D\u043E\u0435", "\u{1F313}", () => cycleTheme());
-    cmd2("density", "\u041F\u043B\u043E\u0442\u043D\u043E\u0441\u0442\u044C \u0438\u043D\u0442\u0435\u0440\u0444\u0435\u0439\u0441\u0430", "\u041E\u0441\u043D\u043E\u0432\u043D\u043E\u0435", "\u2195", () => cycleDensity());
-    cmd2("tour", "\u0411\u044B\u0441\u0442\u0440\u044B\u0439 \u0442\u0443\u0440", "\u041E\u0441\u043D\u043E\u0432\u043D\u043E\u0435", "\u{1F680}", () => startTour());
-    cmd2("startScreen", "\u0421\u0442\u0430\u0440\u0442\u043E\u0432\u044B\u0439 \u044D\u043A\u0440\u0430\u043D", "\u041E\u0441\u043D\u043E\u0432\u043D\u043E\u0435", "\u{1F3E0}", () => showStartScreen());
-    cmd2("assistant", "\u041E\u0442\u043A\u0440\u044B\u0442\u044C \u0430\u0441\u0441\u0438\u0441\u0442\u0435\u043D\u0442\u0430", "\u041E\u0441\u043D\u043E\u0432\u043D\u043E\u0435", "\u2726", () => {
-      selectInspTab("assistant");
-      setTimeout(() => $("#aiInput")?.focus(), 100);
-    });
-    cmd2("learn", "\u041E\u0442\u043A\u0440\u044B\u0442\u044C \u043E\u0431\u0443\u0447\u0435\u043D\u0438\u0435", "\u041E\u0441\u043D\u043E\u0432\u043D\u043E\u0435", "\u{1F393}", () => {
+    cmd2("download", "\u0421\u043A\u0430\u0447\u0430\u0442\u044C \u043F\u0440\u043E\u0435\u043A\u0442 (ZIP)", "\u041E\u0441\u043D\u043E\u0432\u043D\u043E\u0435", "download", () => exportZip());
+    cmd2("settings", "\u041D\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0438", "\u041E\u0441\u043D\u043E\u0432\u043D\u043E\u0435", "settings", () => settingsModal());
+    cmd2("shortcuts", "\u0413\u043E\u0440\u044F\u0447\u0438\u0435 \u043A\u043B\u0430\u0432\u0438\u0448\u0438", "\u041E\u0441\u043D\u043E\u0432\u043D\u043E\u0435", "keyboard", () => shortcutsModal());
+    cmd2("theme", "\u0421\u043C\u0435\u043D\u0438\u0442\u044C \u0442\u0435\u043C\u0443", "\u041E\u0441\u043D\u043E\u0432\u043D\u043E\u0435", "theme", () => cycleTheme());
+    cmd2("density", "\u041F\u043B\u043E\u0442\u043D\u043E\u0441\u0442\u044C \u0438\u043D\u0442\u0435\u0440\u0444\u0435\u0439\u0441\u0430", "\u041E\u0441\u043D\u043E\u0432\u043D\u043E\u0435", "density", () => cycleDensity());
+    cmd2("tour", "\u0411\u044B\u0441\u0442\u0440\u044B\u0439 \u0442\u0443\u0440", "\u041E\u0441\u043D\u043E\u0432\u043D\u043E\u0435", "help", () => startTour());
+    cmd2("startScreen", "\u0421\u0442\u0430\u0440\u0442\u043E\u0432\u044B\u0439 \u044D\u043A\u0440\u0430\u043D", "\u041E\u0441\u043D\u043E\u0432\u043D\u043E\u0435", "home", () => showStartScreen());
+    cmd2("learn", "\u041E\u0442\u043A\u0440\u044B\u0442\u044C \u043E\u0431\u0443\u0447\u0435\u043D\u0438\u0435", "\u041E\u0441\u043D\u043E\u0432\u043D\u043E\u0435", "book", () => {
       selectRailTab("learn");
       renderLearn();
     });
-    cmd2("features", "\u041A\u0430\u0440\u0442\u0430 500 \u0438\u0434\u0435\u0439", "\u041E\u0441\u043D\u043E\u0432\u043D\u043E\u0435", "\u{1F4CB}", () => {
+    cmd2("features", "\u041A\u0430\u0440\u0442\u0430 500 \u0438\u0434\u0435\u0439", "\u041E\u0441\u043D\u043E\u0432\u043D\u043E\u0435", "list", () => {
       selectRailTab("features");
       initFeatures();
     });
-    cmd2("applySettings", "\u041F\u0440\u0438\u043C\u0435\u043D\u0438\u0442\u044C \u043D\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0438", "\u041E\u0441\u043D\u043E\u0432\u043D\u043E\u0435", "\u21BB", () => {
+    cmd2("applySettings", "\u041F\u0440\u0438\u043C\u0435\u043D\u0438\u0442\u044C \u043D\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0438", "\u041E\u0441\u043D\u043E\u0432\u043D\u043E\u0435", "refresh", () => {
       applySettings();
       applyEditorSettings();
     }, { hidden: true });
-    cmd2("layoutColumns", "\u0420\u0430\u0441\u043A\u043B\u0430\u0434\u043A\u0430: \u0442\u0440\u0438 \u043A\u043E\u043B\u043E\u043D\u043A\u0438", "\u0420\u0430\u0441\u043A\u043B\u0430\u0434\u043A\u0430", "\u25A5", () => applyLayout("columns"));
-    cmd2("layoutRows", "\u0420\u0430\u0441\u043A\u043B\u0430\u0434\u043A\u0430: \u0442\u0440\u0438 \u0441\u0442\u0440\u043E\u043A\u0438", "\u0420\u0430\u0441\u043A\u043B\u0430\u0434\u043A\u0430", "\u2630", () => applyLayout("rows"));
-    cmd2("layoutTabs", "\u0420\u0430\u0441\u043A\u043B\u0430\u0434\u043A\u0430: \u0432\u043A\u043B\u0430\u0434\u043A\u0438", "\u0420\u0430\u0441\u043A\u043B\u0430\u0434\u043A\u0430", "\u25A4", () => applyLayout("tabs"));
-    cmd2("collapsePane", "\u0421\u0432\u0435\u0440\u043D\u0443\u0442\u044C \u043F\u0430\u043D\u0435\u043B\u044C", "\u0420\u0430\u0441\u043A\u043B\u0430\u0434\u043A\u0430", "\u2014", (p) => collapsePane(typeof p === "string" ? p : state.activePane));
-    cmd2("fullscreenPane", "\u041F\u0430\u043D\u0435\u043B\u044C \u043D\u0430 \u0432\u0435\u0441\u044C \u044D\u043A\u0440\u0430\u043D", "\u0420\u0430\u0441\u043A\u043B\u0430\u0434\u043A\u0430", "\u26F6", (p) => fullscreenPane(typeof p === "string" ? p : state.activePane));
-    cmd2("formatHtml", "\u0424\u043E\u0440\u043C\u0430\u0442\u0438\u0440\u043E\u0432\u0430\u0442\u044C HTML", "\u0420\u0435\u0434\u0430\u043A\u0442\u0438\u0440\u043E\u0432\u0430\u043D\u0438\u0435", "\u2318", () => formatDoc("html"));
-    cmd2("formatCss", "\u0424\u043E\u0440\u043C\u0430\u0442\u0438\u0440\u043E\u0432\u0430\u0442\u044C CSS", "\u0420\u0435\u0434\u0430\u043A\u0442\u0438\u0440\u043E\u0432\u0430\u043D\u0438\u0435", "\u2318", () => formatDoc("css"));
-    cmd2("formatJs", "\u0424\u043E\u0440\u043C\u0430\u0442\u0438\u0440\u043E\u0432\u0430\u0442\u044C JS", "\u0420\u0435\u0434\u0430\u043A\u0442\u0438\u0440\u043E\u0432\u0430\u043D\u0438\u0435", "\u2318", () => formatDoc("js"));
-    cmd2("minifyHtml", "\u041C\u0438\u043D\u0438\u0444\u0438\u0446\u0438\u0440\u043E\u0432\u0430\u0442\u044C HTML", "\u0420\u0435\u0434\u0430\u043A\u0442\u0438\u0440\u043E\u0432\u0430\u043D\u0438\u0435", "\u21E4", () => minifyDoc("html"));
-    cmd2("minifyCss", "\u041C\u0438\u043D\u0438\u0444\u0438\u0446\u0438\u0440\u043E\u0432\u0430\u0442\u044C CSS", "\u0420\u0435\u0434\u0430\u043A\u0442\u0438\u0440\u043E\u0432\u0430\u043D\u0438\u0435", "\u21E4", () => minifyDoc("css"));
-    cmd2("minifyJs", "\u041C\u0438\u043D\u0438\u0444\u0438\u0446\u0438\u0440\u043E\u0432\u0430\u0442\u044C JS", "\u0420\u0435\u0434\u0430\u043A\u0442\u0438\u0440\u043E\u0432\u0430\u043D\u0438\u0435", "\u21E4", () => minifyDoc("js"));
-    cmd2("sortCss", "\u0421\u043E\u0440\u0442\u0438\u0440\u043E\u0432\u0430\u0442\u044C CSS-\u0441\u0432\u043E\u0439\u0441\u0442\u0432\u0430", "\u0420\u0435\u0434\u0430\u043A\u0442\u0438\u0440\u043E\u0432\u0430\u043D\u0438\u0435", "\u21C5", () => sortCssProps("css"));
-    cmd2("trimTrailing", "\u0423\u0431\u0440\u0430\u0442\u044C \u043F\u0440\u043E\u0431\u0435\u043B\u044B \u0432 \u043A\u043E\u043D\u0446\u0435 \u0441\u0442\u0440\u043E\u043A", "\u0420\u0435\u0434\u0430\u043A\u0442\u0438\u0440\u043E\u0432\u0430\u043D\u0438\u0435", "\u232B", () => {
+    cmd2("layoutColumns", "\u0420\u0430\u0441\u043A\u043B\u0430\u0434\u043A\u0430: \u0442\u0440\u0438 \u043A\u043E\u043B\u043E\u043D\u043A\u0438", "\u0420\u0430\u0441\u043A\u043B\u0430\u0434\u043A\u0430", "columns", () => applyLayout("columns"));
+    cmd2("layoutRows", "\u0420\u0430\u0441\u043A\u043B\u0430\u0434\u043A\u0430: \u0442\u0440\u0438 \u0441\u0442\u0440\u043E\u043A\u0438", "\u0420\u0430\u0441\u043A\u043B\u0430\u0434\u043A\u0430", "rows", () => applyLayout("rows"));
+    cmd2("layoutTabs", "\u0420\u0430\u0441\u043A\u043B\u0430\u0434\u043A\u0430: \u0432\u043A\u043B\u0430\u0434\u043A\u0438", "\u0420\u0430\u0441\u043A\u043B\u0430\u0434\u043A\u0430", "tabs", () => applyLayout("tabs"));
+    cmd2("collapsePane", "\u0421\u0432\u0435\u0440\u043D\u0443\u0442\u044C \u043F\u0430\u043D\u0435\u043B\u044C", "\u0420\u0430\u0441\u043A\u043B\u0430\u0434\u043A\u0430", "minus", (p) => collapsePane(typeof p === "string" ? p : state.activePane));
+    cmd2("fullscreenPane", "\u041F\u0430\u043D\u0435\u043B\u044C \u043D\u0430 \u0432\u0435\u0441\u044C \u044D\u043A\u0440\u0430\u043D", "\u0420\u0430\u0441\u043A\u043B\u0430\u0434\u043A\u0430", "maximize", (p) => fullscreenPane(typeof p === "string" ? p : state.activePane));
+    cmd2("formatHtml", "\u0424\u043E\u0440\u043C\u0430\u0442\u0438\u0440\u043E\u0432\u0430\u0442\u044C HTML", "\u0420\u0435\u0434\u0430\u043A\u0442\u0438\u0440\u043E\u0432\u0430\u043D\u0438\u0435", "format", () => formatDoc("html"));
+    cmd2("formatCss", "\u0424\u043E\u0440\u043C\u0430\u0442\u0438\u0440\u043E\u0432\u0430\u0442\u044C CSS", "\u0420\u0435\u0434\u0430\u043A\u0442\u0438\u0440\u043E\u0432\u0430\u043D\u0438\u0435", "format", () => formatDoc("css"));
+    cmd2("formatJs", "\u0424\u043E\u0440\u043C\u0430\u0442\u0438\u0440\u043E\u0432\u0430\u0442\u044C JS", "\u0420\u0435\u0434\u0430\u043A\u0442\u0438\u0440\u043E\u0432\u0430\u043D\u0438\u0435", "format", () => formatDoc("js"));
+    cmd2("minifyHtml", "\u041C\u0438\u043D\u0438\u0444\u0438\u0446\u0438\u0440\u043E\u0432\u0430\u0442\u044C HTML", "\u0420\u0435\u0434\u0430\u043A\u0442\u0438\u0440\u043E\u0432\u0430\u043D\u0438\u0435", "indent", () => minifyDoc("html"));
+    cmd2("minifyCss", "\u041C\u0438\u043D\u0438\u0444\u0438\u0446\u0438\u0440\u043E\u0432\u0430\u0442\u044C CSS", "\u0420\u0435\u0434\u0430\u043A\u0442\u0438\u0440\u043E\u0432\u0430\u043D\u0438\u0435", "indent", () => minifyDoc("css"));
+    cmd2("minifyJs", "\u041C\u0438\u043D\u0438\u0444\u0438\u0446\u0438\u0440\u043E\u0432\u0430\u0442\u044C JS", "\u0420\u0435\u0434\u0430\u043A\u0442\u0438\u0440\u043E\u0432\u0430\u043D\u0438\u0435", "indent", () => minifyDoc("js"));
+    cmd2("sortCss", "\u0421\u043E\u0440\u0442\u0438\u0440\u043E\u0432\u0430\u0442\u044C CSS-\u0441\u0432\u043E\u0439\u0441\u0442\u0432\u0430", "\u0420\u0435\u0434\u0430\u043A\u0442\u0438\u0440\u043E\u0432\u0430\u043D\u0438\u0435", "list", () => sortCssProps("css"));
+    cmd2("trimTrailing", "\u0423\u0431\u0440\u0430\u0442\u044C \u043F\u0440\u043E\u0431\u0435\u043B\u044B \u0432 \u043A\u043E\u043D\u0446\u0435 \u0441\u0442\u0440\u043E\u043A", "\u0420\u0435\u0434\u0430\u043A\u0442\u0438\u0440\u043E\u0432\u0430\u043D\u0438\u0435", "scissors", () => {
       trimTrailing();
       toast("\u041F\u0440\u043E\u0431\u0435\u043B\u044B \u0443\u0434\u0430\u043B\u0435\u043D\u044B", "ok");
     });
-    cmd2("tabsToSpaces", "\u0422\u0430\u0431\u044B \u2192 \u043F\u0440\u043E\u0431\u0435\u043B\u044B", "\u0420\u0435\u0434\u0430\u043A\u0442\u0438\u0440\u043E\u0432\u0430\u043D\u0438\u0435", "\u2192", () => tabsToSpaces());
-    cmd2("spacesToTabs", "\u041F\u0440\u043E\u0431\u0435\u043B\u044B \u2192 \u0442\u0430\u0431\u044B", "\u0420\u0435\u0434\u0430\u043A\u0442\u0438\u0440\u043E\u0432\u0430\u043D\u0438\u0435", "\u2190", () => spacesToTabs());
-    cmd2("foldAll", "\u0421\u0432\u0435\u0440\u043D\u0443\u0442\u044C \u0432\u0441\u0435 \u0440\u0435\u0433\u0438\u043E\u043D\u044B", "\u0420\u0435\u0434\u0430\u043A\u0442\u0438\u0440\u043E\u0432\u0430\u043D\u0438\u0435", "\u2304", () => toggleFoldAll());
-    cmd2("unfoldAll", "\u0420\u0430\u0437\u0432\u0435\u0440\u043D\u0443\u0442\u044C \u0432\u0441\u0451", "\u0420\u0435\u0434\u0430\u043A\u0442\u0438\u0440\u043E\u0432\u0430\u043D\u0438\u0435", "\u2303", () => unfoldAllPane());
-    cmd2("snippets", "\u0412\u0441\u0442\u0430\u0432\u0438\u0442\u044C \u0441\u043D\u0438\u043F\u043F\u0435\u0442", "\u0420\u0435\u0434\u0430\u043A\u0442\u0438\u0440\u043E\u0432\u0430\u043D\u0438\u0435", "\u2726", () => snippetsModal());
-    cmd2("emmet", "\u0420\u0430\u0437\u0432\u0435\u0440\u043D\u0443\u0442\u044C Emmet", "\u0420\u0435\u0434\u0430\u043A\u0442\u0438\u0440\u043E\u0432\u0430\u043D\u0438\u0435", "\u26A1", () => expandEmmet());
-    cmd2("gotoLine", "\u041F\u0435\u0440\u0435\u0439\u0442\u0438 \u043A \u0441\u0442\u0440\u043E\u043A\u0435", "\u0420\u0435\u0434\u0430\u043A\u0442\u0438\u0440\u043E\u0432\u0430\u043D\u0438\u0435", "\u2197", () => gotoLineDialog());
-    cmd2("duplicateLine", "\u0414\u0443\u0431\u043B\u0438\u0440\u043E\u0432\u0430\u0442\u044C \u0441\u0442\u0440\u043E\u043A\u0443", "\u0420\u0435\u0434\u0430\u043A\u0442\u0438\u0440\u043E\u0432\u0430\u043D\u0438\u0435", "\u29C9", () => cmCommand("duplicateLine"));
-    cmd2("moveLineUp", "\u041F\u0435\u0440\u0435\u043C\u0435\u0441\u0442\u0438\u0442\u044C \u0441\u0442\u0440\u043E\u043A\u0443 \u0432\u0432\u0435\u0440\u0445", "\u0420\u0435\u0434\u0430\u043A\u0442\u0438\u0440\u043E\u0432\u0430\u043D\u0438\u0435", "\u2191", () => cmCommand("moveLineUp"));
-    cmd2("moveLineDown", "\u041F\u0435\u0440\u0435\u043C\u0435\u0441\u0442\u0438\u0442\u044C \u0441\u0442\u0440\u043E\u043A\u0443 \u0432\u043D\u0438\u0437", "\u0420\u0435\u0434\u0430\u043A\u0442\u0438\u0440\u043E\u0432\u0430\u043D\u0438\u0435", "\u2193", () => cmCommand("moveLineDown"));
-    cmd2("toggleComment", "\u0417\u0430\u043A\u043E\u043C\u043C\u0435\u043D\u0442\u0438\u0440\u043E\u0432\u0430\u0442\u044C \u0441\u0442\u0440\u043E\u043A\u0443", "\u0420\u0435\u0434\u0430\u043A\u0442\u0438\u0440\u043E\u0432\u0430\u043D\u0438\u0435", "//", () => cmCommand("toggleComment"));
-    cmd2("multiCursor", "\u041C\u0443\u043B\u044C\u0442\u0438\u043A\u0443\u0440\u0441\u043E\u0440 (Ctrl+D)", "\u0420\u0435\u0434\u0430\u043A\u0442\u0438\u0440\u043E\u0432\u0430\u043D\u0438\u0435", "\u22EE", () => cmCommand("selectNextOccurrence"));
-    cmd2("selectAllOccurrences", "\u0412\u044B\u0434\u0435\u043B\u0438\u0442\u044C \u0432\u0441\u0435 \u0432\u0445\u043E\u0436\u0434\u0435\u043D\u0438\u044F", "\u0420\u0435\u0434\u0430\u043A\u0442\u0438\u0440\u043E\u0432\u0430\u043D\u0438\u0435", "\u25CE", () => cmCommand("selectSelectionMatches"));
-    cmd2("complete", "\u0410\u0432\u0442\u043E\u0434\u043E\u043F\u043E\u043B\u043D\u0435\u043D\u0438\u0435", "\u0420\u0435\u0434\u0430\u043A\u0442\u0438\u0440\u043E\u0432\u0430\u043D\u0438\u0435", "\u2328", () => cmCommand("startCompletion"));
-    cmd2("find", "\u041D\u0430\u0439\u0442\u0438 \u0432 \u0444\u0430\u0439\u043B\u0435", "\u0420\u0435\u0434\u0430\u043A\u0442\u0438\u0440\u043E\u0432\u0430\u043D\u0438\u0435", "\u{1F50D}", () => cmCommand("find"));
-    cmd2("undo", "\u041E\u0442\u043C\u0435\u043D\u0438\u0442\u044C", "\u0420\u0435\u0434\u0430\u043A\u0442\u0438\u0440\u043E\u0432\u0430\u043D\u0438\u0435", "\u21B6", () => {
+    cmd2("tabsToSpaces", "\u0422\u0430\u0431\u044B \u2192 \u043F\u0440\u043E\u0431\u0435\u043B\u044B", "\u0420\u0435\u0434\u0430\u043A\u0442\u0438\u0440\u043E\u0432\u0430\u043D\u0438\u0435", "arrowRight", () => tabsToSpaces());
+    cmd2("spacesToTabs", "\u041F\u0440\u043E\u0431\u0435\u043B\u044B \u2192 \u0442\u0430\u0431\u044B", "\u0420\u0435\u0434\u0430\u043A\u0442\u0438\u0440\u043E\u0432\u0430\u043D\u0438\u0435", "arrowLeft", () => spacesToTabs());
+    cmd2("foldAll", "\u0421\u0432\u0435\u0440\u043D\u0443\u0442\u044C \u0432\u0441\u0435 \u0440\u0435\u0433\u0438\u043E\u043D\u044B", "\u0420\u0435\u0434\u0430\u043A\u0442\u0438\u0440\u043E\u0432\u0430\u043D\u0438\u0435", "chevronDown", () => toggleFoldAll());
+    cmd2("unfoldAll", "\u0420\u0430\u0437\u0432\u0435\u0440\u043D\u0443\u0442\u044C \u0432\u0441\u0451", "\u0420\u0435\u0434\u0430\u043A\u0442\u0438\u0440\u043E\u0432\u0430\u043D\u0438\u0435", "chevronUp", () => unfoldAllPane());
+    cmd2("snippets", "\u0412\u0441\u0442\u0430\u0432\u0438\u0442\u044C \u0441\u043D\u0438\u043F\u043F\u0435\u0442", "\u0420\u0435\u0434\u0430\u043A\u0442\u0438\u0440\u043E\u0432\u0430\u043D\u0438\u0435", "brackets", () => snippetsModal());
+    cmd2("emmet", "\u0420\u0430\u0437\u0432\u0435\u0440\u043D\u0443\u0442\u044C Emmet", "\u0420\u0435\u0434\u0430\u043A\u0442\u0438\u0440\u043E\u0432\u0430\u043D\u0438\u0435", "wand", () => expandEmmet());
+    cmd2("gotoLine", "\u041F\u0435\u0440\u0435\u0439\u0442\u0438 \u043A \u0441\u0442\u0440\u043E\u043A\u0435", "\u0420\u0435\u0434\u0430\u043A\u0442\u0438\u0440\u043E\u0432\u0430\u043D\u0438\u0435", "arrowRight", () => gotoLineDialog());
+    cmd2("duplicateLine", "\u0414\u0443\u0431\u043B\u0438\u0440\u043E\u0432\u0430\u0442\u044C \u0441\u0442\u0440\u043E\u043A\u0443", "\u0420\u0435\u0434\u0430\u043A\u0442\u0438\u0440\u043E\u0432\u0430\u043D\u0438\u0435", "copy", () => cmCommand("duplicateLine"));
+    cmd2("moveLineUp", "\u041F\u0435\u0440\u0435\u043C\u0435\u0441\u0442\u0438\u0442\u044C \u0441\u0442\u0440\u043E\u043A\u0443 \u0432\u0432\u0435\u0440\u0445", "\u0420\u0435\u0434\u0430\u043A\u0442\u0438\u0440\u043E\u0432\u0430\u043D\u0438\u0435", "arrowUp", () => cmCommand("moveLineUp"));
+    cmd2("moveLineDown", "\u041F\u0435\u0440\u0435\u043C\u0435\u0441\u0442\u0438\u0442\u044C \u0441\u0442\u0440\u043E\u043A\u0443 \u0432\u043D\u0438\u0437", "\u0420\u0435\u0434\u0430\u043A\u0442\u0438\u0440\u043E\u0432\u0430\u043D\u0438\u0435", "arrowDown", () => cmCommand("moveLineDown"));
+    cmd2("toggleComment", "\u0417\u0430\u043A\u043E\u043C\u043C\u0435\u043D\u0442\u0438\u0440\u043E\u0432\u0430\u0442\u044C \u0441\u0442\u0440\u043E\u043A\u0443", "\u0420\u0435\u0434\u0430\u043A\u0442\u0438\u0440\u043E\u0432\u0430\u043D\u0438\u0435", "code", () => cmCommand("toggleComment"));
+    cmd2("multiCursor", "\u041C\u0443\u043B\u044C\u0442\u0438\u043A\u0443\u0440\u0441\u043E\u0440 (Ctrl+D)", "\u0420\u0435\u0434\u0430\u043A\u0442\u0438\u0440\u043E\u0432\u0430\u043D\u0438\u0435", "chevronRight", () => cmCommand("selectNextOccurrence"));
+    cmd2("selectAllOccurrences", "\u0412\u044B\u0434\u0435\u043B\u0438\u0442\u044C \u0432\u0441\u0435 \u0432\u0445\u043E\u0436\u0434\u0435\u043D\u0438\u044F", "\u0420\u0435\u0434\u0430\u043A\u0442\u0438\u0440\u043E\u0432\u0430\u043D\u0438\u0435", "chevronRight", () => cmCommand("selectSelectionMatches"));
+    cmd2("complete", "\u0410\u0432\u0442\u043E\u0434\u043E\u043F\u043E\u043B\u043D\u0435\u043D\u0438\u0435", "\u0420\u0435\u0434\u0430\u043A\u0442\u0438\u0440\u043E\u0432\u0430\u043D\u0438\u0435", "keyboard", () => cmCommand("startCompletion"));
+    cmd2("find", "\u041D\u0430\u0439\u0442\u0438 \u0432 \u0444\u0430\u0439\u043B\u0435", "\u0420\u0435\u0434\u0430\u043A\u0442\u0438\u0440\u043E\u0432\u0430\u043D\u0438\u0435", "search", () => cmCommand("find"));
+    cmd2("undo", "\u041E\u0442\u043C\u0435\u043D\u0438\u0442\u044C", "\u0420\u0435\u0434\u0430\u043A\u0442\u0438\u0440\u043E\u0432\u0430\u043D\u0438\u0435", "chevronRight", () => {
       const v = getActiveEditor();
       if (v) {
         undo(v);
         v.focus();
       }
     });
-    cmd2("redo", "\u041F\u043E\u0432\u0442\u043E\u0440\u0438\u0442\u044C", "\u0420\u0435\u0434\u0430\u043A\u0442\u0438\u0440\u043E\u0432\u0430\u043D\u0438\u0435", "\u21B7", () => {
+    cmd2("redo", "\u041F\u043E\u0432\u0442\u043E\u0440\u0438\u0442\u044C", "\u0420\u0435\u0434\u0430\u043A\u0442\u0438\u0440\u043E\u0432\u0430\u043D\u0438\u0435", "chevronRight", () => {
       const v = getActiveEditor();
       if (v) {
         redo(v);
         v.focus();
       }
     });
-    cmd2("cssLab", "CSS-\u043B\u0430\u0431\u043E\u0440\u0430\u0442\u043E\u0440\u0438\u044F", "\u0413\u0435\u043D\u0435\u0440\u0430\u0442\u043E\u0440\u044B", "\u25D0", () => cssLabModal());
-    cmd2("jsTools", "JS-\u0438\u043D\u0441\u0442\u0440\u0443\u043C\u0435\u043D\u0442\u044B", "\u0413\u0435\u043D\u0435\u0440\u0430\u0442\u043E\u0440\u044B", "\u2699", () => jsToolsModal());
-    cmd2("htmlTools", "HTML-\u0433\u0435\u043D\u0435\u0440\u0430\u0442\u043E\u0440\u044B", "\u0413\u0435\u043D\u0435\u0440\u0430\u0442\u043E\u0440\u044B", "\u{1F9F0}", () => htmlToolsModal());
-    cmd2("contrastTool", "\u041F\u0440\u043E\u0432\u0435\u0440\u043A\u0430 \u043A\u043E\u043D\u0442\u0440\u0430\u0441\u0442\u0430 WCAG", "\u0413\u0435\u043D\u0435\u0440\u0430\u0442\u043E\u0440\u044B", "\u25D1", () => contrastTool());
-    cmd2("colorTool", "\u041A\u043E\u043D\u0432\u0435\u0440\u0442\u0435\u0440 \u0446\u0432\u0435\u0442\u043E\u0432", "\u0413\u0435\u043D\u0435\u0440\u0430\u0442\u043E\u0440\u044B", "\u{1F3A8}", () => colorToolDialog());
-    cmd2("librarySearch", "\u041D\u0430\u0439\u0442\u0438 CDN-\u0431\u0438\u0431\u043B\u0438\u043E\u0442\u0435\u043A\u0443", "\u0413\u0435\u043D\u0435\u0440\u0430\u0442\u043E\u0440\u044B", "\u{1F4DA}", () => librarySearchDialog());
-    cmd2("generateSEO", "SEO-\u043C\u0435\u0442\u0430\u0442\u0435\u0433\u0438", "\u0413\u0435\u043D\u0435\u0440\u0430\u0442\u043E\u0440\u044B", "\u{1F50E}", () => {
+    cmd2("cssLab", "CSS-\u043B\u0430\u0431\u043E\u0440\u0430\u0442\u043E\u0440\u0438\u044F", "\u0413\u0435\u043D\u0435\u0440\u0430\u0442\u043E\u0440\u044B", "palette", () => cssLabModal());
+    cmd2("jsTools", "JS-\u0438\u043D\u0441\u0442\u0440\u0443\u043C\u0435\u043D\u0442\u044B", "\u0413\u0435\u043D\u0435\u0440\u0430\u0442\u043E\u0440\u044B", "settings", () => jsToolsModal());
+    cmd2("htmlTools", "HTML-\u0433\u0435\u043D\u0435\u0440\u0430\u0442\u043E\u0440\u044B", "\u0413\u0435\u043D\u0435\u0440\u0430\u0442\u043E\u0440\u044B", "braces", () => htmlToolsModal());
+    cmd2("contrastTool", "\u041F\u0440\u043E\u0432\u0435\u0440\u043A\u0430 \u043A\u043E\u043D\u0442\u0440\u0430\u0441\u0442\u0430 WCAG", "\u0413\u0435\u043D\u0435\u0440\u0430\u0442\u043E\u0440\u044B", "chevronRight", () => contrastTool());
+    cmd2("colorTool", "\u041A\u043E\u043D\u0432\u0435\u0440\u0442\u0435\u0440 \u0446\u0432\u0435\u0442\u043E\u0432", "\u0413\u0435\u043D\u0435\u0440\u0430\u0442\u043E\u0440\u044B", "palette", () => colorToolDialog());
+    cmd2("librarySearch", "\u041D\u0430\u0439\u0442\u0438 CDN-\u0431\u0438\u0431\u043B\u0438\u043E\u0442\u0435\u043A\u0443", "\u0413\u0435\u043D\u0435\u0440\u0430\u0442\u043E\u0440\u044B", "chevronRight", () => librarySearchDialog());
+    cmd2("generateSEO", "SEO-\u043C\u0435\u0442\u0430\u0442\u0435\u0433\u0438", "\u0413\u0435\u043D\u0435\u0440\u0430\u0442\u043E\u0440\u044B", "chevronRight", () => {
       insertText(generateSEO(), "html");
       toast("SEO-\u0442\u0435\u0433\u0438 \u0432\u0441\u0442\u0430\u0432\u043B\u0435\u043D\u044B", "ok");
     });
-    cmd2("extractCss", "\u0418\u0437\u0432\u043B\u0435\u0447\u044C CSS \u0438\u0437 HTML", "\u0413\u0435\u043D\u0435\u0440\u0430\u0442\u043E\u0440\u044B", "\u21E4", () => extractCssFromHtml());
-    cmd2("darkTheme", "\u0422\u0451\u043C\u043D\u0430\u044F \u0442\u0435\u043C\u0430 \u0438\u0437 \u0441\u0432\u0435\u0442\u043B\u043E\u0439", "\u0413\u0435\u043D\u0435\u0440\u0430\u0442\u043E\u0440\u044B", "\u{1F319}", () => {
+    cmd2("extractCss", "\u0418\u0437\u0432\u043B\u0435\u0447\u044C CSS \u0438\u0437 HTML", "\u0413\u0435\u043D\u0435\u0440\u0430\u0442\u043E\u0440\u044B", "indent", () => extractCssFromHtml());
+    cmd2("darkTheme", "\u0422\u0451\u043C\u043D\u0430\u044F \u0442\u0435\u043C\u0430 \u0438\u0437 \u0441\u0432\u0435\u0442\u043B\u043E\u0439", "\u0413\u0435\u043D\u0435\u0440\u0430\u0442\u043E\u0440\u044B", "chevronRight", () => {
       setDoc(darkThemeFrom(getDoc("css")), "css");
       toast("\u0426\u0432\u0435\u0442\u0430 \u0438\u043D\u0432\u0435\u0440\u0442\u0438\u0440\u043E\u0432\u0430\u043D\u044B", "ok");
     });
-    cmd2("mockData", "\u041C\u043E\u043A-\u0434\u0430\u043D\u043D\u044B\u0435 JSON", "\u0413\u0435\u043D\u0435\u0440\u0430\u0442\u043E\u0440\u044B", "\u{1F3B2}", () => insertText(generateMockData(6), "js"));
-    cmd2("newFile", "\u041D\u043E\u0432\u044B\u0439 \u0444\u0430\u0439\u043B", "\u0424\u0430\u0439\u043B\u044B", "\uFF0B", () => newFileDialog(false));
-    cmd2("newFolder", "\u041D\u043E\u0432\u0430\u044F \u043F\u0430\u043F\u043A\u0430", "\u0424\u0430\u0439\u043B\u044B", "\u{1F4C1}", () => newFileDialog(true));
-    cmd2("upload", "\u0417\u0430\u0433\u0440\u0443\u0437\u0438\u0442\u044C \u0444\u0430\u0439\u043B\u044B", "\u0424\u0430\u0439\u043B\u044B", "\u2191", () => $("#hiddenFileInput")?.click());
-    cmd2("renameFile", "\u041F\u0435\u0440\u0435\u0438\u043C\u0435\u043D\u043E\u0432\u0430\u0442\u044C \u0444\u0430\u0439\u043B", "\u0424\u0430\u0439\u043B\u044B", "\u270E", () => renameDialog(Object.values(state.panes).find((p) => p) || state.entry));
-    cmd2("deleteFile", "\u0423\u0434\u0430\u043B\u0438\u0442\u044C \u0444\u0430\u0439\u043B", "\u0424\u0430\u0439\u043B\u044B", "\u{1F5D1}", () => deleteConfirm(Object.values(state.panes).find((p) => p) || state.entry));
-    cmd2("duplicateFile", "\u0414\u0443\u0431\u043B\u0438\u0440\u043E\u0432\u0430\u0442\u044C \u0444\u0430\u0439\u043B", "\u0424\u0430\u0439\u043B\u044B", "\u29C9", () => {
+    cmd2("mockData", "\u041C\u043E\u043A-\u0434\u0430\u043D\u043D\u044B\u0435 JSON", "\u0413\u0435\u043D\u0435\u0440\u0430\u0442\u043E\u0440\u044B", "chevronRight", () => insertText(generateMockData(6), "js"));
+    cmd2("newFile", "\u041D\u043E\u0432\u044B\u0439 \u0444\u0430\u0439\u043B", "\u0424\u0430\u0439\u043B\u044B", "chevronRight", () => newFileDialog(false));
+    cmd2("newFolder", "\u041D\u043E\u0432\u0430\u044F \u043F\u0430\u043F\u043A\u0430", "\u0424\u0430\u0439\u043B\u044B", "chevronRight", () => newFileDialog(true));
+    cmd2("upload", "\u0417\u0430\u0433\u0440\u0443\u0437\u0438\u0442\u044C \u0444\u0430\u0439\u043B\u044B", "\u0424\u0430\u0439\u043B\u044B", "arrowUp", () => $("#hiddenFileInput")?.click());
+    cmd2("renameFile", "\u041F\u0435\u0440\u0435\u0438\u043C\u0435\u043D\u043E\u0432\u0430\u0442\u044C \u0444\u0430\u0439\u043B", "\u0424\u0430\u0439\u043B\u044B", "chevronRight", () => renameDialog(Object.values(state.panes).find((p) => p) || state.entry));
+    cmd2("deleteFile", "\u0423\u0434\u0430\u043B\u0438\u0442\u044C \u0444\u0430\u0439\u043B", "\u0424\u0430\u0439\u043B\u044B", "chevronRight", () => deleteConfirm(Object.values(state.panes).find((p) => p) || state.entry));
+    cmd2("duplicateFile", "\u0414\u0443\u0431\u043B\u0438\u0440\u043E\u0432\u0430\u0442\u044C \u0444\u0430\u0439\u043B", "\u0424\u0430\u0439\u043B\u044B", "copy", () => {
       const p = state.activeFile;
       if (!exists(p)) return;
       const ext = p.split(".").pop();
@@ -50541,172 +52107,156 @@ frame();`;
       renderTree();
       toast("\u0414\u0443\u0431\u043B\u0438\u0440\u043E\u0432\u0430\u043D: " + n, "ok");
     });
-    cmd2("findReferences", "\u041D\u0430\u0439\u0442\u0438 \u0432\u0441\u0435 \u0441\u0441\u044B\u043B\u043A\u0438 \u043D\u0430 \u0444\u0430\u0439\u043B", "\u0424\u0430\u0439\u043B\u044B", "\u{1F517}", () => findReferences(state.activeFile));
-    cmd2("downloadFile", "\u0421\u043A\u0430\u0447\u0430\u0442\u044C \u0430\u043A\u0442\u0438\u0432\u043D\u044B\u0439 \u0444\u0430\u0439\u043B", "\u0424\u0430\u0439\u043B\u044B", "\u2B07", () => downloadFile(state.activeFile));
-    cmd2("exportZip", "\u042D\u043A\u0441\u043F\u043E\u0440\u0442 \u043F\u0440\u043E\u0435\u043A\u0442\u0430 \u0432 ZIP", "\u0424\u0430\u0439\u043B\u044B", "\u{1F4E6}", () => exportZip());
-    cmd2("importZip", "\u0418\u043C\u043F\u043E\u0440\u0442 \u0438\u0437 ZIP", "\u0424\u0430\u0439\u043B\u044B", "\u{1F4E5}", () => $("#hiddenZipInput")?.click());
-    cmd2("importHtml", "\u0418\u043C\u043F\u043E\u0440\u0442 \u043E\u0434\u0438\u043D\u043E\u0447\u043D\u043E\u0433\u043E HTML", "\u0424\u0430\u0439\u043B\u044B", "\u{1F4C4}", () => $("#hiddenHtmlInput")?.click());
-    cmd2("importUrl", "\u0418\u043C\u043F\u043E\u0440\u0442 \u043F\u043E URL", "\u0424\u0430\u0439\u043B\u044B", "\u{1F310}", () => importFromUrl());
-    cmd2("exportSingleHtml", "\u042D\u043A\u0441\u043F\u043E\u0440\u0442 \u0432 \u043E\u0434\u0438\u043D HTML", "\u0424\u0430\u0439\u043B\u044B", "\u{1F4C3}", () => exportSingleHtml());
-    cmd2("exportStaticSite", "\u042D\u043A\u0441\u043F\u043E\u0440\u0442 \u0441\u0442\u0430\u0442\u0438\u0447\u0435\u0441\u043A\u043E\u0433\u043E \u0441\u0430\u0439\u0442\u0430", "\u0424\u0430\u0439\u043B\u044B", "\u{1F30D}", () => exportStaticSite());
-    cmd2("exportAssets", "\u042D\u043A\u0441\u043F\u043E\u0440\u0442 \u0430\u0441\u0441\u0435\u0442\u043E\u0432 ZIP", "\u0424\u0430\u0439\u043B\u044B", "\u{1F5BC}", () => exportZip({ assetsOnly: true }));
-    cmd2("cleanupAssets", "\u0423\u0434\u0430\u043B\u0438\u0442\u044C \u043D\u0435\u0438\u0441\u043F\u043E\u043B\u044C\u0437\u0443\u0435\u043C\u044B\u0435 \u0430\u0441\u0441\u0435\u0442\u044B", "\u0424\u0430\u0439\u043B\u044B", "\u{1F9F9}", () => cleanupAssets());
-    cmd2("snapshot", "\u0421\u043E\u0437\u0434\u0430\u0442\u044C \u0441\u043D\u0430\u043F\u0448\u043E\u0442 \u0432\u0435\u0440\u0441\u0438\u0438", "\u0424\u0430\u0439\u043B\u044B", "\u25F7", () => snapshotDialog());
-    cmd2("versions", "\u0418\u0441\u0442\u043E\u0440\u0438\u044F \u0432\u0435\u0440\u0441\u0438\u0439 \u0438 diff", "\u0424\u0430\u0439\u043B\u044B", "\u{1F558}", () => versionsDialog());
-    cmd2("share", "\u041F\u043E\u0434\u0435\u043B\u0438\u0442\u044C\u0441\u044F \u043F\u0440\u043E\u0435\u043A\u0442\u043E\u043C", "\u0424\u0430\u0439\u043B\u044B", "\u{1F517}", () => shareDialog());
-    cmd2("findInProject", "\u041F\u043E\u0438\u0441\u043A \u043F\u043E \u043F\u0440\u043E\u0435\u043A\u0442\u0443", "\u0424\u0430\u0439\u043B\u044B", "\u{1F50D}", () => {
+    cmd2("findReferences", "\u041D\u0430\u0439\u0442\u0438 \u0432\u0441\u0435 \u0441\u0441\u044B\u043B\u043A\u0438 \u043D\u0430 \u0444\u0430\u0439\u043B", "\u0424\u0430\u0439\u043B\u044B", "link", () => findReferences(state.activeFile));
+    cmd2("downloadFile", "\u0421\u043A\u0430\u0447\u0430\u0442\u044C \u0430\u043A\u0442\u0438\u0432\u043D\u044B\u0439 \u0444\u0430\u0439\u043B", "\u0424\u0430\u0439\u043B\u044B", "download", () => downloadFile(state.activeFile));
+    cmd2("exportZip", "\u042D\u043A\u0441\u043F\u043E\u0440\u0442 \u043F\u0440\u043E\u0435\u043A\u0442\u0430 \u0432 ZIP", "\u0424\u0430\u0439\u043B\u044B", "archive", () => exportZip());
+    cmd2("importZip", "\u0418\u043C\u043F\u043E\u0440\u0442 \u0438\u0437 ZIP", "\u0424\u0430\u0439\u043B\u044B", "download", () => $("#hiddenZipInput")?.click());
+    cmd2("importHtml", "\u0418\u043C\u043F\u043E\u0440\u0442 \u043E\u0434\u0438\u043D\u043E\u0447\u043D\u043E\u0433\u043E HTML", "\u0424\u0430\u0439\u043B\u044B", "file", () => $("#hiddenHtmlInput")?.click());
+    cmd2("importUrl", "\u0418\u043C\u043F\u043E\u0440\u0442 \u043F\u043E URL", "\u0424\u0430\u0439\u043B\u044B", "globe", () => importFromUrl());
+    cmd2("exportSingleHtml", "\u042D\u043A\u0441\u043F\u043E\u0440\u0442 \u0432 \u043E\u0434\u0438\u043D HTML", "\u0424\u0430\u0439\u043B\u044B", "chevronRight", () => exportSingleHtml());
+    cmd2("exportStaticSite", "\u042D\u043A\u0441\u043F\u043E\u0440\u0442 \u0441\u0442\u0430\u0442\u0438\u0447\u0435\u0441\u043A\u043E\u0433\u043E \u0441\u0430\u0439\u0442\u0430", "\u0424\u0430\u0439\u043B\u044B", "chevronRight", () => exportStaticSite());
+    cmd2("exportAssets", "\u042D\u043A\u0441\u043F\u043E\u0440\u0442 \u0430\u0441\u0441\u0435\u0442\u043E\u0432 ZIP", "\u0424\u0430\u0439\u043B\u044B", "image", () => exportZip({ assetsOnly: true }));
+    cmd2("cleanupAssets", "\u0423\u0434\u0430\u043B\u0438\u0442\u044C \u043D\u0435\u0438\u0441\u043F\u043E\u043B\u044C\u0437\u0443\u0435\u043C\u044B\u0435 \u0430\u0441\u0441\u0435\u0442\u044B", "\u0424\u0430\u0439\u043B\u044B", "trash", () => cleanupAssets());
+    cmd2("snapshot", "\u0421\u043E\u0437\u0434\u0430\u0442\u044C \u0441\u043D\u0430\u043F\u0448\u043E\u0442 \u0432\u0435\u0440\u0441\u0438\u0438", "\u0424\u0430\u0439\u043B\u044B", "history", () => snapshotDialog());
+    cmd2("versions", "\u0418\u0441\u0442\u043E\u0440\u0438\u044F \u0432\u0435\u0440\u0441\u0438\u0439 \u0438 diff", "\u0424\u0430\u0439\u043B\u044B", "chevronRight", () => versionsDialog());
+    cmd2("share", "\u041F\u043E\u0434\u0435\u043B\u0438\u0442\u044C\u0441\u044F \u043F\u0440\u043E\u0435\u043A\u0442\u043E\u043C", "\u0424\u0430\u0439\u043B\u044B", "link", () => shareDialog());
+    cmd2("findInProject", "\u041F\u043E\u0438\u0441\u043A \u043F\u043E \u043F\u0440\u043E\u0435\u043A\u0442\u0443", "\u0424\u0430\u0439\u043B\u044B", "search", () => {
       selectRailTab("search");
       setTimeout(() => $("#globalSearch")?.focus(), 100);
     });
-    cmd2("replaceAll", "\u0417\u0430\u043C\u0435\u043D\u0438\u0442\u044C \u043F\u043E \u0432\u0441\u0435\u043C\u0443 \u043F\u0440\u043E\u0435\u043A\u0442\u0443", "\u0424\u0430\u0439\u043B\u044B", "\u21C4", () => replaceAllInProject());
-    cmd2("demo", "\u0417\u0430\u0433\u0440\u0443\u0437\u0438\u0442\u044C \u0434\u0435\u043C\u043E-\u043F\u0440\u043E\u0435\u043A\u0442", "\u0424\u0430\u0439\u043B\u044B", "\u26A1", () => {
+    cmd2("replaceAll", "\u0417\u0430\u043C\u0435\u043D\u0438\u0442\u044C \u043F\u043E \u0432\u0441\u0435\u043C\u0443 \u043F\u0440\u043E\u0435\u043A\u0442\u0443", "\u0424\u0430\u0439\u043B\u044B", "resize", () => replaceAllInProject());
+    cmd2("demo", "\u0417\u0430\u0433\u0440\u0443\u0437\u0438\u0442\u044C \u0434\u0435\u043C\u043E-\u043F\u0440\u043E\u0435\u043A\u0442", "\u0424\u0430\u0439\u043B\u044B", "wand", () => {
       resetProject();
       run("full");
       toast("\u0414\u0435\u043C\u043E \u0437\u0430\u0433\u0440\u0443\u0436\u0435\u043D\u043E", "ok");
     });
-    cmd2("writeVirtual", "\u0417\u0430\u043F\u0438\u0441\u0430\u0442\u044C \u0432\u0438\u0440\u0442\u0443\u0430\u043B\u044C\u043D\u044B\u0439 \u0444\u0430\u0439\u043B", "\u0424\u0430\u0439\u043B\u044B", "", (p) => {
+    cmd2("writeVirtual", "\u0417\u0430\u043F\u0438\u0441\u0430\u0442\u044C \u0432\u0438\u0440\u0442\u0443\u0430\u043B\u044C\u043D\u044B\u0439 \u0444\u0430\u0439\u043B", "\u0424\u0430\u0439\u043B\u044B", "chevronRight", (p) => {
       if (p?.path) write(p.path, p.content || "");
     }, { hidden: true });
-    cmd2("rotateDevice", "\u041F\u043E\u0432\u0435\u0440\u043D\u0443\u0442\u044C \u0443\u0441\u0442\u0440\u043E\u0439\u0441\u0442\u0432\u043E", "\u041F\u0440\u0435\u0434\u043F\u0440\u043E\u0441\u043C\u043E\u0442\u0440", "\u27F3", () => rotateDevice());
-    cmd2("toggleGrid", "\u0421\u0435\u0442\u043A\u0430 \u043F\u043E\u0432\u0435\u0440\u0445 \u043F\u0440\u0435\u0434\u043F\u0440\u043E\u0441\u043C\u043E\u0442\u0440\u0430", "\u041F\u0440\u0435\u0434\u043F\u0440\u043E\u0441\u043C\u043E\u0442\u0440", "\u25A6", () => toggleGrid());
-    cmd2("toggleRulers", "\u041B\u0438\u043D\u0435\u0439\u043A\u0438 \u0438 \u0438\u0437\u043C\u0435\u0440\u0435\u043D\u0438\u0435", "\u041F\u0440\u0435\u0434\u043F\u0440\u043E\u0441\u043C\u043E\u0442\u0440", "\u{1F4CF}", () => toggleRulers());
-    cmd2("eyedropper", "\u041F\u0438\u043F\u0435\u0442\u043A\u0430 \u0446\u0432\u0435\u0442\u0430", "\u041F\u0440\u0435\u0434\u043F\u0440\u043E\u0441\u043C\u043E\u0442\u0440", "\u25C9", () => eyedropper());
-    cmd2("inspectMode", "\u0418\u043D\u0441\u043F\u0435\u043A\u0442\u043E\u0440 \u044D\u043B\u0435\u043C\u0435\u043D\u0442\u043E\u0432", "\u041F\u0440\u0435\u0434\u043F\u0440\u043E\u0441\u043C\u043E\u0442\u0440", "\u2316", () => toggleInspect());
-    cmd2("previewFullscreen", "\u041F\u0440\u0435\u0434\u043F\u0440\u043E\u0441\u043C\u043E\u0442\u0440 \u043D\u0430 \u0432\u0435\u0441\u044C \u044D\u043A\u0440\u0430\u043D", "\u041F\u0440\u0435\u0434\u043F\u0440\u043E\u0441\u043C\u043E\u0442\u0440", "\u26F6", () => previewFullscreen());
-    cmd2("popout", "\u041E\u0442\u043A\u0440\u044B\u0442\u044C \u043F\u0440\u0435\u0434\u043F\u0440\u043E\u0441\u043C\u043E\u0442\u0440 \u0432 \u043E\u043A\u043D\u0435", "\u041F\u0440\u0435\u0434\u043F\u0440\u043E\u0441\u043C\u043E\u0442\u0440", "\u2197", () => popout());
-    cmd2("reloadPreview", "\u041F\u0435\u0440\u0435\u0437\u0430\u0433\u0440\u0443\u0437\u0438\u0442\u044C \u043F\u0440\u0435\u0434\u043F\u0440\u043E\u0441\u043C\u043E\u0442\u0440", "\u041F\u0440\u0435\u0434\u043F\u0440\u043E\u0441\u043C\u043E\u0442\u0440", "\u21BB", () => run("full"));
-    cmd2("toggleJs", "\u0412\u043A\u043B\u044E\u0447\u0438\u0442\u044C/\u0432\u044B\u043A\u043B\u044E\u0447\u0438\u0442\u044C JS", "\u041F\u0440\u0435\u0434\u043F\u0440\u043E\u0441\u043C\u043E\u0442\u0440", "JS", () => {
+    cmd2("rotateDevice", "\u041F\u043E\u0432\u0435\u0440\u043D\u0443\u0442\u044C \u0443\u0441\u0442\u0440\u043E\u0439\u0441\u0442\u0432\u043E", "\u041F\u0440\u0435\u0434\u043F\u0440\u043E\u0441\u043C\u043E\u0442\u0440", "rotate", () => rotateDevice());
+    cmd2("toggleGrid", "\u0421\u0435\u0442\u043A\u0430 \u043F\u043E\u0432\u0435\u0440\u0445 \u043F\u0440\u0435\u0434\u043F\u0440\u043E\u0441\u043C\u043E\u0442\u0440\u0430", "\u041F\u0440\u0435\u0434\u043F\u0440\u043E\u0441\u043C\u043E\u0442\u0440", "grid", () => toggleGrid());
+    cmd2("toggleRulers", "\u041B\u0438\u043D\u0435\u0439\u043A\u0438 \u0438 \u0438\u0437\u043C\u0435\u0440\u0435\u043D\u0438\u0435", "\u041F\u0440\u0435\u0434\u043F\u0440\u043E\u0441\u043C\u043E\u0442\u0440", "ruler", () => toggleRulers());
+    cmd2("eyedropper", "\u041F\u0438\u043F\u0435\u0442\u043A\u0430 \u0446\u0432\u0435\u0442\u0430", "\u041F\u0440\u0435\u0434\u043F\u0440\u043E\u0441\u043C\u043E\u0442\u0440", "target", () => eyedropper());
+    cmd2("inspectMode", "\u0418\u043D\u0441\u043F\u0435\u043A\u0442\u043E\u0440 \u044D\u043B\u0435\u043C\u0435\u043D\u0442\u043E\u0432", "\u041F\u0440\u0435\u0434\u043F\u0440\u043E\u0441\u043C\u043E\u0442\u0440", "target", () => toggleInspect());
+    cmd2("previewFullscreen", "\u041F\u0440\u0435\u0434\u043F\u0440\u043E\u0441\u043C\u043E\u0442\u0440 \u043D\u0430 \u0432\u0435\u0441\u044C \u044D\u043A\u0440\u0430\u043D", "\u041F\u0440\u0435\u0434\u043F\u0440\u043E\u0441\u043C\u043E\u0442\u0440", "maximize", () => previewFullscreen());
+    cmd2("popout", "\u041E\u0442\u043A\u0440\u044B\u0442\u044C \u043F\u0440\u0435\u0434\u043F\u0440\u043E\u0441\u043C\u043E\u0442\u0440 \u0432 \u043E\u043A\u043D\u0435", "\u041F\u0440\u0435\u0434\u043F\u0440\u043E\u0441\u043C\u043E\u0442\u0440", "arrowRight", () => popout());
+    cmd2("reloadPreview", "\u041F\u0435\u0440\u0435\u0437\u0430\u0433\u0440\u0443\u0437\u0438\u0442\u044C \u043F\u0440\u0435\u0434\u043F\u0440\u043E\u0441\u043C\u043E\u0442\u0440", "\u041F\u0440\u0435\u0434\u043F\u0440\u043E\u0441\u043C\u043E\u0442\u0440", "refresh", () => run("full"));
+    cmd2("toggleJs", "\u0412\u043A\u043B\u044E\u0447\u0438\u0442\u044C/\u0432\u044B\u043A\u043B\u044E\u0447\u0438\u0442\u044C JS", "\u041F\u0440\u0435\u0434\u043F\u0440\u043E\u0441\u043C\u043E\u0442\u0440", "chevronRight", () => {
       const c = $("#optJs");
       c.checked = !c.checked;
       c.dispatchEvent(new Event("change"));
     });
-    cmd2("toggleExternal", "\u0411\u043B\u043E\u043A\u0438\u0440\u043E\u0432\u0430\u0442\u044C \u0432\u043D\u0435\u0448\u043D\u0438\u0435 \u0440\u0435\u0441\u0443\u0440\u0441\u044B", "\u041F\u0440\u0435\u0434\u043F\u0440\u043E\u0441\u043C\u043E\u0442\u0440", "\u{1F310}", () => {
+    cmd2("toggleExternal", "\u0411\u043B\u043E\u043A\u0438\u0440\u043E\u0432\u0430\u0442\u044C \u0432\u043D\u0435\u0448\u043D\u0438\u0435 \u0440\u0435\u0441\u0443\u0440\u0441\u044B", "\u041F\u0440\u0435\u0434\u043F\u0440\u043E\u0441\u043C\u043E\u0442\u0440", "globe", () => {
       const c = $("#optExternal");
       c.checked = !c.checked;
       c.dispatchEvent(new Event("change"));
     });
-    cmd2("emulateReducedMotion", "\u042D\u043C\u0443\u043B\u044F\u0446\u0438\u044F reduced-motion", "\u041F\u0440\u0435\u0434\u043F\u0440\u043E\u0441\u043C\u043E\u0442\u0440", "\u{1F39E}", () => {
+    cmd2("emulateReducedMotion", "\u042D\u043C\u0443\u043B\u044F\u0446\u0438\u044F reduced-motion", "\u041F\u0440\u0435\u0434\u043F\u0440\u043E\u0441\u043C\u043E\u0442\u0440", "chevronRight", () => {
       const s = $("#optMotion");
+      if (!s) return;
       s.value = s.value === "reduce" ? "no-preference" : "reduce";
       s.dispatchEvent(new Event("change"));
     });
-    cmd2("rtl", "RTL-\u0440\u0430\u0437\u043C\u0435\u0442\u043A\u0430", "\u041F\u0440\u0435\u0434\u043F\u0440\u043E\u0441\u043C\u043E\u0442\u0440", "\u2194", () => {
+    cmd2("rtl", "RTL-\u0440\u0430\u0437\u043C\u0435\u0442\u043A\u0430", "\u041F\u0440\u0435\u0434\u043F\u0440\u043E\u0441\u043C\u043E\u0442\u0440", "resize", () => {
       const s = $("#optLocale");
+      if (!s) return;
       s.value = s.value === "ar" ? "ru" : "ar";
       s.dispatchEvent(new Event("change"));
     });
-    cmd2("schemeEmulation", "\u042D\u043C\u0443\u043B\u044F\u0446\u0438\u044F \u0446\u0432\u0435\u0442\u043E\u0432\u043E\u0439 \u0441\u0445\u0435\u043C\u044B", "\u041F\u0440\u0435\u0434\u043F\u0440\u043E\u0441\u043C\u043E\u0442\u0440", "\u{1F317}", () => {
+    cmd2("schemeEmulation", "\u042D\u043C\u0443\u043B\u044F\u0446\u0438\u044F \u0446\u0432\u0435\u0442\u043E\u0432\u043E\u0439 \u0441\u0445\u0435\u043C\u044B", "\u041F\u0440\u0435\u0434\u043F\u0440\u043E\u0441\u043C\u043E\u0442\u0440", "chevronRight", () => {
       const s = $("#optScheme");
+      if (!s) return;
       s.value = s.value === "dark" ? "light" : "dark";
       s.dispatchEvent(new Event("change"));
     });
-    cmd2("consoleClear", "\u041E\u0447\u0438\u0441\u0442\u0438\u0442\u044C \u043A\u043E\u043D\u0441\u043E\u043B\u044C", "\u041E\u0442\u043B\u0430\u0434\u043A\u0430", "\u{1F9F9}", () => {
+    cmd2("consoleClear", "\u041E\u0447\u0438\u0441\u0442\u0438\u0442\u044C \u043A\u043E\u043D\u0441\u043E\u043B\u044C", "\u041E\u0442\u043B\u0430\u0434\u043A\u0430", "trash", () => {
       state.logs = [];
       renderConsole();
       send("clearTrace", {});
     });
-    cmd2("breakpoint", "\u0414\u043E\u0431\u0430\u0432\u0438\u0442\u044C \u0442\u043E\u0447\u043A\u0443 \u043E\u0441\u0442\u0430\u043D\u043E\u0432\u0430", "\u041E\u0442\u043B\u0430\u0434\u043A\u0430", "\u{1F534}", () => addBreakpointDialog());
-    cmd2("refreshInspectors", "\u041E\u0431\u043D\u043E\u0432\u0438\u0442\u044C \u0438\u043D\u0441\u043F\u0435\u043A\u0442\u043E\u0440\u044B", "\u041E\u0442\u043B\u0430\u0434\u043A\u0430", "\u21BB", () => refreshInspectors());
-    cmd2("stepInto", "Step into", "\u041E\u0442\u043B\u0430\u0434\u043A\u0430", "\u2193", () => {
+    cmd2("breakpoint", "\u0414\u043E\u0431\u0430\u0432\u0438\u0442\u044C \u0442\u043E\u0447\u043A\u0443 \u043E\u0441\u0442\u0430\u043D\u043E\u0432\u0430", "\u041E\u0442\u043B\u0430\u0434\u043A\u0430", "chevronRight", () => addBreakpointDialog());
+    cmd2("refreshInspectors", "\u041E\u0431\u043D\u043E\u0432\u0438\u0442\u044C \u0438\u043D\u0441\u043F\u0435\u043A\u0442\u043E\u0440\u044B", "\u041E\u0442\u043B\u0430\u0434\u043A\u0430", "refresh", () => refreshInspectors());
+    cmd2("stepInto", "Step into", "\u041E\u0442\u043B\u0430\u0434\u043A\u0430", "arrowDown", () => {
       state.traceIndex = Math.max(0, state.traceIndex + 1);
       renderDebugPanel();
     });
-    cmd2("stepOver", "Step over", "\u041E\u0442\u043B\u0430\u0434\u043A\u0430", "\u2192", () => {
+    cmd2("stepOver", "Step over", "\u041E\u0442\u043B\u0430\u0434\u043A\u0430", "arrowRight", () => {
       state.traceIndex = Math.min(state.trace.length - 1, state.traceIndex + 1);
       renderDebugPanel();
     });
-    cmd2("resume", "Resume", "\u041E\u0442\u043B\u0430\u0434\u043A\u0430", "\u25B6", () => {
+    cmd2("resume", "Resume", "\u041E\u0442\u043B\u0430\u0434\u043A\u0430", "play", () => {
       state.traceIndex = state.trace.length - 1;
       renderDebugPanel();
     });
-    cmd2("screenReader", "\u042D\u043C\u0443\u043B\u044F\u0446\u0438\u044F \u0441\u043A\u0440\u0438\u043D\u0440\u0438\u0434\u0435\u0440\u0430", "\u0414\u043E\u0441\u0442\u0443\u043F\u043D\u043E\u0441\u0442\u044C", "\u{1F50A}", () => screenReader());
-    cmd2("a11yReport", "\u041E\u0442\u0447\u0451\u0442 \u043E \u0434\u043E\u0441\u0442\u0443\u043F\u043D\u043E\u0441\u0442\u0438", "\u0414\u043E\u0441\u0442\u0443\u043F\u043D\u043E\u0441\u0442\u044C", "\u267F", () => {
+    cmd2("screenReader", "\u042D\u043C\u0443\u043B\u044F\u0446\u0438\u044F \u0441\u043A\u0440\u0438\u043D\u0440\u0438\u0434\u0435\u0440\u0430", "\u0414\u043E\u0441\u0442\u0443\u043F\u043D\u043E\u0441\u0442\u044C", "eye", () => screenReader());
+    cmd2("a11yReport", "\u041E\u0442\u0447\u0451\u0442 \u043E \u0434\u043E\u0441\u0442\u0443\u043F\u043D\u043E\u0441\u0442\u0438", "\u0414\u043E\u0441\u0442\u0443\u043F\u043D\u043E\u0441\u0442\u044C", "shield", () => {
       selectInspTab("dom");
       emulateA11y();
     });
-    cmd2("keyboardCheck", "\u041F\u0440\u043E\u0432\u0435\u0440\u043A\u0430 \u0444\u043E\u043A\u0443\u0441\u0430", "\u0414\u043E\u0441\u0442\u0443\u043F\u043D\u043E\u0441\u0442\u044C", "\u2328", () => {
+    cmd2("keyboardCheck", "\u041F\u0440\u043E\u0432\u0435\u0440\u043A\u0430 \u0444\u043E\u043A\u0443\u0441\u0430", "\u0414\u043E\u0441\u0442\u0443\u043F\u043D\u043E\u0441\u0442\u044C", "keyboard", () => {
       emulateA11y();
       toast("\u041F\u0440\u043E\u0432\u0435\u0440\u044C\u0442\u0435 \u043F\u043E\u0440\u044F\u0434\u043E\u043A Tab \u0432 \u043F\u0440\u0435\u0434\u043F\u0440\u043E\u0441\u043C\u043E\u0442\u0440\u0435", "info");
     });
-    cmd2("aiExplain", "\u041E\u0431\u044A\u044F\u0441\u043D\u0438\u0442\u044C \u043A\u043E\u0434", "\u0410\u0441\u0441\u0438\u0441\u0442\u0435\u043D\u0442", "\u2753", () => {
-      selectInspTab("assistant");
-      ask("\u0447\u0442\u043E \u0434\u0435\u043B\u0430\u0435\u0442 \u043A\u043E\u0434?");
+    cmd2("codeTests", "\u041A\u0430\u0440\u043A\u0430\u0441 \u0442\u0435\u0441\u0442\u043E\u0432", "\u0418\u043D\u0441\u0442\u0440\u0443\u043C\u0435\u043D\u0442\u044B \u043A\u043E\u0434\u0430", "chevronRight", () => {
+      insertText(generateTests(getDoc("js")), "js");
+      toast("\u041A\u0430\u0440\u043A\u0430\u0441 \u0442\u0435\u0441\u0442\u043E\u0432 \u0432\u0441\u0442\u0430\u0432\u043B\u0435\u043D", "ok");
     });
-    cmd2("aiExplainSelection", "\u041E\u0431\u044A\u044F\u0441\u043D\u0438\u0442\u044C \u0432\u044B\u0434\u0435\u043B\u0435\u043D\u043D\u043E\u0435", "\u0410\u0441\u0441\u0438\u0441\u0442\u0435\u043D\u0442", "\u{1F50D}", () => {
-      const s = getSelection2();
-      if (!s) return toast("\u0421\u043D\u0430\u0447\u0430\u043B\u0430 \u0432\u044B\u0434\u0435\u043B\u0438\u0442\u0435 \u043A\u043E\u0434", "warn");
-      selectInspTab("assistant");
-      ask("\u043E\u0431\u044A\u044F\u0441\u043D\u0438 \u0432\u044B\u0434\u0435\u043B\u0435\u043D\u043D\u044B\u0439 \u043A\u043E\u0434: " + s.slice(0, 200));
-    });
-    cmd2("aiFix", "\u0410\u0432\u0442\u043E\u043F\u043E\u0447\u0438\u043D\u043A\u0430 \u043E\u0448\u0438\u0431\u043E\u043A", "\u0410\u0441\u0441\u0438\u0441\u0442\u0435\u043D\u0442", "\u{1F6E0}", () => {
-      selectInspTab("assistant");
-      ask("\u0438\u0441\u043F\u0440\u0430\u0432\u044C \u043E\u0448\u0438\u0431\u043A\u0438");
-    });
-    cmd2("aiTests", "\u0421\u0433\u0435\u043D\u0435\u0440\u0438\u0440\u043E\u0432\u0430\u0442\u044C \u0442\u0435\u0441\u0442\u044B", "\u0410\u0441\u0441\u0438\u0441\u0442\u0435\u043D\u0442", "\u{1F9EA}", () => {
-      const t2 = generateTests(getDoc("js"));
-      insertText(t2, "js");
-      toast("\u0422\u0435\u0441\u0442\u044B \u0432\u0441\u0442\u0430\u0432\u043B\u0435\u043D\u044B", "ok");
-    });
-    cmd2("aiDocs", "\u0414\u043E\u043A\u0443\u043C\u0435\u043D\u0442\u0430\u0446\u0438\u044F \u0438\u0437 \u043A\u043E\u0434\u0430", "\u0410\u0441\u0441\u0438\u0441\u0442\u0435\u043D\u0442", "\u{1F4D6}", () => ctx.modal({ title: "\u0414\u043E\u043A\u0443\u043C\u0435\u043D\u0442\u0430\u0446\u0438\u044F", wide: true, body: `<pre style="white-space:pre-wrap;font:12px var(--mono)">${esc(generateDocs(getDoc("js")))}</pre>`, okText: "\u0421\u043A\u0430\u0447\u0430\u0442\u044C", onOk: () => download("DOCS.md", generateDocs(getDoc("js")), "text/markdown") }));
-    cmd2("aiReadme", "\u0421\u0433\u0435\u043D\u0435\u0440\u0438\u0440\u043E\u0432\u0430\u0442\u044C README", "\u0410\u0441\u0441\u0438\u0441\u0442\u0435\u043D\u0442", "\u{1F4DD}", () => download("README.md", generateReadme(), "text/markdown"));
-    cmd2("aiChangelog", "\u0421\u0433\u0435\u043D\u0435\u0440\u0438\u0440\u043E\u0432\u0430\u0442\u044C changelog", "\u0410\u0441\u0441\u0438\u0441\u0442\u0435\u043D\u0442", "\u{1F4CB}", () => download("CHANGELOG.md", generateChangelog2(), "text/markdown"));
-    cmd2("aiRefactor", "\u0420\u0435\u0444\u0430\u043A\u0442\u043E\u0440\u0438\u043D\u0433 \u0432\u044B\u0434\u0435\u043B\u0435\u043D\u043D\u043E\u0433\u043E", "\u0410\u0441\u0441\u0438\u0441\u0442\u0435\u043D\u0442", "\u267B", () => {
-      const s = getSelection2() || getDoc("js");
-      const out = refactorSelection(s);
+    cmd2("codeDocs", "\u0414\u043E\u043A\u0443\u043C\u0435\u043D\u0442\u0430\u0446\u0438\u044F \u0438\u0437 \u043A\u043E\u0434\u0430", "\u0418\u043D\u0441\u0442\u0440\u0443\u043C\u0435\u043D\u0442\u044B \u043A\u043E\u0434\u0430", "chevronRight", () => ctx.modal({
+      title: "\u0414\u043E\u043A\u0443\u043C\u0435\u043D\u0442\u0430\u0446\u0438\u044F",
+      wide: true,
+      body: `<pre style="white-space:pre-wrap;font:12px var(--mono)">${esc(generateDocs(getDoc("js")))}</pre>`,
+      okText: "\u0421\u043A\u0430\u0447\u0430\u0442\u044C",
+      onOk: () => download("DOCS.md", generateDocs(getDoc("js")), "text/markdown")
+    }));
+    cmd2("codeReadme", "README \u043F\u0440\u043E\u0435\u043A\u0442\u0430", "\u0418\u043D\u0441\u0442\u0440\u0443\u043C\u0435\u043D\u0442\u044B \u043A\u043E\u0434\u0430", "chevronRight", () => download("README.md", generateReadme(), "text/markdown"));
+    cmd2("codeChangelog", "Changelog", "\u0418\u043D\u0441\u0442\u0440\u0443\u043C\u0435\u043D\u0442\u044B \u043A\u043E\u0434\u0430", "chevronRight", () => download("CHANGELOG.md", generateChangelog2(), "text/markdown"));
+    cmd2("codeRefactor", "\u041F\u0440\u043E\u0441\u0442\u043E\u0439 \u0440\u0435\u0444\u0430\u043A\u0442\u043E\u0440\u0438\u043D\u0433", "\u0418\u043D\u0441\u0442\u0440\u0443\u043C\u0435\u043D\u0442\u044B \u043A\u043E\u0434\u0430", "chevronRight", () => {
+      const s = getSelection2() || getDoc("js"), out = refactorSelection(s);
       if (getSelection2()) insertText(out);
       else setDoc(out, "js");
-      toast("\u0420\u0435\u0444\u0430\u043A\u0442\u043E\u0440\u0438\u043D\u0433 \u043F\u0440\u0438\u043C\u0435\u043D\u0451\u043D", "ok");
+      toast("var\u2192let, ==\u2192=== \u043F\u0440\u0438\u043C\u0435\u043D\u0435\u043D\u044B", "ok");
     });
-    cmd2("aiSecurity", "\u041F\u0440\u043E\u0432\u0435\u0440\u043A\u0430 \u0431\u0435\u0437\u043E\u043F\u0430\u0441\u043D\u043E\u0441\u0442\u0438", "\u0410\u0441\u0441\u0438\u0441\u0442\u0435\u043D\u0442", "\u{1F512}", () => {
+    cmd2("securityScan", "\u041F\u0440\u043E\u0432\u0435\u0440\u043A\u0430 \u0431\u0435\u0437\u043E\u043F\u0430\u0441\u043D\u043E\u0441\u0442\u0438", "\u0418\u043D\u0441\u0442\u0440\u0443\u043C\u0435\u043D\u0442\u044B \u043A\u043E\u0434\u0430", "chevronRight", () => {
       const f = securityScan(Object.values(allTextFiles()).join("\n"));
       ctx.modal({
         title: "\u041F\u0440\u043E\u0432\u0435\u0440\u043A\u0430 \u0431\u0435\u0437\u043E\u043F\u0430\u0441\u043D\u043E\u0441\u0442\u0438",
         wide: true,
-        body: f.length ? `<div class="list-rows">${f.map((x2) => `<div class="list-row"><b>[${x2.sev}]</b><div class="grow">${x2.msg}</div><small>\u0441\u0442\u0440\u043E\u043A\u0430 ~${x2.line}</small></div>`).join("")}</div>` : "<p>\u042F\u0432\u043D\u044B\u0445 \u0443\u0433\u0440\u043E\u0437 \u043D\u0435 \u043D\u0430\u0439\u0434\u0435\u043D\u043E \u2705</p>",
-        okText: "\u0417\u0430\u043A\u0440\u044B\u0442\u044C"
+        okText: "\u0417\u0430\u043A\u0440\u044B\u0442\u044C",
+        body: f.length ? `<div class="list-rows">${f.map((x2) => `<div class="list-row"><b>[${x2.sev}]</b><div class="grow">${esc(x2.msg)}</div><small>\u0441\u0442\u0440\u043E\u043A\u0430 ~${x2.line}</small></div>`).join("")}</div>` : "<p>\u042F\u0432\u043D\u044B\u0445 \u0443\u0433\u0440\u043E\u0437 \u043D\u0435 \u043D\u0430\u0439\u0434\u0435\u043D\u043E.</p>"
       });
     });
-    cmd2("aiGenerate", "\u0421\u0433\u0435\u043D\u0435\u0440\u0438\u0440\u043E\u0432\u0430\u0442\u044C \u043A\u043E\u0434 \u043F\u043E \u043E\u043F\u0438\u0441\u0430\u043D\u0438\u044E", "\u0410\u0441\u0441\u0438\u0441\u0442\u0435\u043D\u0442", "\u2726", () => ctx.modal({
-      title: "\u0413\u0435\u043D\u0435\u0440\u0430\u0446\u0438\u044F \u043A\u043E\u0434\u0430 \u043F\u043E \u043E\u043F\u0438\u0441\u0430\u043D\u0438\u044E",
-      narrow: true,
-      body: `<div class="field"><label>\u041E\u043F\u0438\u0448\u0438\u0442\u0435, \u0447\u0442\u043E \u043D\u0443\u0436\u043D\u043E</label><input id="genDesc" placeholder="\u0441\u0434\u0435\u043B\u0430\u0439 \u043A\u0430\u0440\u0442\u043E\u0447\u043A\u0443 \u0442\u043E\u0432\u0430\u0440\u0430 \u0441 \u043A\u043D\u043E\u043F\u043A\u043E\u0439"></div>
-      <p class="muted" style="font-size:11px">\u0420\u0430\u0431\u043E\u0442\u0430\u0435\u0442 \u043E\u0444\u043B\u0430\u0439\u043D \u043D\u0430 \u0448\u0430\u0431\u043B\u043E\u043D\u0430\u0445: \u0444\u043E\u0440\u043C\u0430, \u043A\u0430\u0440\u0442\u043E\u0447\u043A\u0430, \u043A\u043D\u043E\u043F\u043A\u0430, hero, \u043C\u043E\u0434\u0430\u043B\u044C\u043D\u043E\u0435 \u043E\u043A\u043D\u043E, \u0442\u0430\u0431\u044B, \u0430\u043A\u043A\u043E\u0440\u0434\u0435\u043E\u043D, \u0433\u0440\u0430\u0444\u0438\u043A, \u0433\u0440\u0430\u0434\u0438\u0435\u043D\u0442, \u0441\u0435\u0442\u043A\u0430\u2026</p>`,
-      okText: "\u0421\u043E\u0437\u0434\u0430\u0442\u044C",
-      onOk: (root) => {
-        const d = root.querySelector("#genDesc").value;
-        const g = generateFromDescription(d);
-        insertText(g.code, g.lang);
-        toast(g.note, "ok");
-      }
+    cmd2("codePerf", "\u0421\u043E\u0432\u0435\u0442\u044B \u043F\u043E \u043E\u043F\u0442\u0438\u043C\u0438\u0437\u0430\u0446\u0438\u0438", "\u0418\u043D\u0441\u0442\u0440\u0443\u043C\u0435\u043D\u0442\u044B \u043A\u043E\u0434\u0430", "chevronRight", () => ctx.modal({
+      title: "\u041E\u043F\u0442\u0438\u043C\u0438\u0437\u0430\u0446\u0438\u044F",
+      body: "<ul>" + perfTips().map((t2) => `<li>${esc(t2)}</li>`).join("") + "</ul>",
+      okText: "\u041E\u043A"
     }));
-    cmd2("aiPerf", "\u0421\u043E\u0432\u0435\u0442\u044B \u043F\u043E \u043E\u043F\u0442\u0438\u043C\u0438\u0437\u0430\u0446\u0438\u0438", "\u0410\u0441\u0441\u0438\u0441\u0442\u0435\u043D\u0442", "\u26A1", () => ctx.modal({ title: "\u041E\u043F\u0442\u0438\u043C\u0438\u0437\u0430\u0446\u0438\u044F", body: "<ul>" + perfTips().map((t2) => `<li>${t2}</li>`).join("") + "</ul>", okText: "\u041E\u043A" }));
-    cmd2("a11yMarkup", "\u0414\u043E\u0441\u0442\u0443\u043F\u043D\u0430\u044F \u0440\u0430\u0437\u043C\u0435\u0442\u043A\u0430", "\u0410\u0441\u0441\u0438\u0441\u0442\u0435\u043D\u0442", "\u267F", () => {
+    cmd2("a11yMarkup", "\u0414\u043E\u0441\u0442\u0443\u043F\u043D\u0430\u044F \u0440\u0430\u0437\u043C\u0435\u0442\u043A\u0430", "\u0418\u043D\u0441\u0442\u0440\u0443\u043C\u0435\u043D\u0442\u044B \u043A\u043E\u0434\u0430", "chevronRight", () => {
       setDoc(accessibleWrap(getDoc("html")), "html");
       toast("alt \u0438 aria-label \u0434\u043E\u0431\u0430\u0432\u043B\u0435\u043D\u044B", "ok");
     });
-    cmd2("lessons", "\u0418\u043D\u0442\u0435\u0440\u0430\u043A\u0442\u0438\u0432\u043D\u044B\u0435 \u0443\u0440\u043E\u043A\u0438", "\u041E\u0431\u0443\u0447\u0435\u043D\u0438\u0435", "\u{1F4D8}", () => {
+    cmd2("lessons", "\u0418\u043D\u0442\u0435\u0440\u0430\u043A\u0442\u0438\u0432\u043D\u044B\u0435 \u0443\u0440\u043E\u043A\u0438", "\u041E\u0431\u0443\u0447\u0435\u043D\u0438\u0435", "book", () => {
       selectRailTab("learn");
       renderLearn();
       openLesson(LESSONS[0]);
     });
-    cmd2("quiz", "\u041C\u0438\u043D\u0438-\u043A\u0432\u0438\u0437\u044B", "\u041E\u0431\u0443\u0447\u0435\u043D\u0438\u0435", "\u{1F9E0}", () => {
+    cmd2("quiz", "\u041C\u0438\u043D\u0438-\u043A\u0432\u0438\u0437\u044B", "\u041E\u0431\u0443\u0447\u0435\u043D\u0438\u0435", "chart", () => {
       selectRailTab("learn");
       renderLearn();
       $('[data-lt="quiz"]')?.click();
     });
-    cmd2("recipes", "\u0411\u0438\u0431\u043B\u0438\u043E\u0442\u0435\u043A\u0430 \u0440\u0435\u0446\u0435\u043F\u0442\u043E\u0432", "\u041E\u0431\u0443\u0447\u0435\u043D\u0438\u0435", "\u{1F4D6}", () => {
+    cmd2("recipes", "\u0411\u0438\u0431\u043B\u0438\u043E\u0442\u0435\u043A\u0430 \u0440\u0435\u0446\u0435\u043F\u0442\u043E\u0432", "\u041E\u0431\u0443\u0447\u0435\u043D\u0438\u0435", "book", () => {
       selectRailTab("learn");
       renderLearn();
       $('[data-lt="recipes"]')?.click();
     });
-    cmd2("visualizations", "\u0412\u0438\u0437\u0443\u0430\u043B\u0438\u0437\u0430\u0446\u0438\u044F event loop", "\u041E\u0431\u0443\u0447\u0435\u043D\u0438\u0435", "\u{1F3AC}", () => {
+    cmd2("visualizations", "\u0412\u0438\u0437\u0443\u0430\u043B\u0438\u0437\u0430\u0446\u0438\u044F event loop", "\u041E\u0431\u0443\u0447\u0435\u043D\u0438\u0435", "play", () => {
       selectRailTab("learn");
       renderLearn();
       $('[data-lt="viz"]')?.click();
     });
-    cmd2("eventLoop", "Event loop / async-await", "\u041E\u0431\u0443\u0447\u0435\u043D\u0438\u0435", "\u{1F504}", () => cmdRun("visualizations"));
-    cmd2("perfTips", "\u0421\u043E\u0432\u0435\u0442\u044B \u043F\u043E \u043F\u0440\u043E\u0438\u0437\u0432\u043E\u0434\u0438\u0442\u0435\u043B\u044C\u043D\u043E\u0441\u0442\u0438", "\u041F\u0435\u0440\u0444\u043E\u043C\u0430\u043D\u0441", "\u26A1", () => cmdRun("aiPerf"));
-    cmd2("benchmark", "\u0411\u0435\u043D\u0447\u043C\u0430\u0440\u043A \u0440\u0435\u043D\u0434\u0435\u0440\u0430", "\u041F\u0435\u0440\u0444\u043E\u043C\u0430\u043D\u0441", "\u23F1", () => {
+    cmd2("eventLoop", "Event loop / async-await", "\u041E\u0431\u0443\u0447\u0435\u043D\u0438\u0435", "chevronRight", () => cmdRun("visualizations"));
+    cmd2("perfTips", "\u0421\u043E\u0432\u0435\u0442\u044B \u043F\u043E \u043F\u0440\u043E\u0438\u0437\u0432\u043E\u0434\u0438\u0442\u0435\u043B\u044C\u043D\u043E\u0441\u0442\u0438", "\u041F\u0435\u0440\u0444\u043E\u043C\u0430\u043D\u0441", "wand", () => cmdRun("codePerf"));
+    cmd2("benchmark", "\u0411\u0435\u043D\u0447\u043C\u0430\u0440\u043A \u0440\u0435\u043D\u0434\u0435\u0440\u0430", "\u041F\u0435\u0440\u0444\u043E\u043C\u0430\u043D\u0441", "chevronRight", () => {
       const t0 = performance.now();
       run("full");
       setTimeout(() => ctx.modal({
@@ -50716,24 +52266,24 @@ frame();`;
         okText: "\u041E\u043A"
       }), 900);
     });
-    cmd2("lighthouse", "Lighthouse-\u043F\u043E\u0434\u043E\u0431\u043D\u0430\u044F \u043E\u0446\u0435\u043D\u043A\u0430", "\u041F\u0435\u0440\u0444\u043E\u043C\u0430\u043D\u0441", "\u{1F4C8}", () => {
+    cmd2("lighthouse", "Lighthouse-\u043F\u043E\u0434\u043E\u0431\u043D\u0430\u044F \u043E\u0446\u0435\u043D\u043A\u0430", "\u041F\u0435\u0440\u0444\u043E\u043C\u0430\u043D\u0441", "chart", () => {
       selectInspTab("perf");
       refreshInspectors();
     });
-    cmd2("bundleSize", "\u0420\u0430\u0437\u043C\u0435\u0440 \u0431\u0430\u043D\u0434\u043B\u0430", "\u041F\u0435\u0440\u0444\u043E\u043C\u0430\u043D\u0441", "\u{1F4E6}", () => toast(`\u0420\u0430\u0437\u043C\u0435\u0440 \u043F\u0440\u043E\u0435\u043A\u0442\u0430: ${(projectSize() / 1024).toFixed(1)} \u041A\u0411`, "info"));
-    cmd2("lazyLoad", '\u0414\u043E\u0431\u0430\u0432\u0438\u0442\u044C loading="lazy"', "\u041F\u0435\u0440\u0444\u043E\u043C\u0430\u043D\u0441", "\u{1F5BC}", () => {
+    cmd2("bundleSize", "\u0420\u0430\u0437\u043C\u0435\u0440 \u0431\u0430\u043D\u0434\u043B\u0430", "\u041F\u0435\u0440\u0444\u043E\u043C\u0430\u043D\u0441", "archive", () => toast(`\u0420\u0430\u0437\u043C\u0435\u0440 \u043F\u0440\u043E\u0435\u043A\u0442\u0430: ${(projectSize() / 1024).toFixed(1)} \u041A\u0411`, "info"));
+    cmd2("lazyLoad", '\u0414\u043E\u0431\u0430\u0432\u0438\u0442\u044C loading="lazy"', "\u041F\u0435\u0440\u0444\u043E\u043C\u0430\u043D\u0441", "image", () => {
       const html2 = getDoc("html").replace(/<img\b(?![^>]*loading=)/gi, '<img loading="lazy"');
       setDoc(html2, "html");
       toast('loading="lazy" \u0434\u043E\u0431\u0430\u0432\u043B\u0435\u043D', "ok");
     });
-    cmd2("installPWA", "\u0423\u0441\u0442\u0430\u043D\u043E\u0432\u0438\u0442\u044C \u043A\u0430\u043A \u043F\u0440\u0438\u043B\u043E\u0436\u0435\u043D\u0438\u0435", "PWA", "\u{1F4F2}", () => {
+    cmd2("installPWA", "\u0423\u0441\u0442\u0430\u043D\u043E\u0432\u0438\u0442\u044C \u043A\u0430\u043A \u043F\u0440\u0438\u043B\u043E\u0436\u0435\u043D\u0438\u0435", "PWA", "window", () => {
       if (window.__pwaPrompt) {
         window.__pwaPrompt.prompt();
         toast("\u0423\u0441\u0442\u0430\u043D\u043E\u0432\u043A\u0430 \u043F\u0440\u0438\u043B\u043E\u0436\u0435\u043D\u0438\u044F", "ok");
       } else toast("\u041E\u0442\u043A\u0440\u043E\u0439\u0442\u0435 \u043C\u0435\u043D\u044E \u0431\u0440\u0430\u0443\u0437\u0435\u0440\u0430 \u2192 \xAB\u0423\u0441\u0442\u0430\u043D\u043E\u0432\u0438\u0442\u044C \u043F\u0440\u0438\u043B\u043E\u0436\u0435\u043D\u0438\u0435\xBB", "info");
     });
-    cmd2("offlineCheck", "\u041F\u0440\u043E\u0432\u0435\u0440\u0438\u0442\u044C \u043E\u0444\u043B\u0430\u0439\u043D-\u0440\u0435\u0436\u0438\u043C", "PWA", "\u{1F4F4}", () => toast(navigator.onLine ? "\u041E\u043D\u043B\u0430\u0439\u043D. Service Worker \u043A\u044D\u0448\u0438\u0440\u0443\u0435\u0442 \u0440\u0435\u0441\u0443\u0440\u0441\u044B." : "\u041E\u0444\u043B\u0430\u0439\u043D \u2014 \u0440\u0435\u0434\u0430\u043A\u0442\u043E\u0440 \u0440\u0430\u0431\u043E\u0442\u0430\u0435\u0442 \u0438\u0437 \u043A\u044D\u0448\u0430", "info"));
-    cmd2("coldStart", "\u0425\u043E\u043B\u043E\u0434\u043D\u044B\u0439 \u0437\u0430\u043F\u0443\u0441\u043A", "PWA", "\u2744", () => {
+    cmd2("offlineCheck", "\u041F\u0440\u043E\u0432\u0435\u0440\u0438\u0442\u044C \u043E\u0444\u043B\u0430\u0439\u043D-\u0440\u0435\u0436\u0438\u043C", "PWA", "server", () => toast(navigator.onLine ? "\u041E\u043D\u043B\u0430\u0439\u043D. Service Worker \u043A\u044D\u0448\u0438\u0440\u0443\u0435\u0442 \u0440\u0435\u0441\u0443\u0440\u0441\u044B." : "\u041E\u0444\u043B\u0430\u0439\u043D \u2014 \u0440\u0435\u0434\u0430\u043A\u0442\u043E\u0440 \u0440\u0430\u0431\u043E\u0442\u0430\u0435\u0442 \u0438\u0437 \u043A\u044D\u0448\u0430", "info"));
+    cmd2("coldStart", "\u0425\u043E\u043B\u043E\u0434\u043D\u044B\u0439 \u0437\u0430\u043F\u0443\u0441\u043A", "PWA", "gauge", () => {
       const nav2 = typeof performance.getEntriesByType === "function" ? performance.getEntriesByType("navigation") : [];
       const t2 = nav2[0] || {};
       ctx.modal({
@@ -50743,26 +52293,26 @@ frame();`;
         okText: "\u041E\u043A"
       });
     });
-    cmd2("plugins", "\u041F\u043B\u0430\u0433\u0438\u043D\u044B", "\u042D\u043A\u043E\u0441\u0438\u0441\u0442\u0435\u043C\u0430", "\u{1F50C}", () => {
+    cmd2("plugins", "\u041F\u043B\u0430\u0433\u0438\u043D\u044B", "\u042D\u043A\u043E\u0441\u0438\u0441\u0442\u0435\u043C\u0430", "puzzle", () => {
       selectRailTab("plugins");
       renderPlugins();
     });
-    cmd2("pluginMarket", "\u041C\u0430\u0440\u043A\u0435\u0442\u043F\u043B\u0435\u0439\u0441 \u043F\u043B\u0430\u0433\u0438\u043D\u043E\u0432", "\u042D\u043A\u043E\u0441\u0438\u0441\u0442\u0435\u043C\u0430", "\u{1F3EA}", () => {
+    cmd2("pluginMarket", "\u041C\u0430\u0440\u043A\u0435\u0442\u043F\u043B\u0435\u0439\u0441 \u043F\u043B\u0430\u0433\u0438\u043D\u043E\u0432", "\u042D\u043A\u043E\u0441\u0438\u0441\u0442\u0435\u043C\u0430", "puzzle", () => {
       selectRailTab("plugins");
       renderPlugins();
       toast("\u0414\u043E\u0441\u0442\u0443\u043F\u043D\u044B \u0432\u0441\u0442\u0440\u043E\u0435\u043D\u043D\u044B\u0435 \u043F\u043B\u0430\u0433\u0438\u043D\u044B + \u0443\u0441\u0442\u0430\u043D\u043E\u0432\u043A\u0430 \u043F\u043E \u0441\u0441\u044B\u043B\u043A\u0435", "info");
     });
-    cmd2("workflow", "GitHub Actions workflow", "\u042D\u043A\u043E\u0441\u0438\u0441\u0442\u0435\u043C\u0430", "\u2699", () => {
+    cmd2("workflow", "GitHub Actions workflow", "\u042D\u043A\u043E\u0441\u0438\u0441\u0442\u0435\u043C\u0430", "settings", () => {
       download(".github-workflows-build.yml", workflowYAML("github"), "text/yaml");
       toast("Workflow \u0441\u043A\u0430\u0447\u0430\u043D", "ok");
     });
-    cmd2("gitlabCI", "GitLab CI", "\u042D\u043A\u043E\u0441\u0438\u0441\u0442\u0435\u043C\u0430", "\u{1F98A}", () => download(".gitlab-ci.yml", workflowYAML("gitlab"), "text/yaml"));
-    cmd2("embed", "Embed-\u043A\u043E\u0434", "\u042D\u043A\u043E\u0441\u0438\u0441\u0442\u0435\u043C\u0430", "\u{1F4FA}", () => {
+    cmd2("gitlabCI", "GitLab CI", "\u042D\u043A\u043E\u0441\u0438\u0441\u0442\u0435\u043C\u0430", "package", () => download(".gitlab-ci.yml", workflowYAML("gitlab"), "text/yaml"));
+    cmd2("embed", "Embed-\u043A\u043E\u0434", "\u042D\u043A\u043E\u0441\u0438\u0441\u0442\u0435\u043C\u0430", "chevronRight", () => {
       copy(embedCode());
       toast("Embed-\u043A\u043E\u0434 \u0441\u043A\u043E\u043F\u0438\u0440\u043E\u0432\u0430\u043D", "ok");
     });
-    cmd2("gist", "\u042D\u043A\u0441\u043F\u043E\u0440\u0442 \u0432 GitHub Gist", "\u042D\u043A\u043E\u0441\u0438\u0441\u0442\u0435\u043C\u0430", "\u{1F419}", () => shareDialog());
-    cmd2("cli", "CLI \u0434\u043B\u044F \u043F\u0440\u043E\u0435\u043A\u0442\u043E\u0432", "\u042D\u043A\u043E\u0441\u0438\u0441\u0442\u0435\u043C\u0430", "\u25B8", () => ctx.modal({
+    cmd2("gist", "\u042D\u043A\u0441\u043F\u043E\u0440\u0442 \u0432 GitHub Gist", "\u042D\u043A\u043E\u0441\u0438\u0441\u0442\u0435\u043C\u0430", "package", () => shareDialog());
+    cmd2("cli", "CLI \u0434\u043B\u044F \u043F\u0440\u043E\u0435\u043A\u0442\u043E\u0432", "\u042D\u043A\u043E\u0441\u0438\u0441\u0442\u0435\u043C\u0430", "terminal", () => ctx.modal({
       title: "CLI Runlet",
       wide: false,
       body: `<p class="muted">\u0424\u0430\u0439\u043B <code class="inline">cli/runlet.mjs</code> \u0443\u043F\u0440\u0430\u0432\u043B\u044F\u0435\u0442 \u043F\u0440\u043E\u0435\u043A\u0442\u0430\u043C\u0438 \u0438\u0437 \u0442\u0435\u0440\u043C\u0438\u043D\u0430\u043B\u0430:</p>
@@ -50772,7 +52322,7 @@ node cli/runlet.mjs build -o dist/index.html
 node cli/runlet.mjs serve --port 7788</pre>`,
       okText: "\u041E\u043A"
     }));
-    cmd2("webhook", "\u0412\u0435\u0431\u0445\u0443\u043A\u0438 \u043D\u0430 \u0441\u043E\u0445\u0440\u0430\u043D\u0435\u043D\u0438\u0435", "\u042D\u043A\u043E\u0441\u0438\u0441\u0442\u0435\u043C\u0430", "\u{1F514}", () => ctx.modal({
+    cmd2("webhook", "\u0412\u0435\u0431\u0445\u0443\u043A\u0438 \u043D\u0430 \u0441\u043E\u0445\u0440\u0430\u043D\u0435\u043D\u0438\u0435", "\u042D\u043A\u043E\u0441\u0438\u0441\u0442\u0435\u043C\u0430", "info", () => ctx.modal({
       title: "Webhooks",
       narrow: true,
       body: `<div class="field"><label>URL \u0434\u043B\u044F POST \u043F\u0440\u0438 \u0441\u043E\u0445\u0440\u0430\u043D\u0435\u043D\u0438\u0438</label><input id="hookUrl" placeholder="https://example.com/hook"></div>
@@ -50783,7 +52333,7 @@ node cli/runlet.mjs serve --port 7788</pre>`,
         toast("Webhook \u0441\u043E\u0445\u0440\u0430\u043D\u0451\u043D", "ok");
       }
     }));
-    cmd2("restApi", "REST API \u0440\u0435\u0434\u0430\u043A\u0442\u043E\u0440\u0430", "\u042D\u043A\u043E\u0441\u0438\u0441\u0442\u0435\u043C\u0430", "\u{1F310}", () => ctx.modal({
+    cmd2("restApi", "REST API \u0440\u0435\u0434\u0430\u043A\u0442\u043E\u0440\u0430", "\u042D\u043A\u043E\u0441\u0438\u0441\u0442\u0435\u043C\u0430", "globe", () => ctx.modal({
       title: "REST API",
       wide: false,
       body: `<p class="muted">\u041B\u043E\u043A\u0430\u043B\u044C\u043D\u044B\u0439 \u0441\u0435\u0440\u0432\u0435\u0440 (Electron: \u043F\u043E\u0440\u0442 7788, web: /api):</p>
@@ -50795,38 +52345,69 @@ GET  /api/files
 POST /api/run</pre>`,
       okText: "\u041E\u043A"
     }));
-    cmd2("terminalPlugin", "\u041F\u043B\u0430\u0433\u0438\u043D-\u0442\u0435\u0440\u043C\u0438\u043D\u0430\u043B", "\u042D\u043A\u043E\u0441\u0438\u0441\u0442\u0435\u043C\u0430", "\u25B8", () => openPlugin("terminal"));
-    cmd2("collab", "\u0421\u043E\u0432\u043C\u0435\u0441\u0442\u043D\u043E\u0435 \u0440\u0435\u0434\u0430\u043A\u0442\u0438\u0440\u043E\u0432\u0430\u043D\u0438\u0435", "\u0421\u043E\u0432\u043C\u0435\u0441\u0442\u043D\u0430\u044F \u0440\u0430\u0431\u043E\u0442\u0430", "\u{1F465}", () => collaborationDialog());
-    cmd2("collabInvite", "\u041F\u0440\u0438\u0433\u043B\u0430\u0441\u0438\u0442\u044C \u043F\u043E e-mail", "\u0421\u043E\u0432\u043C\u0435\u0441\u0442\u043D\u0430\u044F \u0440\u0430\u0431\u043E\u0442\u0430", "\u2709", () => collaborationDialog());
-    cmd2("teacherMode", "\u0420\u0435\u0436\u0438\u043C \u043F\u0440\u0435\u043F\u043E\u0434\u0430\u0432\u0430\u0442\u0435\u043B\u044F", "\u0421\u043E\u0432\u043C\u0435\u0441\u0442\u043D\u0430\u044F \u0440\u0430\u0431\u043E\u0442\u0430", "\u{1F393}", () => {
+    cmd2("terminalPlugin", "\u041F\u043B\u0430\u0433\u0438\u043D-\u0442\u0435\u0440\u043C\u0438\u043D\u0430\u043B", "\u042D\u043A\u043E\u0441\u0438\u0441\u0442\u0435\u043C\u0430", "terminal", () => openPlugin("terminal"));
+    cmd2("collab", "\u0421\u043E\u0432\u043C\u0435\u0441\u0442\u043D\u043E\u0435 \u0440\u0435\u0434\u0430\u043A\u0442\u0438\u0440\u043E\u0432\u0430\u043D\u0438\u0435", "\u0421\u043E\u0432\u043C\u0435\u0441\u0442\u043D\u0430\u044F \u0440\u0430\u0431\u043E\u0442\u0430", "users", () => collaborationDialog());
+    cmd2("collabInvite", "\u041F\u0440\u0438\u0433\u043B\u0430\u0441\u0438\u0442\u044C \u043F\u043E e-mail", "\u0421\u043E\u0432\u043C\u0435\u0441\u0442\u043D\u0430\u044F \u0440\u0430\u0431\u043E\u0442\u0430", "link", () => collaborationDialog());
+    cmd2("teacherMode", "\u0420\u0435\u0436\u0438\u043C \u043F\u0440\u0435\u043F\u043E\u0434\u0430\u0432\u0430\u0442\u0435\u043B\u044F", "\u0421\u043E\u0432\u043C\u0435\u0441\u0442\u043D\u0430\u044F \u0440\u0430\u0431\u043E\u0442\u0430", "book", () => {
       setReadOnly(true);
       toast("\u0420\u0435\u0436\u0438\u043C \u043F\u0440\u0435\u043F\u043E\u0434\u0430\u0432\u0430\u0442\u0435\u043B\u044F \u0432\u043A\u043B\u0451\u043D (read-only)", "ok");
     });
-    cmd2("toggleReadOnly", "\u0420\u0435\u0436\u0438\u043C \u0442\u043E\u043B\u044C\u043A\u043E \u0434\u043B\u044F \u0447\u0442\u0435\u043D\u0438\u044F", "\u0421\u043E\u0432\u043C\u0435\u0441\u0442\u043D\u0430\u044F \u0440\u0430\u0431\u043E\u0442\u0430", "\u{1F512}", () => {
+    cmd2("toggleReadOnly", "\u0420\u0435\u0436\u0438\u043C \u0442\u043E\u043B\u044C\u043A\u043E \u0434\u043B\u044F \u0447\u0442\u0435\u043D\u0438\u044F", "\u0421\u043E\u0432\u043C\u0435\u0441\u0442\u043D\u0430\u044F \u0440\u0430\u0431\u043E\u0442\u0430", "shield", () => {
       setReadOnly(!state.readOnly);
       toast(state.readOnly ? "\u0420\u0435\u0434\u0430\u043A\u0442\u0438\u0440\u043E\u0432\u0430\u043D\u0438\u0435 \u0437\u0430\u0431\u043B\u043E\u043A\u0438\u0440\u043E\u0432\u0430\u043D\u043E" : "\u0420\u0435\u0434\u0430\u043A\u0442\u0438\u0440\u043E\u0432\u0430\u043D\u0438\u0435 \u0440\u0430\u0437\u0440\u0435\u0448\u0435\u043D\u043E", "info");
     });
-    cmd2("gotoDiag", "\u041F\u0435\u0440\u0435\u0439\u0442\u0438 \u043A \u0434\u0438\u0430\u0433\u043D\u043E\u0441\u0442\u0438\u043A\u0435", "\u0410\u043D\u0430\u043B\u0438\u0437", "\u2197", (arg) => {
+    cmd2("gotoDiag", "\u041F\u0435\u0440\u0435\u0439\u0442\u0438 \u043A \u0434\u0438\u0430\u0433\u043D\u043E\u0441\u0442\u0438\u043A\u0435", "\u0410\u043D\u0430\u043B\u0438\u0437", "arrowRight", (arg) => {
       const d = state.report?.diagnostics?.find((x2) => x2.id === arg?.id && x2.line === arg?.line);
       if (d) gotoDiagnostic(d);
     });
-    cmd2("explainDiag", "\u041E\u0431\u044A\u044F\u0441\u043D\u0438\u0442\u044C \u0437\u0430\u043C\u0435\u0447\u0430\u043D\u0438\u0435", "\u0410\u043D\u0430\u043B\u0438\u0437", "\u2753", (arg) => {
+    cmd2("explainDiag", "\u041E\u0431\u044A\u044F\u0441\u043D\u0438\u0442\u044C \u0437\u0430\u043C\u0435\u0447\u0430\u043D\u0438\u0435", "\u0410\u043D\u0430\u043B\u0438\u0437", "chevronRight", (arg) => {
       const d = state.report?.diagnostics?.find((x2) => x2.id === arg?.id && x2.line === arg?.line);
       if (!d) return;
-      selectInspTab("assistant");
-      ask(`\u041E\u0431\u044A\u044F\u0441\u043D\u0438 \u043F\u0440\u043E\u0431\u043B\u0435\u043C\u0443 ${d.id}: ${d.msg}. ${d.why || ""}`);
+      ctx.modal({
+        title: d.id + " \u2014 \u043F\u043E\u044F\u0441\u043D\u0435\u043D\u0438\u0435",
+        wide: false,
+        okText: "\u041A \u0441\u0442\u0440\u043E\u043A\u0435",
+        body: `<p><b>${esc(d.msg)}</b></p>
+        ${d.why ? `<div class="beginner">${esc(d.why)}</div>` : ""}
+        ${d.fix ? `<p class="muted">\u0427\u0442\u043E \u0434\u0435\u043B\u0430\u0442\u044C: ${esc(d.fix)}</p>` : ""}
+        <p class="muted" style="font-size:11px">${esc(d.file)}:${d.line}</p>`,
+        onOk: () => gotoDiagnostic(d)
+      });
     });
-    cmd2("exportReportMd", "\u041E\u0442\u0447\u0451\u0442 \u0432 Markdown", "\u0410\u043D\u0430\u043B\u0438\u0437", "\u2B07", () => exportReport("md"));
-    cmd2("exportReportJson", "\u041E\u0442\u0447\u0451\u0442 \u0432 JSON", "\u0410\u043D\u0430\u043B\u0438\u0437", "\u2B07", () => exportReport("json"));
-    cmd2("copyReport", "\u0421\u043A\u043E\u043F\u0438\u0440\u043E\u0432\u0430\u0442\u044C \u043E\u0442\u0447\u0451\u0442", "\u0410\u043D\u0430\u043B\u0438\u0437", "\u{1F4CB}", () => {
+    cmd2("exportReportMd", "\u041E\u0442\u0447\u0451\u0442 \u0432 Markdown", "\u0410\u043D\u0430\u043B\u0438\u0437", "download", () => exportReport("md"));
+    cmd2("exportReportJson", "\u041E\u0442\u0447\u0451\u0442 \u0432 JSON", "\u0410\u043D\u0430\u043B\u0438\u0437", "download", () => exportReport("json"));
+    cmd2("copyReport", "\u0421\u043A\u043E\u043F\u0438\u0440\u043E\u0432\u0430\u0442\u044C \u043E\u0442\u0447\u0451\u0442", "\u0410\u043D\u0430\u043B\u0438\u0437", "list", () => {
       copy(reportMarkdown());
       toast("\u041E\u0442\u0447\u0451\u0442 \u0441\u043A\u043E\u043F\u0438\u0440\u043E\u0432\u0430\u043D", "ok");
     });
-    cmd2("securityScan", "\u0421\u043A\u0430\u043D\u0438\u0440\u043E\u0432\u0430\u0442\u044C \u0431\u0435\u0437\u043E\u043F\u0430\u0441\u043D\u043E\u0441\u0442\u044C", "\u0410\u043D\u0430\u043B\u0438\u0437", "\u{1F512}", () => cmdRun("aiSecurity"));
-    cmd2("openFile", "\u041E\u0442\u043A\u0440\u044B\u0442\u044C \u0444\u0430\u0439\u043B", "\u0424\u0430\u0439\u043B\u044B", "\u{1F4C4}", (p) => {
+    cmd2("projectManager", "\u041C\u0435\u043D\u044E \u043F\u0440\u043E\u0435\u043A\u0442\u043E\u0432", "\u041F\u0440\u043E\u0435\u043A\u0442", "folder", () => ctx.showStartScreen?.());
+    cmd2("exportProject", "\u042D\u043A\u0441\u043F\u043E\u0440\u0442 \u043F\u0440\u043E\u0435\u043A\u0442\u0430", "\u041F\u0440\u043E\u0435\u043A\u0442", "archive", () => exportProject(""));
+    cmd2("exportAllProjects", "\u042D\u043A\u0441\u043F\u043E\u0440\u0442 \u0432\u0441\u0435\u0445 \u043F\u0440\u043E\u0435\u043A\u0442\u043E\u0432", "\u041F\u0440\u043E\u0435\u043A\u0442", "download", () => exportAllProjects());
+    cmd2("importProject", "\u0418\u043C\u043F\u043E\u0440\u0442 \u043F\u0440\u043E\u0435\u043A\u0442\u0430", "\u041F\u0440\u043E\u0435\u043A\u0442", "upload", () => $("#hiddenProjectInput")?.click());
+    cmd2("newProject", "\u041D\u043E\u0432\u044B\u0439 \u043F\u0440\u043E\u0435\u043A\u0442", "\u041F\u0440\u043E\u0435\u043A\u0442", "plus", () => ctx.showStartScreen?.());
+    cmd2("liveServer", "Live Server", "\u0421\u0435\u0440\u0432\u0435\u0440", "server", () => toggleLiveServer());
+    cmd2("liveServerDialog", "\u041D\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0438 Live Server", "\u0421\u0435\u0440\u0432\u0435\u0440", "server", () => liveServerDialog());
+    cmd2("openSite", "\u0421\u0430\u0439\u0442 \u0432 \u043E\u043A\u043D\u0435", "\u0421\u0435\u0440\u0432\u0435\u0440", "window", () => ctx.openSiteWindow?.());
+    cmd2("openSiteExternal", "\u041E\u0442\u043A\u0440\u044B\u0442\u044C \u0441\u0430\u0439\u0442 \u0432 \u0431\u0440\u0430\u0443\u0437\u0435\u0440\u0435", "\u0421\u0435\u0440\u0432\u0435\u0440", "external", () => openSiteExternal());
+    cmd2("windowedMode", "\u041E\u043A\u043E\u043D\u043D\u044B\u0439 \u0440\u0435\u0436\u0438\u043C", "\u041E\u043A\u043D\u0430", "window", () => ctx.toggleWindows?.());
+    cmd2("closeWindows", "\u0417\u0430\u043A\u0440\u044B\u0442\u044C \u0432\u0441\u0435 \u043E\u043A\u043D\u0430", "\u041E\u043A\u043D\u0430", "close", () => closeAllWindows());
+    cmd2("previewWindow", "\u041F\u0440\u0435\u0434\u043F\u0440\u043E\u0441\u043C\u043E\u0442\u0440 \u0432 \u043E\u043A\u043D\u0435", "\u041E\u043A\u043D\u0430", "window", () => ctx.openPreviewWindow?.());
+    cmd2("detachEditor", "\u0420\u0435\u0434\u0430\u043A\u0442\u043E\u0440 \u0432 \u043E\u043A\u043D\u0435", "\u041E\u043A\u043D\u0430", "window", (p) => detachEditor(typeof p === "string" ? p : state.activePane));
+    cmd2("openThreeD", "3D-\u0440\u0435\u0434\u0430\u043A\u0442\u043E\u0440", "3D", "cube", () => {
+      selectRailTab("three");
+      emit("three:show");
+    });
+    cmd2("openThreeWindow", "3D \u0432 \u043E\u043A\u043D\u0435", "3D", "window", () => ctx.openThreeWindow?.());
+    cmd2("threeAdd", "\u0414\u043E\u0431\u0430\u0432\u0438\u0442\u044C \u043E\u0431\u044A\u0435\u043A\u0442", "3D", "plus", () => {
+      selectRailTab("three");
+      addObject("cube");
+    });
+    cmd2("threeExport", "\u042D\u043A\u0441\u043F\u043E\u0440\u0442 3D \u0432 \u043F\u0440\u043E\u0435\u043A\u0442", "3D", "download", () => exportToProject());
+    cmd2("helpWelcome", "\u041A\u0430\u043A \u0440\u0430\u0431\u043E\u0442\u0430\u0442\u044C", "\u041E\u0441\u043D\u043E\u0432\u043D\u043E\u0435", "info", () => showWelcome());
+    cmd2("openFile", "\u041E\u0442\u043A\u0440\u044B\u0442\u044C \u0444\u0430\u0439\u043B", "\u0424\u0430\u0439\u043B\u044B", "file", (p) => {
       if (typeof p === "string") openFile(p);
     }, { hidden: true });
-    cmd2("openPanel", "\u041E\u0442\u043A\u0440\u044B\u0442\u044C \u043F\u0430\u043D\u0435\u043B\u044C", "\u041E\u0441\u043D\u043E\u0432\u043D\u043E\u0435", "", (p) => {
+    cmd2("openPanel", "\u041E\u0442\u043A\u0440\u044B\u0442\u044C \u043F\u0430\u043D\u0435\u043B\u044C", "\u041E\u0441\u043D\u043E\u0432\u043D\u043E\u0435", "chevronRight", (p) => {
       if (typeof p === "string") selectInspTab(p);
     }, { hidden: true });
   }
@@ -50838,6 +52419,7 @@ POST /api/run</pre>`,
   }
 
   // app/src/main.js
+  init_threeD();
   var started = performance.now();
   async function boot() {
     Object.assign(ctx, {
@@ -50862,7 +52444,35 @@ POST /api/run</pre>`,
       applyEditorSettings,
       focusPane,
       getDoc,
-      setDoc
+      setDoc,
+      openProject,
+      listProjects,
+      toggleWindowedMode,
+      // new subsystems
+      showStartScreen,
+      showWelcome,
+      hydrateIcons,
+      applySettings,
+      run,
+      analyze: () => runAnalysis2(),
+      srcdoc,
+      liveStatus,
+      toggleWindows: toggleWindowedMode,
+      openSiteWindowRaw: (url, html2) => openSiteWindow(url, html2),
+      openPreviewWindow: () => openWindow({
+        id: "preview",
+        title: "\u041F\u0440\u0435\u0434\u043F\u0440\u043E\u0441\u043C\u043E\u0442\u0440",
+        icon: "monitor",
+        width: 900,
+        height: 640,
+        html: srcdoc()
+      }),
+      openThreeWindow: openThreeDWindow,
+      movePanelWindow,
+      detachEditor,
+      windowCount,
+      setNativeFrame: (v) => window.runlet?.setFrame?.(v),
+      toggleLiveServer
     });
     const restored = await initStorage();
     const base2 = JSON.parse(JSON.stringify(DEFAULT_SETTINGS));
@@ -50873,16 +52483,22 @@ POST /api/run</pre>`,
       sandboxPermissions: { ...base2.sandboxPermissions, ...saved.sandboxPermissions || {} },
       keybindings: { ...base2.keybindings, ...saved.keybindings || {} }
     };
+    initProjects();
     initEditors();
     initPreview();
     initFiles();
     initPanels();
-    initAssistant();
     initLearn();
     initPlugins();
     initFeatures();
+    initThreeD();
+    initWindows();
+    initLiveServer();
     initCommands();
     initUI();
+    hydrateIcons();
+    if (window.runlet?.setFrame && state.settings.nativeFrame) window.runlet.setFrame(true);
+    if (state.settings.windowedMode && !state.settings.showLauncher) setTimeout(() => toggleWindowedMode(), 900);
     applyEditorSettings();
     applyLayout(state.layout);
     applyDevice();
@@ -51037,7 +52653,15 @@ POST /api/run</pre>`,
       getDoc,
       setDoc,
       coverage: () => coverage(),
-      srcdoc: () => run("full"),
+      projects: () => listProjects(),
+      openProject,
+      showStartScreen,
+      showWelcome,
+      toggleWindowedMode,
+      liveStatus,
+      toggleLiveServer,
+      srcdoc: () => srcdoc(),
+      scene3d: () => Promise.resolve().then(() => (init_threeD(), threeD_exports)).then((m) => m.getScene()),
       console: {
         clear: () => {
           state.logs = [];

@@ -5,7 +5,8 @@ const { contextBridge, ipcRenderer } = require('electron');
 // before it ever reaches ipcRenderer.invoke.
 const CHANNELS = new Set([
   'analyze', 'app:info', 'fs:open', 'fs:save', 'fs:read', 'fs:write',
-  'win:control', 'shell:open', 'python:check', 'preview:popout'
+  'win:control', 'win:frame', 'shell:open', 'python:check', 'preview:popout',
+  'live:start', 'live:update', 'live:stop', 'live:status', 'live:external'
 ]);
 
 const str = (v, max = 4 * 1024 * 1024) =>
@@ -58,6 +59,18 @@ const api = {
     ipcRenderer.on('menu:command', (_, id) => { if (typeof id === 'string' && id.length < 80) cb(id); });
   },
   pythonCheck: () => ipcRenderer.invoke('python:check'),
+  setFrame: useFrame => ipcRenderer.invoke('win:frame', !!useFrame),
+  liveStart: payload => {
+    if (!payload || typeof payload !== 'object' || !payload.project || !payload.project.files) return Promise.resolve({ ok: false, error: 'bad payload' });
+    return ipcRenderer.invoke('live:start', { port: Number(payload.port) || 5500, project: payload.project });
+  },
+  liveUpdate: payload => ipcRenderer.invoke('live:update', { project: payload?.project }),
+  liveStop: () => ipcRenderer.invoke('live:stop'),
+  liveStatus: () => ipcRenderer.invoke('live:status'),
+  liveExternal: () => {
+    const p = Number(process.env.RUNLET_LIVE_PORT) || 5500;
+    return ipcRenderer.invoke('live:external');
+  },
   // The REST token is deliberately NOT exposed to the renderer: it lives in
   // userData/api-token (0600) and is only needed by the local CLI.
 };

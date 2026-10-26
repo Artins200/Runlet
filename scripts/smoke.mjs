@@ -5,6 +5,15 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ORIGIN = process.env.RUNLET_TEST_ORIGIN || 'http://localhost:4173';
+const CTX = new Proxy({}, {
+  get: (_, k) => {
+    if (k === 'createLinearGradient' || k === 'createRadialGradient') return () => ({ addColorStop() {} });
+    if (k === 'measureText') return () => ({ width: 10 });
+    if (k === 'getImageData') return () => ({ data: new Uint8ClampedArray(4) });
+    return () => {};
+  },
+  set: () => true
+});
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const html = await (await fetch(ORIGIN + '/')).text();
@@ -28,11 +37,7 @@ const dom = new JSDOM(html, {
     w.fetch = (u, o) => globalThis.fetch(new URL(typeof u === 'string' ? u : u.url, ORIGIN), o);
     w.structuredClone = globalThis.structuredClone;
     w.CSS = { escape: s => String(s).replace(/[^a-zA-Z0-9_-]/g, c => '\\' + c) };
-    w.HTMLCanvasElement.prototype.getContext = () => ({
-      clearRect() {}, fillRect() {}, fillText() {}, drawImage() {}, createLinearGradient: () => ({ addColorStop() {} }),
-      beginPath() {}, fill() {}, roundRect() {}, save() {}, restore() {}, translate() {}, scale() {},
-      measureText: () => ({ width: 10 }), set fillStyle(v) {}, set font(v) {}, set globalAlpha(v) {}, set textAlign(v) {}, set textBaseline(v) {}
-    });
+    w.HTMLCanvasElement.prototype.getContext = () => CTX;
     w.HTMLCanvasElement.prototype.toDataURL = () => 'data:image/png;base64,AA';
     w.Range.prototype.getClientRects = function () { return { length: 0, item: () => null, [Symbol.iterator]: function* () {} }; };
     w.Range.prototype.getBoundingClientRect = () => ({ x: 0, y: 0, top: 0, left: 0, right: 0, bottom: 0, width: 0, height: 0 });
@@ -65,6 +70,23 @@ check('analysis panel has score', /score-ring/.test(w.document.querySelector('#a
 check('preview iframe has srcdoc', (w.document.querySelector('#previewFrame')?.getAttribute('srcdoc') || w.document.querySelector('#previewFrame')?.srcdoc || '').length > 100);
 check('command registry populated', w.Runlet?.commands?.size > 100, w.Runlet?.commands?.size + ' commands');
 check('CSS variables applied', !!w.document.documentElement.style.getPropertyValue('--accent'));
+
+// New UI: launcher, icons, toolbar, devices, 3D, projects, windows
+check('Project launcher shown', !!w.document.querySelector('#startScreen .launch'));
+check('Launcher has project rows', w.document.querySelectorAll('#prjList .project-row').length >= 1);
+check('Toolbar rendered from presets', w.document.querySelectorAll('#toolbarPrimary [data-cmd]').length >= 5);
+check('Secondary toolbar rendered', w.document.querySelectorAll('#toolbarSecondary [data-cmd]').length >= 2);
+check('SVG icons hydrated', w.document.querySelectorAll('svg.ico').length >= 10);
+check('No emoji in UI labels', !/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}]/u.test(w.document.body.textContent || ''));
+const devBtns = [...w.document.querySelectorAll('#deviceSwitch [data-device]')].map(b => b.dataset.device);
+check('Only 3 clear device presets + custom', JSON.stringify(devBtns) === JSON.stringify(['desktop','tablet','phone','custom']), devBtns.join(','));
+check('3D editor canvas exists', !!w.document.querySelector('#tdCanvas'));
+check('Windows layer exists', !!w.document.querySelector('#windowsLayer'));
+check('Live Server bar exists', !!w.document.querySelector('#liveBar'));
+check('Inspector sub-tabs grouped', w.document.querySelectorAll('#inspectorTabs .insp-tab').length === 5 &&
+  w.document.querySelectorAll('#inspectorSubTabs .sub-tab').length === 4);
+check('Public API exposes projects/windows/live', typeof w.Runlet.projects === 'function' &&
+  typeof w.Runlet.toggleWindowedMode === 'function' && typeof w.Runlet.liveStatus === 'function');
 
 // interaction: run a command through the palette registry
 try { w.Runlet?.runCommand('layoutRows'); check('layoutRows command', w.document.querySelector('#editors')?.dataset.layout === 'rows'); }

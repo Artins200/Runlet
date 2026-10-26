@@ -1,5 +1,6 @@
 /* Inspector panels: analysis, console, debugger, DOM, network, storage, perf, log. */
 import { state, ctx, $, $$, el, esc, on, emit, toast, download, copy, debounce, fmtBytes, sanitizeColor } from './core.js';
+import { icon } from './icons.js';
 import { read, listFiles } from './state.js';
 import { reportMarkdown, reportJSON, gotoDiagnostic, applyFix, fixAllSafe, runAnalysis, scheduleAnalysis } from './analyzer.js';
 import { refreshInspectors, request, send, evalInPreview, setBreakpoint, emulateA11y, screenReader } from './preview.js';
@@ -61,10 +62,10 @@ export function renderAnalysis() {
         <span class="verdict ${r.summary.verdict_level}">${esc(r.summary.verdict)}</span>
         <h2>${esc(r.summary.headline)}</h2>
         <p class="analysis-desc">${esc(r.summary.description)}</p>
-        <div class="engine-line"><span class="pill ${py ? 'pill-accent' : ''}">${py ? '🐍 Python-движок' : '⚡ JS-анализ'}</span>
+        <div class="engine-line"><span class="pill ${py ? 'pill-accent' : ''}">${icon(py ? 'code' : 'info', 12)} ${py ? 'Python-движок' : 'JS-анализ'}</span>
           <span>${r.elapsed_ms} мс</span><span>${r.diagnostics.length} замечаний</span>
-          <button class="mini-btn" data-cmd="analyze">↻ Обновить</button>
-          <button class="mini-btn" data-cmd="analysisReport">⛶ Развернуть</button></div>
+          <button class="mini-btn" data-cmd="analyze">${icon('refresh', 12)} Обновить</button>
+          <button class="mini-btn" data-cmd="analysisReport">${icon('maximize', 12)} Развернуть</button></div>
       </div>
     </div>
     <div class="grade-bars">${Object.entries(r.grades).map(([k, v]) => `
@@ -75,16 +76,17 @@ export function renderAnalysis() {
     <div class="section"><h3>Ошибки и замечания <span class="count">${r.diagnostics.length}</span></h3>
       <div class="sev-filters">${['all', 'error', 'warning', 'info', 'hint'].map(f =>
         `<button class="sev-chip ${diagFilter === f ? 'active' : ''}" data-sev="${f}">${sevRu[f]} <span class="n">${f === 'all' ? r.diagnostics.length : r.diagnostics.filter(d => d.sev === f).length}</span></button>`).join('')}
-        <button class="sev-chip" data-cmd="fixAll">🛠 Исправить</button></div>
+        <button class="sev-chip" data-cmd="fixAll">${icon('wand', 12)} Исправить</button></div>
       <div class="diag-list">${diagnosticsHtml(r)}</div></div>
     ${chipsHtml(r)}
     <div class="section"><h3>Для новичка <button class="mini-btn" id="beginnerToggle" style="margin-left:auto">${beginnerMode ? 'Скрыть' : 'Объяснить'}</button></h3>
       <div class="beginner ${beginnerMode ? '' : 'hidden'}" id="beginnerBox"><ul>${r.summary.beginner.map(b => `<li>${esc(b)}</li>`).join('')}</ul></div></div>
     <div class="rowflex" style="padding:0 14px 14px">
-      <button class="mini-btn" data-cmd="exportReportMd">⬇ Markdown</button>
-      <button class="mini-btn" data-cmd="exportReportJson">⬇ JSON</button>
-      <button class="mini-btn" data-cmd="copyReport">📋 Копировать</button>
-      <button class="mini-btn" data-cmd="assistant">✦ Спросить ассистента</button></div>`;
+      <button class="mini-btn" data-cmd="exportReportMd">${icon('download', 12)} Markdown</button>
+      <button class="mini-btn" data-cmd="exportReportJson">${icon('download', 12)} JSON</button>
+      <button class="mini-btn" data-cmd="copyReport">${icon('copy', 12)} Копировать</button>
+      <button class="mini-btn" data-cmd="helpWelcome">${icon('help', 12)} Как работать</button>
+      </div>`;
   host.querySelectorAll('[data-sev]').forEach(b => b.addEventListener('click', () => { diagFilter = b.dataset.sev; renderAnalysis(); }));
   host.querySelectorAll('.diag-top .file').forEach(b => b.addEventListener('click', () => {
     const d = r.diagnostics.find(x => x.id === b.dataset.rid && x.line === +b.dataset.line);
@@ -101,14 +103,14 @@ const gradesRu = { correctness: 'корректность', a11y: 'доступ�
 const sevRu = { all: 'все', error: 'ошибки', warning: 'предупр.', info: 'инфо', hint: 'советы' };
 function diagnosticsHtml(r) {
   const list = r.diagnostics.filter(d => diagFilter === 'all' || d.sev === diagFilter);
-  if (!list.length) return '<div class="empty-note">Здесь чисто ✨</div>';
+  if (!list.length) return '<div class="empty-note">Здесь чисто </div>';
   return list.slice(0, 90).map(d => `<div class="diag ${d.sev}">
     <div class="diag-top"><span class="sev ${d.sev}">${({ error: 'ОШИБКА', warning: 'ВНИМАНИЕ', info: 'ИНФО', hint: 'СОВЕТ' })[d.sev]}</span>
       <span>${esc(d.id)} · ${esc(gradesRu[d.cat] || d.cat)}</span>
       <span class="file" data-rid="${esc(d.id)}" data-line="${d.line}">${esc(d.file)}:${d.line} ↗</span></div>
     <p class="diag-msg">${esc(d.msg)}</p>
     ${d.why ? `<div class="diag-why hidden"><b>Почему:</b> ${esc(d.why)}</div>` : ''}
-    ${d.fix ? `<div class="diag-fix">💡 ${esc(d.fix)}</div>` : ''}
+    ${d.fix ? `<div class="diag-fix"> ${esc(d.fix)}</div>` : ''}
     <div class="diag-actions">${d.edit ? `<button class="mini-btn" data-fix="${esc(d.id)}" data-line="${d.line}">Исправить</button>` : ''}
       <button class="mini-btn" data-cmd="gotoDiag" data-rid="${esc(d.id)}" data-line="${d.line}">К строке</button>
       <button class="mini-btn" data-cmd="explainDiag" data-rid="${esc(d.id)}" data-line="${d.line}">Объяснить</button></div>
@@ -117,13 +119,13 @@ function diagnosticsHtml(r) {
 function chipsHtml(r) {
   const b = r.behavior || {};
   const chips = [];
-  for (const e of (b.events || []).slice(0, 6)) chips.push(`<span class="chip">⚡ <b>${esc(e.type)}</b> → ${esc(e.target)}</span>`);
-  for (const n of (b.network || []).slice(0, 4)) chips.push(`<span class="chip">🌐 <b>${esc(n.method || 'fetch')}</b> ${esc(String(n.url).slice(0, 40))}</span>`);
+  for (const e of (b.events || []).slice(0, 6)) chips.push(`<span class="chip"> <b>${esc(e.type)}</b> → ${esc(e.target)}</span>`);
+  for (const n of (b.network || []).slice(0, 4)) chips.push(`<span class="chip"> <b>${esc(n.method || 'fetch')}</b> ${esc(String(n.url).slice(0, 40))}</span>`);
   for (const t of (b.timers || []).slice(0, 3)) chips.push(`<span class="chip">⏱ ${esc(t.kind || 'timer')}</span>`);
-  for (const s of (b.storage || []).slice(0, 4)) chips.push(`<span class="chip">💾 <b>${esc(s.store)}</b> ${esc(s.key)}</span>`);
+  for (const s of (b.storage || []).slice(0, 4)) chips.push(`<span class="chip"> <b>${esc(s.store)}</b> ${esc(s.key)}</span>`);
   for (const c of (b.colors || []).slice(0, 6)) {
     const col = sanitizeColor(c.value, 'transparent');
-    chips.push(`<span class="chip">🎨 <b style="color:${col}">■</b> ${esc(String(c.value).slice(0, 40))}</span>`);
+    chips.push(`<span class="chip"> <b style="color:${col}">■</b> ${esc(String(c.value).slice(0, 40))}</span>`);
   }
   if (!chips.length) return '';
   return `<div class="section"><h3>Поведение кода</h3><div class="chips">${chips.join('')}</div></div>`;
@@ -132,7 +134,7 @@ function chipsHtml(r) {
 export function fullAnalysisReport() {
   const r = state.report;
   ctx.modal({
-    title: '🧠 Полный анализ кода', wide: true,
+    title: ' Полный анализ кода', wide: true,
     body: `<div id="fullReport" class="analysis-report">${r ? reportBody(r) : '<div class="empty-note">Сначала запустите анализ</div>'}</div>`,
     okText: 'Закрыть',
     onMount: root => {
@@ -189,7 +191,7 @@ export function renderConsole() {
       <select id="logLevel" class="mini-select"><option value="all">все</option><option value="log">log</option><option value="info">info</option><option value="warn">warn</option><option value="error">error</option></select>
       <input id="logSearch" placeholder="Поиск / regex…" style="flex:1;min-width:70px;height:25px;border-radius:8px;border:1px solid var(--border);background:var(--code-bg);padding:0 8px;font-size:11px">
       <label class="chk"><input type="checkbox" id="logGroup" ${state.consoleGroup ? 'checked' : ''}> группировать</label>
-      <button class="mini-btn" id="logClear">Очистить</button><button class="mini-btn" id="logSave">⬇</button>
+      <button class="mini-btn" id="logClear">Очистить</button><button class="mini-btn" id="logSave"></button>
       <button class="mini-btn" id="logJson">JSON</button></div>
       <div class="console-list" id="logList" style="flex:1;overflow:auto"></div>
       <div class="repl-bar"><span class="repl-prompt">›</span><input id="replInput" placeholder="Введите JS-выражение (Enter — выполнить)" autocomplete="off">
@@ -258,8 +260,8 @@ export function renderDebug() {
       <button class="mini-btn" id="dbgAddBp">＋ Точка</button></div>
     <div class="section"><h3>Точки останова <span class="count">${bps.length}</span></h3>
       <div class="debug-steps">${bps.length ? bps.map(b => `<div class="kv"><span>${esc(b.file)}:${b.line}</span>
-        <span>${b.condition ? '❓ ' + esc(b.condition) : 'обычная'}</span>
-        <button class="mini-btn" data-bpdel="${esc(b.file)}:${b.line}">✕</button></div>`).join('') : '<div class="empty-note">Клик «＋ Точка» и укажите строку</div>'}</div></div>
+        <span>${b.condition ? ' ' + esc(b.condition) : 'обычная'}</span>
+        <button class="mini-btn" data-bpdel="${esc(b.file)}:${b.line}"></button></div>`).join('') : '<div class="empty-note">Клик «＋ Точка» и укажите строку</div>'}</div></div>
     <div class="section"><h3>Выполненные строки <span class="count">${trace.length}</span></h3>
       <div class="debug-steps" id="timeline" style="max-height:150px;overflow:auto">${trace.slice(-120).map((t, i) => `<div class="timeline-row ${i === state.traceIndex ? 'active' : ''}" data-ti="${i}">
         <span>${t.t}ms</span><b>${esc(t.file)}:${t.line}</b><span>${esc(Object.keys(t.vars || {}).slice(0, 5).join(', '))}</span></div>`).join('') || '<div class="empty-note">Запустите код — трассировщик запишет executed lines</div>'}</div></div>
@@ -291,7 +293,7 @@ function scopeHtml() {
   const entries = Object.entries(vars);
   const watches = state.watch || [];
   return (entries.length ? entries.slice(0, 16).map(([k, v]) => `<div class="kv"><span>${esc(k)}</span><b>${esc(typeof v === 'object' ? JSON.stringify(v) : String(v))}</b></div>`).join('') : '<div class="dim" style="padding:4px">Переменные появятся при шаге по трассировке</div>') +
-    watches.map(w => `<div class="kv"><span>👁 ${esc(w)}</span><b>${esc((state.watchValues || {})[w] || '—')}</b></div>`).join('');
+    watches.map(w => `<div class="kv"><span> ${esc(w)}</span><b>${esc((state.watchValues || {})[w] || '—')}</b></div>`).join('');
 }
 function stackHtml() {
   const t = state.trace[state.traceIndex];
@@ -325,8 +327,8 @@ export function renderDom() {
   const host = $('#domPanel'); if (!host) return;
   const selected = state.selectedElement;
   host.innerHTML = `<div class="insp-toolbar"><button class="mini-btn" id="domRefresh">↻ Обновить DOM</button>
-      <button class="mini-btn" id="domInspect">⌖ Инспектор</button><button class="mini-btn" id="domA11y">♿ a11y</button>
-      <button class="mini-btn" id="domSpeech">🔊 Скринридер</button></div>
+      <button class="mini-btn" id="domInspect">⌖ Инспектор</button><button class="mini-btn" id="domA11y"> a11y</button>
+      <button class="mini-btn" id="domSpeech"> Скринридер</button></div>
     <div class="dom-tree" id="domTreeBox">${state.domTree ? domHtml(state.domTree, 0) : '<div class="empty-note">Нажмите «Обновить DOM»</div>'}</div>
     <div class="section"><h3>Computed styles ${selected ? '— ' + esc(selected.tag) : ''}</h3>
       <div class="debug-steps">${Object.entries(state.computedStyles || {}).map(([k, v]) => `<div class="kv"><span>${esc(k)}</span><b>${esc(v)}</b></div>`).join('') || '<div class="dim">Выберите элемент в предпросмотре</div>'}</div></div>
@@ -391,18 +393,18 @@ export function renderPerf() {
 }
 export function renderLog() {
   const host = $('#logPanel'); if (!host) return;
-  host.innerHTML = `<div class="insp-toolbar"><button class="mini-btn" id="logExport">⬇ Журнал</button>
+  host.innerHTML = `<div class="insp-toolbar"><button class="mini-btn" id="logExport"> Журнал</button>
     <button class="mini-btn" id="logClear2">Очистить</button><span class="spacer"></span><span class="muted">${state.activity.length} событий</span></div>
     <div class="debug-steps">${state.activity.map(a => `<div class="kv"><span>${new Date(a.t).toLocaleTimeString('ru-RU')}</span><b style="font-weight:400;text-align:right">${esc(a.msg.slice(0, 90))}</b></div>`).join('') || '<div class="empty-note">Журнал пуст</div>'}</div>`;
   host.querySelector('#logExport').onclick = () => download('runlet-activity.json', JSON.stringify(state.activity, null, 2), 'application/json');
   host.querySelector('#logClear2').onclick = () => { state.activity = []; renderLog(); };
 }
 function showA11yScan(data) {
-  ctx.modal({ title: '♿ Отчёт о доступности', wide: false,
+  ctx.modal({ title: ' Отчёт о доступности', wide: false,
     body: `<p><b>Фокусируемых элементов:</b> ${data.focusables}</p><p><b>Заголовков:</b> ${data.headings}</p>
       <p><b>Язык страницы:</b> ${esc(data.lang || 'не указан')}</p>
       <h4 style="margin:12px 0 6px">Проблемы (${data.issues.length})</h4>
-      <ul style="font-size:12px;line-height:1.7">${data.issues.length ? data.issues.map(i => `<li>${esc(i)}</li>`).join('') : '<li>Проблем не найдено ✅</li>'}</ul>`,
+      <ul style="font-size:12px;line-height:1.7">${data.issues.length ? data.issues.map(i => `<li>${esc(i)}</li>`).join('') : '<li>Проблем не найдено </li>'}</ul>`,
     okText: 'Закрыть' });
 }
 
