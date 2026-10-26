@@ -1,13 +1,13 @@
 /* Every UI action lives here: buttons, hotkeys and the command palette. */
 import {
   state, ctx, registerCommand, runCommand, commands, $, $$, toast, copy, download, emit, on,
-  applyTheme, debounce, DEFAULT_SETTINGS
+  applyTheme, debounce, DEFAULT_SETTINGS, esc
 } from './core.js';
 import { undo, redo } from '@codemirror/commands';
 import {
   read, write, exists, listFiles, persistNow, makeSnapshot, allTextFiles,
   projectJSON, importProjectJSON, resetProject, resetSettings, exportSettings,
-  importSettings, applySettings, applyPreset, projectSize
+  importSettings, applySettings, applyPreset, projectSize, setReadOnly
 } from './state.js';
 import {
   setDoc, getDoc, getSelection, insertText, insertSnippet, expandEmmet, formatDoc,
@@ -175,7 +175,7 @@ export function initCommands() {
   cmd('aiExplainSelection', 'Объяснить выделенное', 'Ассистент', '🔍', () => { const s = getSelection(); if (!s) return toast('Сначала выделите код', 'warn'); selectInspTab('assistant'); ask('объясни выделенный код: ' + s.slice(0, 200)); });
   cmd('aiFix', 'Автопочинка ошибок', 'Ассистент', '🛠', () => { selectInspTab('assistant'); ask('исправь ошибки'); });
   cmd('aiTests', 'Сгенерировать тесты', 'Ассистент', '🧪', () => { const t = generateTests(getDoc('js')); insertText(t, 'js'); toast('Тесты вставлены', 'ok'); });
-  cmd('aiDocs', 'Документация из кода', 'Ассистент', '📖', () => ctx.modal({ title: 'Документация', wide: true, body: `<pre style="white-space:pre-wrap;font:12px var(--mono)">${generateDocs(getDoc('js'))}</pre>`, okText: 'Скачать', onOk: () => download('DOCS.md', generateDocs(getDoc('js')), 'text/markdown') }));
+  cmd('aiDocs', 'Документация из кода', 'Ассистент', '📖', () => ctx.modal({ title: 'Документация', wide: true, body: `<pre style="white-space:pre-wrap;font:12px var(--mono)">${esc(generateDocs(getDoc('js')))}</pre>`, okText: 'Скачать', onOk: () => download('DOCS.md', generateDocs(getDoc('js')), 'text/markdown') }));
   cmd('aiReadme', 'Сгенерировать README', 'Ассистент', '📝', () => download('README.md', generateReadme(), 'text/markdown'));
   cmd('aiChangelog', 'Сгенерировать changelog', 'Ассистент', '📋', () => download('CHANGELOG.md', generateChangelog(), 'text/markdown'));
   cmd('aiRefactor', 'Рефакторинг выделенного', 'Ассистент', '♻', () => { const s = getSelection() || getDoc('js'); const out = refactorSelection(s); if (getSelection()) insertText(out); else setDoc(out, 'js'); toast('Рефакторинг применён', 'ok'); });
@@ -257,7 +257,8 @@ POST /api/run</pre>`, okText: 'Ок' }));
   /* ── collaboration ──────────────────────────────────────────── */
   cmd('collab', 'Совместное редактирование', 'Совместная работа', '👥', () => collaborationDialog());
   cmd('collabInvite', 'Пригласить по e-mail', 'Совместная работа', '✉', () => collaborationDialog());
-  cmd('teacherMode', 'Режим преподавателя', 'Совместная работа', '🎓', () => { state.readOnly = true; toast('Режим преподавателя вклён (read-only)', 'ok'); });
+  cmd('teacherMode', 'Режим преподавателя', 'Совместная работа', '🎓', () => { setReadOnly(true); toast('Режим преподавателя вклён (read-only)', 'ok'); });
+  cmd('toggleReadOnly', 'Режим только для чтения', 'Совместная работа', '🔒', () => { setReadOnly(!state.readOnly); toast(state.readOnly ? 'Редактирование заблокировано' : 'Редактирование разрешено', 'info'); });
 
   /* ── diagnostics helpers ────────────────────────────────────── */
   cmd('gotoDiag', 'Перейти к диагностике', 'Анализ', '↗', arg => {

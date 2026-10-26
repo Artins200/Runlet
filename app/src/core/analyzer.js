@@ -6,12 +6,28 @@ import { CSS_PROPS, CSS_VALUES } from './data.js';
 import { editors, setDoc, getDoc, goto } from './editor.js';
 import * as acorn from 'acorn';
 
+const MAX_ANALYZE_TOTAL = 4 * 1024 * 1024;
 export function analysisJob() {
+  // Cap what we hand to the sidecar process; never send arbitrary objects.
+  const files = {};
+  let total = 0;
+  for (const [name, content] of Object.entries(allTextFiles())) {
+    if (typeof name !== 'string' || name.length > 300 || name.includes('\0') || name.includes('\\')) continue;
+    if (typeof content !== 'string') continue;
+    total += content.length;
+    if (total > MAX_ANALYZE_TOTAL) break;
+    files[name] = content.slice(0, 2 * 1024 * 1024);
+  }
   return {
-    files: allTextFiles(), entry: state.entry,
-    deps: state.deps.map(d => (typeof d === 'string' ? d : d.id)),
-    locale: state.settings.locale, active: state.activePane
+    files, entry: String(state.entry || 'index.html').slice(0, 300),
+    deps: state.deps.map(d => typeof d === 'string' ? d.slice(0, 80) : String(d?.id || '').slice(0, 80)),
+    locale: String(state.settings.locale || 'ru').slice(0, 8), active: state.activePane
   };
+}
+function apiToken() {
+  const meta = document.querySelector('meta[name="runlet-api-token"]');
+  const t = meta?.getAttribute('content') || '';
+  return /^[a-f0-9]{32,128}$/i.test(t) ? t : '';
 }
 
 let pending = 0;
@@ -25,11 +41,22 @@ export async function runAnalysis({ silent = false, force = false } = {}) {
     if (window.runlet?.analyze) {
       report = await window.runlet.analyze(job);       // Electron → python3 engine.py --server
     } else {
-      const res = await fetch('/api/analyze', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(job)
-      });
-      if (res.ok) report = await res.json();
+      const token = apiToken();
+      const body = JSON.stringify(job);
+      if (body.length > MAX_ANALYZE_TOTAL) throw new Error('analysis job too large');
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 20000);
+      try {
+        const res = await fetch('/api/analyze', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...(token ? { 'X-Runlet-Token': token } : {}) },
+          body, signal: controller.signal, credentials: 'same-origin', referrerPolicy: 'no-referrer'
+        });
+        if (res.ok) {
+          const text = await res.text();
+          if (text.length < 8 * 1024 * 1024) report = JSON.parse(text);
+        }
+      } finally { clearTimeout(timer); }
     }
   } catch (e) {
     console.warn('[runlet] python engine unavailable:', e.message);

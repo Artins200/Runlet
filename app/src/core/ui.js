@@ -7,7 +7,7 @@ import {
 import {
   applySettings, applyPreset, exportSettings, importSettings, resetSettings,
   persistNow, PRESETS, resetProject, projectJSON, importProjectJSON,
-  listFiles, read, write, exists, allTextFiles
+  listFiles, read, write, exists, allTextFiles, setReadOnly
 } from './state.js';
 import {
   setPaneFile, focusPane, getDoc, setDoc, insertText, insertSnippet, expandEmmet,
@@ -292,7 +292,14 @@ export function settingsModal(tab = 'editor') {
         ${bool('Автозапуск предпросмотра', 'autoRun')}${bool('Автоанализ кода', 'autoAnalyze')}
         ${bool('Автосохранение', 'autoSave')}${bool('CSS hot swap', 'hotCss')}${bool('JS hot reload', 'hotJs')}
         ${bool('Подтверждать удаление', 'confirmDelete')}${bool('Подсказки при первом запуске', 'firstRun')}
-      </div><div class="beginner mt8">Предпросмотр работает в изолированном iframe (sandbox без allow-same-origin): cookies, localStorage и сеть контролируются мостом редактора.</div>`,
+      </div>
+      <h4 style="margin:12px 0 4px">Разрешения sandbox предпросмотра</h4>
+      <p class="muted" style="font-size:10.5px;margin:0 0 6px">По умолчанию выключены — включайте только для доверенных проектов. Опции расширяют права кода из открытой ссылки.</p>
+      <div class="rowflex" id="sandboxOpts">
+        ${[['forms','Формы'],['popups','Новые окна'],['modals','Модальные окна'],['downloads','Скачивания'],['pointerLock','Pointer lock'],['orientationLock','Ориентация']].map(([k,l]) =>
+          `<label class="chk"><input type="checkbox" data-sandbox="${k}" ${s.sandboxPermissions?.[k] ? 'checked' : ''}> ${l}</label>`).join('')}
+      </div>
+      <div class="beginner mt8">Предпросмотр работает в изолированном iframe (<code class="inline">sandbox</code> без <code class="inline">allow-same-origin</code>): cookies, localStorage и сеть контролируются мостом редактора. Сообщения принимаются только от текущего документа по одноразовому идентификатору.</div>`,
     keys: `<p class="muted">Кликните по полю и нажмите сочетание клавиш. Изменения применяются сразу.</p>
       <div class="field-row">${Object.entries(s.keybindings).map(([k, v]) =>
         `<div class="field"><label>${esc(commandTitle(k))}</label><input data-key="${k}" value="${esc(v)}" readonly style="cursor:pointer"></div>`).join('')}</div>`,
@@ -341,6 +348,12 @@ export function settingsModal(tab = 'editor') {
             inp.value = keyEventToString(e);
             state.settings.keybindings[inp.dataset.key] = inp.value;
             applySettings(); toast('Горячая клавиша обновлена', 'ok');
+          });
+        });
+        body.querySelectorAll('[data-sandbox]').forEach(inp => {
+          inp.addEventListener('change', () => {
+            state.settings.sandboxPermissions = { ...(state.settings.sandboxPermissions || {}), [inp.dataset.sandbox]: inp.checked };
+            applySettings();
           });
         });
         body.querySelectorAll('[data-preset]').forEach(b => b.onclick = () => { applyPreset(b.dataset.preset); closeModal(); settingsModal(t); });
@@ -739,7 +752,7 @@ export function collaborationDialog() {
       root.querySelector('#collabSend').onclick = send;
       root.querySelector('#collabMsg').addEventListener('keydown', e => { if (e.key === 'Enter') send(); });
       root.querySelector('#collabInvite').onclick = () => location.href = 'mailto:?subject=Runlet проект&body=' + encodeURIComponent(location.href);
-      root.querySelector('#collabTeacher').onclick = () => { state.readOnly = true; toast('Режим преподавателя: студенты видят read-only', 'ok'); };
+      root.querySelector('#collabTeacher').onclick = () => { setReadOnly(true); toast('Режим преподавателя: студенты видят read-only', 'ok'); };
       window.__collabChat = chat;
     } });
 }

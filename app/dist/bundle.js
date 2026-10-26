@@ -4305,6 +4305,16 @@
     codeToPreview: true,
     timeLimit: 4e3,
     confirmDelete: true,
+    // Least-privilege sandbox for the preview iframe. Enabling these widens the
+    // attack surface for untrusted/shared projects — keep them off by default.
+    sandboxPermissions: {
+      popups: false,
+      modals: false,
+      downloads: false,
+      pointerLock: false,
+      orientationLock: false,
+      forms: true
+    },
     keybindings: {
       "run": "Ctrl+Enter",
       "format": "Ctrl+Shift+F",
@@ -4646,8 +4656,22 @@ reset.addEventListener('click', () => {
     }
     document.documentElement.lang = state.settings.locale === "ar" ? "ar" : state.settings.locale;
   }
+  function safeDataSrc(v) {
+    if (typeof v !== "string" || v.length > 8 * 1024 * 1024) return "";
+    return /^(data:(image|audio|video|font)\/[a-z0-9.+_-]+[;,]|blob:|https:\/\/)/i.test(v) ? v : "";
+  }
+  function sanitizeColor(v, fallback = "#7c6cf6") {
+    return typeof v === "string" && /^#(?:[0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$/i.test(v) ? v : fallback;
+  }
   function applyTheme() {
     const s = state.settings;
+    s.accent = sanitizeColor(s.accent);
+    s.fontSize = Math.max(9, Math.min(28, Number(s.fontSize) || 13));
+    s.lineHeight = Math.max(1, Math.min(2.5, Number(s.lineHeight) || 1.6));
+    s.tabSize = Math.max(1, Math.min(8, Math.round(Number(s.tabSize) || 2)));
+    s.theme = ["auto", "dark", "light", "contrast"].includes(s.theme) ? s.theme : "auto";
+    s.density = ["comfy", "compact"].includes(s.density) ? s.density : "comfy";
+    s.fontFamily = ["mono", "system", "courier", "sans"].includes(s.fontFamily) ? s.fontFamily : "mono";
     let theme2 = s.theme;
     if (theme2 === "auto") theme2 = matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
     document.documentElement.dataset.theme = theme2;
@@ -4661,7 +4685,7 @@ reset.addEventListener('click', () => {
       system: "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
       courier: '"Courier New", Courier, monospace',
       sans: "var(--sans)"
-    }[s.fontFamily] || "monospace";
+    }[s.fontFamily];
     document.documentElement.style.setProperty("--mono", mono);
     const c = $("#accentInput");
     if (c) c.value = s.accent;
@@ -5717,22 +5741,37 @@ reset.addEventListener('click', () => {
     }
     const hash3 = location.hash || "";
     if (hash3.startsWith("#p=")) {
-      try {
-        const loaded = await decodeShare(hash3.slice(3));
+      const code2 = hash3.slice(3);
+      if (code2.length <= 2e6) {
+        let loaded = null, shareError = null;
+        try {
+          loaded = await decodeShare(code2);
+        } catch (e) {
+          if (e.code === "PASSWORD_REQUIRED") {
+            const pass = await askPassword();
+            if (pass) {
+              try {
+                loaded = await decodeShare(code2, pass);
+              } catch (e2) {
+                shareError = e2;
+              }
+            }
+          } else shareError = e;
+        }
         if (loaded && loaded.files) {
-          setProject(loaded, "\u0418\u0437 \u0441\u0441\u044B\u043B\u043A\u0438");
-          toast("\u041F\u0440\u043E\u0435\u043A\u0442 \u0437\u0430\u0433\u0440\u0443\u0436\u0435\u043D \u0438\u0437 \u0441\u0441\u044B\u043B\u043A\u0438 (\u0440\u0435\u0436\u0438\u043C \u0442\u043E\u043B\u044C\u043A\u043E \u0434\u043B\u044F \u0447\u0442\u0435\u043D\u0438\u044F)", "ok", "\u0428\u0430\u0440\u0438\u043D\u0433");
           state.readOnly = !!loaded.readOnly;
+          setProject(loaded, loaded.projectName || "\u0418\u0437 \u0441\u0441\u044B\u043B\u043A\u0438");
+          toast(state.readOnly ? "\u041F\u0440\u043E\u0435\u043A\u0442 \u0437\u0430\u0433\u0440\u0443\u0436\u0435\u043D \u0438\u0437 \u0441\u0441\u044B\u043B\u043A\u0438 (\u0440\u0435\u0436\u0438\u043C \u0442\u043E\u043B\u044C\u043A\u043E \u0434\u043B\u044F \u0447\u0442\u0435\u043D\u0438\u044F)" : "\u041F\u0440\u043E\u0435\u043A\u0442 \u0437\u0430\u0433\u0440\u0443\u0436\u0435\u043D \u0438\u0437 \u0441\u0441\u044B\u043B\u043A\u0438", "ok", "\u0428\u0430\u0440\u0438\u043D\u0433");
+          emit("readOnly:changed", state.readOnly);
           return true;
         }
-      } catch (e) {
-        console.warn("share decode", e);
-      }
+        toast("\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u043E\u0442\u043A\u0440\u044B\u0442\u044C \u0441\u0441\u044B\u043B\u043A\u0443: " + (shareError?.message || "\u043F\u043E\u0432\u0440\u0435\u0436\u0434\u0451\u043D\u043D\u044B\u0435 \u0434\u0430\u043D\u043D\u044B\u0435"), "err", "\u0428\u0430\u0440\u0438\u043D\u0433");
+      } else toast("\u0421\u0441\u044B\u043B\u043A\u0430 \u043D\u0430 \u043F\u0440\u043E\u0435\u043A\u0442 \u0441\u043B\u0438\u0448\u043A\u043E\u043C \u0434\u043B\u0438\u043D\u043D\u0430\u044F", "err", "\u0428\u0430\u0440\u0438\u043D\u0433");
     }
     const rawSettings = localStorage.getItem(LS_SETTINGS);
     if (rawSettings) {
       try {
-        Object.assign(state.settings, JSON.parse(rawSettings));
+        Object.assign(state.settings, sanitizeSettings(JSON.parse(rawSettings)));
       } catch (e) {
       }
     }
@@ -5779,15 +5818,26 @@ reset.addEventListener('click', () => {
     });
   }
   var loadFromIDB = () => idbGet("project");
+  var UNSAFE_KEYS = /* @__PURE__ */ new Set(["__proto__", "constructor", "prototype"]);
+  function safePathKey(p, maxLen = 300) {
+    if (typeof p !== "string" || !p || p.length > maxLen || p.includes("\0") || p.includes("\\") || p.startsWith("/") || /^[A-Za-z]:/.test(p) || UNSAFE_KEYS.has(p)) return null;
+    const parts = p.split("/");
+    if (parts.some((x2) => x2 === ".." || x2 === "." || x2 === "" || UNSAFE_KEYS.has(x2) || /^\s|\s$/.test(x2))) return null;
+    if (!/[\w.-]/.test(p) || /[<>:"|?*\x00-\x1f]/.test(p)) return null;
+    return p;
+  }
   function setProject(data3, name2, restoreEditors = false) {
     state.files = {};
     for (const [p, f] of Object.entries(data3.files || {})) {
-      state.files[p] = typeof f === "string" ? makeFile(f, p) : { ...makeFile(f.content ?? "", p), ...f };
+      const key = safePathKey(p);
+      if (!key) continue;
+      state.files[key] = typeof f === "string" ? makeFile(f, key) : makeFile(String(f?.content ?? ""), key);
     }
     if (!Object.keys(state.files).length) resetProject();
     state.entry = data3.entry || ("index.html" in state.files ? "index.html" : Object.keys(state.files)[0]);
     state.projectName = name2 || data3.projectName || "\u041C\u043E\u0439 \u043F\u0440\u043E\u0435\u043A\u0442";
-    state.panes = { ...state.panes, ...data3.panes || {} };
+    const mergedPanes = { ...state.panes, ...data3.panes || {} };
+    state.panes = Object.fromEntries(Object.entries(mergedPanes).map(([k, v]) => [k, ["html", "css", "js"].includes(k) && safePathKey(v) ? v : state.panes[k] || ""]));
     state.deps = data3.deps || [];
     state.layout = data3.layout || "columns";
     state.snapshots = data3.snapshots || [];
@@ -5870,6 +5920,16 @@ reset.addEventListener('click', () => {
     return Object.prototype.hasOwnProperty.call(state.files, p);
   }
   function write(p, content2, opts = {}) {
+    const key = safePathKey(p);
+    if (!key) {
+      if (!opts.quiet) toast("\u041D\u0435\u0434\u043E\u043F\u0443\u0441\u0442\u0438\u043C\u043E\u0435 \u0438\u043C\u044F \u0444\u0430\u0439\u043B\u0430 \u2014 \u043F\u0443\u0442\u044C \u043E\u0442\u043A\u043B\u043E\u043D\u0451\u043D", "err", "\u0411\u0435\u0437\u043E\u043F\u0430\u0441\u043D\u043E\u0441\u0442\u044C");
+      return null;
+    }
+    p = key;
+    if (typeof content2 !== "string" || content2.length > 8 * 1024 * 1024) {
+      toast("\u0424\u0430\u0439\u043B \u0441\u043B\u0438\u0448\u043A\u043E\u043C \u0431\u043E\u043B\u044C\u0448\u043E\u0439 \u0438\u043B\u0438 \u043D\u0435 \u0442\u0435\u043A\u0441\u0442\u043E\u0432\u044B\u0439", "err");
+      return null;
+    }
     const isNew = !exists(p);
     state.files[p] = makeFile(content2, p);
     if (opts.keepPane !== true) {
@@ -5900,7 +5960,10 @@ reset.addEventListener('click', () => {
     if (!opts.silent) emit("toast", { msg: `\u0423\u0434\u0430\u043B\u0435\u043D\u043E: ${p}`, type: "ok" });
   }
   function rename(oldP, newP) {
-    if (oldP === newP || !exists(oldP)) return false;
+    const from = safePathKey(oldP), to = safePathKey(newP);
+    if (!from || !to || from === to || !exists(from)) return false;
+    oldP = from;
+    newP = to;
     const kids = Object.keys(state.files).filter((x2) => x2 === oldP || x2.startsWith(oldP + "/"));
     const oldBase = oldP.split("/").pop();
     const newBase = newP.split("/").pop();
@@ -6077,9 +6140,30 @@ reset.addEventListener('click', () => {
   function exportSettings() {
     return JSON.stringify(state.settings, null, 2);
   }
+  function sanitizeSettings(d) {
+    const out = {};
+    if (!d || typeof d !== "object" || Array.isArray(d)) return out;
+    const ref2 = DEFAULT_SETTINGS;
+    for (const [k, v] of Object.entries(d)) {
+      if (UNSAFE_KEYS.has(k) || !Object.prototype.hasOwnProperty.call(ref2, k)) continue;
+      const orig = ref2[k];
+      if (typeof orig === "boolean" && typeof v === "boolean") out[k] = v;
+      else if (typeof orig === "number" && typeof v === "number" && Math.abs(v) < 1e7) out[k] = v;
+      else if (typeof orig === "string" && typeof v === "string" && v.length < 200) out[k] = v;
+      else if (Array.isArray(orig) && Array.isArray(v)) out[k] = v.slice(0, 100);
+      else if (orig && typeof orig === "object" && !Array.isArray(orig) && v && typeof v === "object" && !Array.isArray(v)) {
+        const nested = {};
+        for (const [nk, nv] of Object.entries(v)) {
+          if (UNSAFE_KEYS.has(nk) || !Object.prototype.hasOwnProperty.call(orig, nk)) continue;
+          if (typeof orig[nk] === typeof nv && (typeof nv === "boolean" || typeof nv === "number" || typeof nv === "string" && nv.length < 200)) nested[nk] = nv;
+        }
+        out[k] = { ...orig, ...nested };
+      }
+    }
+    return out;
+  }
   function importSettings(text) {
-    const d = JSON.parse(text);
-    Object.assign(state.settings, d);
+    Object.assign(state.settings, sanitizeSettings(JSON.parse(text)));
     applySettings();
     return true;
   }
@@ -6088,27 +6172,149 @@ reset.addEventListener('click', () => {
     applySettings();
     toast("\u041D\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0438 \u0441\u0431\u0440\u043E\u0448\u0435\u043D\u044B", "ok");
   }
+  var MAX_SHARE_CODE = 2e6;
+  var MAX_SHARE_JSON = 4 * 1024 * 1024;
+  var SHARE_PBKDF2_ITER = 15e4;
+  function toB64u(bytes) {
+    let bin = "";
+    for (let i4 = 0; i4 < bytes.length; i4 += 32768) bin += String.fromCharCode(...bytes.subarray(i4, i4 + 32768));
+    return btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  }
+  function fromB64u(code2) {
+    const b64 = code2.replace(/-/g, "+").replace(/_/g, "/");
+    const bin = atob(b64 + "===".slice((b64.length + 3) % 4));
+    return Uint8Array.from(bin, (c) => c.charCodeAt(0));
+  }
+  async function shareKey(password, salt) {
+    if (!globalThis.crypto?.subtle) throw new Error("Web Crypto \u043D\u0435\u0434\u043E\u0441\u0442\u0443\u043F\u0435\u043D \u2014 \u043F\u0430\u0440\u043E\u043B\u044C\u043D\u0430\u044F \u0441\u0441\u044B\u043B\u043A\u0430 \u043D\u0435 \u043F\u043E\u0434\u0434\u0435\u0440\u0436\u0438\u0432\u0430\u0435\u0442\u0441\u044F");
+    const base2 = await crypto.subtle.importKey("raw", new TextEncoder().encode(password), "PBKDF2", false, ["deriveKey"]);
+    return crypto.subtle.deriveKey(
+      { name: "PBKDF2", salt, iterations: SHARE_PBKDF2_ITER, hash: "SHA-256" },
+      base2,
+      { name: "AES-GCM", length: 256 },
+      false,
+      ["encrypt", "decrypt"]
+    );
+  }
+  function validateShared(p) {
+    if (!p || typeof p !== "object" || Array.isArray(p) || !p.files || typeof p.files !== "object" || Array.isArray(p.files))
+      throw new Error("\u041D\u0435\u043A\u043E\u0440\u0440\u0435\u043A\u0442\u043D\u044B\u0439 \u0444\u043E\u0440\u043C\u0430\u0442 \u043F\u0440\u043E\u0435\u043A\u0442\u0430");
+    const files = {};
+    let total = 0;
+    for (const [k, v] of Object.entries(p.files).slice(0, 200)) {
+      const key = safePathKey(k);
+      if (!key || typeof v !== "string") continue;
+      total += v.length;
+      if (total > MAX_SHARE_JSON) throw new Error("\u041F\u0440\u043E\u0435\u043A\u0442 \u0432 \u0441\u0441\u044B\u043B\u043A\u0435 \u0441\u043B\u0438\u0448\u043A\u043E\u043C \u0431\u043E\u043B\u044C\u0448\u043E\u0439");
+      files[key] = v.slice(0, 2 * 1024 * 1024);
+    }
+    if (!Object.keys(files).length) throw new Error("\u0412 \u0441\u0441\u044B\u043B\u043A\u0435 \u043D\u0435\u0442 \u0444\u0430\u0439\u043B\u043E\u0432");
+    return {
+      v: 3,
+      files,
+      entry: safePathKey(p.entry) || Object.keys(files)[0],
+      panes: { ...state.panes, ...p.panes && typeof p.panes === "object" ? Object.fromEntries(
+        Object.entries(p.panes).filter(([k, v]) => ["html", "css", "js"].includes(k) && typeof v === "string" && safePathKey(v))
+      ) : {} },
+      deps: Array.isArray(p.deps) ? p.deps.filter((d) => typeof d === "string" && d.length < 80).slice(0, 50) : [],
+      projectName: typeof p.projectName === "string" ? p.projectName.slice(0, 200) : "\u0418\u0437 \u0441\u0441\u044B\u043B\u043A\u0438",
+      readOnly: !!p.readOnly
+    };
+  }
   async function encodeShare(opts = {}) {
-    const payload = {
+    const payload = validateShared({
+      v: 3,
       files: Object.fromEntries(Object.entries(state.files).map(([p, f]) => [p, f.content])),
       entry: state.entry,
       panes: state.panes,
       deps: state.deps,
       projectName: state.projectName,
-      readOnly: !!opts.readOnly,
-      password: opts.password || null,
-      v: 2
-    };
+      readOnly: !!opts.readOnly
+    });
     const bytes = deflateSync(strToU8(JSON.stringify(payload)), { level: 9 });
-    let bin = "";
-    for (const b of bytes) bin += String.fromCharCode(b);
-    return btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+    if (bytes.length > MAX_SHARE_JSON) throw new Error("\u041F\u0440\u043E\u0435\u043A\u0442 \u0441\u043B\u0438\u0448\u043A\u043E\u043C \u0431\u043E\u043B\u044C\u0448\u043E\u0439 \u0434\u043B\u044F \u0441\u0441\u044B\u043B\u043A\u0438");
+    if (opts.password) {
+      const salt = crypto.getRandomValues(new Uint8Array(16));
+      const iv = crypto.getRandomValues(new Uint8Array(12));
+      const key = await shareKey(String(opts.password).slice(0, 200), salt);
+      const cipher = new Uint8Array(await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, bytes));
+      const code2 = "E" + toB64u(salt) + "." + toB64u(iv) + "." + toB64u(cipher);
+      if (code2.length > MAX_SHARE_CODE) throw new Error("\u041F\u0440\u043E\u0435\u043A\u0442 \u0441\u043B\u0438\u0448\u043A\u043E\u043C \u0431\u043E\u043B\u044C\u0448\u043E\u0439 \u0434\u043B\u044F \u0441\u0441\u044B\u043B\u043A\u0438");
+      return code2;
+    }
+    return toB64u(bytes);
   }
-  async function decodeShare(code2) {
-    const b64 = code2.replace(/-/g, "+").replace(/_/g, "/");
-    const bin = atob(b64 + "===".slice((b64.length + 3) % 4));
-    const bytes = Uint8Array.from(bin, (c) => c.charCodeAt(0));
-    return JSON.parse(strFromU8(inflateSync(bytes)));
+  async function decodeShare(code2, password = null) {
+    if (typeof code2 !== "string" || !code2 || code2.length > MAX_SHARE_CODE || !/^[A-Za-z0-9._-]+$/.test(code2))
+      throw new Error("\u041D\u0435\u043A\u043E\u0440\u0440\u0435\u043A\u0442\u043D\u0430\u044F \u0441\u0441\u044B\u043B\u043A\u0430");
+    let bytes;
+    if (code2.startsWith("E")) {
+      if (!password) {
+        const e = new Error("\u0422\u0440\u0435\u0431\u0443\u0435\u0442\u0441\u044F \u043F\u0430\u0440\u043E\u043B\u044C");
+        e.code = "PASSWORD_REQUIRED";
+        throw e;
+      }
+      const parts = code2.slice(1).split(".");
+      if (parts.length !== 3) throw new Error("\u041F\u043E\u0432\u0440\u0435\u0436\u0434\u0451\u043D\u043D\u0430\u044F \u0441\u0441\u044B\u043B\u043A\u0430");
+      const salt = fromB64u(parts[0]), iv = fromB64u(parts[1]), cipher = fromB64u(parts[2]);
+      if (salt.length !== 16 || iv.length !== 12 || cipher.length > MAX_SHARE_JSON) throw new Error("\u041F\u043E\u0432\u0440\u0435\u0436\u0434\u0451\u043D\u043D\u0430\u044F \u0441\u0441\u044B\u043B\u043A\u0430");
+      const key = await shareKey(String(password).slice(0, 200), salt);
+      try {
+        bytes = new Uint8Array(await crypto.subtle.decrypt({ name: "AES-GCM", iv }, key, cipher));
+      } catch (_) {
+        throw new Error("\u041D\u0435\u0432\u0435\u0440\u043D\u044B\u0439 \u043F\u0430\u0440\u043E\u043B\u044C");
+      }
+    } else bytes = fromB64u(code2);
+    if (bytes.length > MAX_SHARE_JSON) throw new Error("\u0421\u0441\u044B\u043B\u043A\u0430 \u0441\u043B\u0438\u0448\u043A\u043E\u043C \u0431\u043E\u043B\u044C\u0448\u0430\u044F");
+    const out = inflateSync(bytes, { out: new Uint8Array(MAX_SHARE_JSON) });
+    const json2 = strFromU8(out);
+    if (json2.length > MAX_SHARE_JSON) throw new Error("\u041F\u0440\u043E\u0435\u043A\u0442 \u0441\u043B\u0438\u0448\u043A\u043E\u043C \u0431\u043E\u043B\u044C\u0448\u043E\u0439");
+    return validateShared(JSON.parse(json2));
+  }
+  function askPassword() {
+    return new Promise((resolve) => {
+      const overlay = document.createElement("div");
+      overlay.style.cssText = "position:fixed;inset:0;z-index:99999;display:grid;place-items:center;background:rgba(4,5,14,.88);font:14px system-ui;color:#fff";
+      const card = document.createElement("div");
+      card.style.cssText = "background:#181b2c;border:1px solid #ffffff22;border-radius:20px;padding:24px;width:min(380px,92vw);box-shadow:0 20px 60px #0008";
+      const h = document.createElement("h2");
+      h.textContent = "\u{1F512} \u041F\u0440\u043E\u0435\u043A\u0442 \u0437\u0430\u0449\u0438\u0449\u0451\u043D \u043F\u0430\u0440\u043E\u043B\u0435\u043C";
+      h.style.cssText = "margin:0 0 8px;font-size:18px";
+      const p = document.createElement("p");
+      p.textContent = "\u0421\u0441\u044B\u043B\u043A\u0430 \u0437\u0430\u0448\u0438\u0444\u0440\u043E\u0432\u0430\u043D\u0430 AES-GCM. \u0412\u0432\u0435\u0434\u0438\u0442\u0435 \u043F\u0430\u0440\u043E\u043B\u044C, \u0447\u0442\u043E\u0431\u044B \u043E\u0442\u043A\u0440\u044B\u0442\u044C \u043F\u0440\u043E\u0435\u043A\u0442.";
+      p.style.cssText = "color:#979cb9;font-size:12px;line-height:1.5";
+      const input = document.createElement("input");
+      input.type = "password";
+      input.placeholder = "\u041F\u0430\u0440\u043E\u043B\u044C";
+      input.style.cssText = "width:100%;height:38px;border-radius:11px;border:1px solid #ffffff33;background:#121424;color:#fff;padding:0 12px;outline:0";
+      const row = document.createElement("div");
+      row.style.cssText = "display:flex;gap:8px;margin-top:12px";
+      const ok = document.createElement("button");
+      ok.textContent = "\u041E\u0442\u043A\u0440\u044B\u0442\u044C";
+      ok.style.cssText = "flex:1;height:36px;border:0;border-radius:11px;background:#7c6cf6;color:#fff;font-weight:700";
+      const cancel = document.createElement("button");
+      cancel.textContent = "\u041E\u0442\u043C\u0435\u043D\u0430";
+      cancel.style.cssText = "height:36px;padding:0 14px;border:1px solid #ffffff33;border-radius:11px;background:transparent;color:#ccc";
+      const finish = (v) => {
+        overlay.remove();
+        resolve(v);
+      };
+      ok.onclick = () => finish(input.value);
+      cancel.onclick = () => finish("");
+      input.onkeydown = (e) => {
+        if (e.key === "Enter") finish(input.value);
+        if (e.key === "Escape") finish("");
+      };
+      row.append(ok, cancel);
+      card.append(h, p, input, row);
+      overlay.appendChild(card);
+      document.body.appendChild(overlay);
+      input.focus();
+    });
+  }
+  function setReadOnly(v) {
+    state.readOnly = !!v;
+    emit("readOnly:changed", state.readOnly);
   }
 
   // node_modules/@marijn/find-cluster-break/src/index.js
@@ -42583,6 +42789,9 @@ reset.addEventListener('click', () => {
   function parse3(input, options) {
     return Parser2.parse(input, options);
   }
+  function parseExpressionAt2(input, pos, options) {
+    return Parser2.parseExpressionAt(input, pos, options);
+  }
 
   // app/src/core/editor.js
   var import_js_beautify = __toESM(require_js());
@@ -43607,6 +43816,7 @@ assert(add(2, 3) === 5, '2 + 3 = 5');` }
   var editors = {};
   var langComp = {};
   var prefComp = {};
+  var readComp = {};
   var internal = { html: false, css: false, js: false };
   var PANES = ["html", "css", "js"];
   var highlight = HighlightStyle.define([
@@ -43936,6 +44146,7 @@ assert(add(2, 3) === 5, '2 + 3 = 5');` }
       if (!host) continue;
       langComp[pane] = new Compartment();
       prefComp[pane] = new Compartment();
+      readComp[pane] = new Compartment();
       const path = state.panes[pane] || "";
       const view = new EditorView({
         state: EditorState.create({
@@ -43965,6 +44176,7 @@ assert(add(2, 3) === 5, '2 + 3 = 5');` }
             cmTheme,
             langComp[pane].of(languageFor(pane, path)),
             prefComp[pane].of(prefExtensions()),
+            readComp[pane].of(readOnlyExtensions()),
             EditorState.allowMultipleSelections.of(true),
             EditorState.tabSize.of(state.settings.tabSize),
             keymap.of([
@@ -43982,7 +44194,7 @@ assert(add(2, 3) === 5, '2 + 3 = 5');` }
               if (u.docChanged && !internal[pane]) {
                 const content2 = u.state.doc.toString();
                 if (state.readOnly) {
-                } else write(p, content2, { fromPane: pane });
+                } else write(p, content2, { fromPane: pane, quiet: true });
                 updateMinimap(pane);
               }
               if (u.docChanged || u.selectionSet || u.focusChanged) updateCursor(pane, u.view);
@@ -44014,12 +44226,24 @@ assert(add(2, 3) === 5, '2 + 3 = 5');` }
       }
     });
     on("settings:changed", applyEditorSettings);
+    on("readOnly:changed", (v) => setEditorsReadOnly(v));
     on("analysis:report", () => {
       for (const p of PANES) if (editors[p]) forceLinting(editors[p]);
     });
     on("pane:goto", ({ pane, line, col }) => goto(pane, line, col));
     on("files:changed", () => {
     });
+  }
+  function readOnlyExtensions() {
+    return [EditorState.readOnly.of(!!state.readOnly), EditorView.editable.of(!state.readOnly)];
+  }
+  function setEditorsReadOnly(v) {
+    state.readOnly = !!v;
+    for (const pane of PANES) {
+      const view = editors[pane];
+      if (!view || !readComp[pane]) continue;
+      view.dispatch({ effects: readComp[pane].reconfigure(readOnlyExtensions()) });
+    }
   }
   function prefExtensions() {
     const s = state.settings;
@@ -44048,7 +44272,8 @@ assert(add(2, 3) === 5, '2 + 3 = 5');` }
       if (!view) continue;
       view.dispatch({ effects: [
         prefComp[pane].reconfigure(prefExtensions()),
-        langComp[pane].reconfigure(languageFor(pane, state.panes[pane]))
+        langComp[pane].reconfigure(languageFor(pane, state.panes[pane])),
+        readComp[pane].reconfigure(readOnlyExtensions())
       ] });
       updateMinimap(pane);
       const mm = $(`[data-minimap="${pane}"]`);
@@ -44367,8 +44592,15 @@ assert(add(2, 3) === 5, '2 + 3 = 5');` }
     var fid2 = cfg.fid || "rl";
     var files = cfg.files || {};
     var bp = cfg.breakpoints || {};
+    var sentWindow = 0, sentCount = 0;
     var send2 = function(type, data3) {
       try {
+        var now = Date.now();
+        if (now - sentWindow > 1e3) {
+          sentWindow = now;
+          sentCount = 0;
+        }
+        if (++sentCount > 400) return;
         parent.postMessage({ __runlet: true, fid: fid2, type, data: data3 }, "*");
       } catch (e) {
       }
@@ -44503,6 +44735,19 @@ assert(add(2, 3) === 5, '2 + 3 = 5');` }
     window.print = function() {
       send2("alert", { text: "print() \u043F\u0435\u0440\u0435\u0445\u0432\u0430\u0447\u0435\u043D", level: "info" });
     };
+    try {
+      window.open = function(url) {
+        send2("alert", { text: "window.open \u0437\u0430\u0431\u043B\u043E\u043A\u0438\u0440\u043E\u0432\u0430\u043D \u043F\u0435\u0441\u043E\u0447\u043D\u0438\u0446\u0435\u0439: " + String(url || "").slice(0, 120), level: "warn" });
+        return null;
+      };
+    } catch (e) {
+    }
+    try {
+      window.close = function() {
+        send2("alert", { text: "window.close \u0437\u0430\u0431\u043B\u043E\u043A\u0438\u0440\u043E\u0432\u0430\u043D", level: "info" });
+      };
+    } catch (e) {
+    }
     function Shim() {
       this._d = {};
     }
@@ -44899,15 +45144,21 @@ assert(add(2, 3) === 5, '2 + 3 = 5');` }
     }
     window.addEventListener("message", function(e) {
       var d = e.data;
-      if (!d || !d.__rlcmd) return;
-      var p = d.data || {};
+      if (!d || d.__rlcmd !== true || d.fid !== fid2) return;
+      if (typeof d.type !== "string" || d.type.length > 48) return;
+      if (!d.data || typeof d.data !== "object") return;
+      var p = d.data;
       switch (d.type) {
         case "eval": {
           var result, error = "";
-          try {
-            result = (0, eval)(p.expr);
-          } catch (err2) {
-            error = String(err2);
+          if (typeof p.expr !== "string" || p.expr.length > 2e4) {
+            error = "expression too long";
+          } else {
+            try {
+              result = (0, eval)(p.expr);
+            } catch (err2) {
+              error = String(err2);
+            }
           }
           send2("eval-result", { id: p.id, value: ser(result), error });
           break;
@@ -44921,11 +45172,15 @@ assert(add(2, 3) === 5, '2 + 3 = 5');` }
             document.head.appendChild(s);
             style = s;
           }
-          style.textContent = p.css;
+          style.textContent = typeof p.css === "string" ? p.css.slice(0, 2e6) : "";
           send2("alert", { text: "CSS \u043E\u0431\u043D\u043E\u0432\u043B\u0451\u043D \u0431\u0435\u0437 \u043F\u0435\u0440\u0435\u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0438", level: "ok" });
           break;
         }
         case "hotjs": {
+          if (typeof p.code !== "string" || p.code.length > 2e6) {
+            send2("error", { text: "Hot reload: \u043A\u043E\u0434 \u0441\u043B\u0438\u0448\u043A\u043E\u043C \u0431\u043E\u043B\u044C\u0448\u043E\u0439", line: 0, stack: "" });
+            break;
+          }
           try {
             (0, eval)(p.code);
             send2("alert", { text: "JS \u043F\u0435\u0440\u0435\u0437\u0430\u043F\u0443\u0449\u0435\u043D \u0431\u0435\u0437 \u043F\u0435\u0440\u0435\u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0438", level: "ok" });
@@ -44935,12 +45190,13 @@ assert(add(2, 3) === 5, '2 + 3 = 5');` }
           break;
         }
         case "highlight":
-          highlightEl(p.selector);
+          highlightEl(typeof p.selector === "string" ? p.selector.slice(0, 300) : "");
           break;
         case "getDOM":
-          send2("dom", { tree: domTree(document.documentElement, 0, p.depth || 5) });
+          send2("dom", { tree: domTree(document.documentElement, 0, Math.min(6, Math.max(1, +p.depth || 5))) });
           break;
         case "getStyles": {
+          if (typeof p.selector !== "string" || p.selector.length > 300) break;
           var el2 = null;
           try {
             el2 = document.querySelector(p.selector);
@@ -45060,16 +45316,35 @@ assert(add(2, 3) === 5, '2 + 3 = 5');` }
   var currentSrcdoc = "";
   var lastHash = { html: "", css: "", js: "" };
   var fid = 0;
+  var currentFid = "rl0";
   var runCount = 0;
   var requests = /* @__PURE__ */ new Map();
   var reqId = 0;
   var formState = null;
   var measureStart = null;
+  var lastSandboxValue = null;
+  function applySandbox() {
+    if (!frame) return;
+    const p = state.settings.sandboxPermissions || {};
+    const tokens = ["allow-scripts"];
+    if (p.forms) tokens.push("allow-forms");
+    if (p.popups) tokens.push("allow-popups");
+    if (p.modals) tokens.push("allow-modals");
+    if (p.downloads) tokens.push("allow-downloads");
+    if (p.pointerLock) tokens.push("allow-pointer-lock");
+    if (p.orientationLock) tokens.push("allow-orientation-lock");
+    const value = tokens.join(" ");
+    const changed = lastSandboxValue !== null && lastSandboxValue !== value;
+    lastSandboxValue = value;
+    frame.setAttribute("sandbox", value);
+    if (changed && currentSrcdoc) run("full");
+  }
   function initPreview() {
     frame = $("#previewFrame");
     stage = $("#previewStage");
     wrap = $("#previewFrameWrap");
     window.addEventListener("message", onFrameMessage);
+    applySandbox();
     frame.addEventListener("load", () => emit("preview:load"));
     const dev = $("#deviceSelect");
     dev?.addEventListener("change", () => {
@@ -45142,7 +45417,10 @@ assert(add(2, 3) === 5, '2 + 3 = 5');` }
     on("project:loaded", () => {
       lastHash = { html: "", css: "", js: "" };
     });
-    on("settings:changed", applyDevice);
+    on("settings:changed", () => {
+      applyDevice();
+      applySandbox();
+    });
     on("deps:changed", () => run("full"));
     on("cursor", (d) => {
       if (d.pane !== "html" || !state.settings.codeToPreview) return;
@@ -45163,12 +45441,12 @@ assert(add(2, 3) === 5, '2 + 3 = 5');` }
     const text = lines[line - 1] || "";
     const idm = /id=["']([^"']+)["']/.exec(text);
     const sel = idm ? "#" + idm[1] : (/<([\w-]+)/.exec(text) || [])[1];
-    if (sel) send("highlight", { selector: sel });
+    if (sel && sel.length <= 200) send("highlight", { selector: sel });
   }, 420);
   function send(type, data3 = {}) {
-    if (!frame?.contentWindow) return;
+    if (!frame?.contentWindow || typeof type !== "string" || type.length > 48) return;
     try {
-      frame.contentWindow.postMessage({ __rlcmd: true, type, data: data3 }, "*");
+      frame.contentWindow.postMessage({ __rlcmd: true, fid: currentFid, type, data: data3 }, "*");
     } catch (e) {
     }
   }
@@ -45186,9 +45464,25 @@ assert(add(2, 3) === 5, '2 + 3 = 5');` }
     });
   }
   function onFrameMessage(e) {
-    if (!e.data || !e.data.__runlet) return;
+    const msg = e.data;
+    if (!msg || typeof msg !== "object" || msg.__runlet !== true) return;
     if (frame && e.source !== frame.contentWindow) return;
-    const { type, data: data3 } = e.data;
+    if (msg.fid !== currentFid || e.origin !== "null" && e.origin !== location.origin) return;
+    if (typeof msg.type !== "string" || msg.type.length > 48 || !msg.data || typeof msg.data !== "object") return;
+    let packed;
+    try {
+      packed = JSON.stringify(msg.data);
+    } catch (_) {
+      return;
+    }
+    if (!packed || packed.length > 512e3) return;
+    let data3;
+    try {
+      data3 = JSON.parse(packed);
+    } catch (_) {
+      return;
+    }
+    const type = msg.type;
     switch (type) {
       case "ready":
         state.perf = { ...state.perf, renderMs: data3.ms, elements: data3.elements };
@@ -45217,7 +45511,7 @@ assert(add(2, 3) === 5, '2 + 3 = 5');` }
         });
         emit("console:log", { level: "error", text: data3.text });
         emit("preview:error", data3);
-        if (runCount > 1) toast(data3.text.slice(0, 120), "err", "\u041E\u0448\u0438\u0431\u043A\u0430 \u0432 \u043F\u0440\u0435\u0434\u043F\u0440\u043E\u0441\u043C\u043E\u0442\u0440\u0435");
+        if (runCount > 1) toast(String(data3.text || "").slice(0, 120), "err", "\u041E\u0448\u0438\u0431\u043A\u0430 \u0432 \u043F\u0440\u0435\u0434\u043F\u0440\u043E\u0441\u043C\u043E\u0442\u0440\u0435");
         break;
       case "alert":
         if (state.alertsAsToast) toast(String(data3.text).slice(0, 220), data3.level || "info", "\u0418\u0437 \u043F\u0440\u0435\u0434\u043F\u0440\u043E\u0441\u043C\u043E\u0442\u0440\u0430");
@@ -45232,7 +45526,7 @@ assert(add(2, 3) === 5, '2 + 3 = 5');` }
         emit("element:select", data3);
         if (state.inspectMode) {
           const html2 = getDoc("html");
-          const idx = html2.indexOf(data3.html.slice(0, 40));
+          const idx = html2.indexOf(String(data3.html || "").slice(0, 40));
           if (idx >= 0) goto("html", html2.slice(0, idx).split("\n").length);
           else toast(`\u0412\u044B\u0431\u0440\u0430\u043D <${data3.tag}> \u2014 ${data3.selector}`, "info", "\u0418\u043D\u0441\u043F\u0435\u043A\u0442\u043E\u0440");
         }
@@ -45303,7 +45597,7 @@ assert(add(2, 3) === 5, '2 + 3 = 5');` }
     box.style.width = (r.w || 0) + "px";
     box.style.height = (r.h || 0) + "px";
     box.classList.add("show");
-    box.innerHTML = `<span class="hover-label">${esc((data3.tag || "").slice(0, 34))} \xB7 ${Math.round(r.w || 0)}\xD7${Math.round(r.h || 0)}</span>`;
+    box.innerHTML = `<span class="hover-label">${esc(String(data3.tag || "").slice(0, 34))} \xB7 ${Math.round(r.w || 0)}\xD7${Math.round(r.h || 0)}</span>`;
     if (sel === "#hoverHighlight") setTimeout(() => box.classList.remove("show"), 900);
   }
   function resolvePath(base2, ref2) {
@@ -45606,9 +45900,18 @@ ${escapeScript(c)}
     }
     if (/\.pug$/i.test(entry)) html2 = compilePug(html2);
     if (/\.md$/i.test(entry)) html2 = miniMarkdown(html2);
+    currentFid = "rl" + ++fid;
+    const virtualFiles = {};
+    let virtualBytes = 0;
+    for (const [p, f] of Object.entries(files)) {
+      if (/\.(css|js|html?|scss)$/i.test(p) || typeof f.content !== "string") continue;
+      virtualBytes += f.content.length;
+      if (virtualBytes > 4 * 1024 * 1024) break;
+      virtualFiles[p] = f.content.slice(0, 2 * 1024 * 1024);
+    }
     const cfg = {
-      fid: "rl" + ++fid,
-      files: Object.fromEntries(Object.entries(files).filter(([p]) => !/\.(css|js|html?|scss)$/i.test(p)).map(([p, f]) => [p, f.content])),
+      fid: currentFid,
+      files: virtualFiles,
       breakpoints: state.breakpoints,
       scheme: $("#optScheme")?.value || "auto",
       motion: $("#optMotion")?.value || "no-preference",
@@ -45630,10 +45933,10 @@ ${escapeScript(c)}
     return html2;
   }
   function escapeScript(code2) {
-    return code2.replace(/<\/script/gi, "<\\/script");
+    return String(code2).replace(/<\/script/gi, "<\\/script").replace(/<\/style/gi, "<\\/style");
   }
   function jsonForScript(o) {
-    return JSON.stringify(o).replace(/</g, "\\u003c").replace(/<!--/g, "<\\!--");
+    return JSON.stringify(o).replace(/</g, "\\u003c").replace(/>/g, "\\u003e").replace(/&/g, "\\u0026").replace(/\u2028/g, "\\u2028").replace(/\u2029/g, "\\u2029");
   }
   function run(reason = "full") {
     if (!frame) return;
@@ -45658,7 +45961,12 @@ ${code2}
       emit("preview:hotjs");
       return;
     }
-    currentSrcdoc = buildSrcdoc();
+    const next = buildSrcdoc();
+    if (next.length > 8 * 1024 * 1024) {
+      toast("\u041F\u0440\u0435\u0434\u043F\u0440\u043E\u0441\u043C\u043E\u0442\u0440 \u0441\u043B\u0438\u0448\u043A\u043E\u043C \u0431\u043E\u043B\u044C\u0448\u043E\u0439 (>8 \u041C\u0411) \u2014 \u0437\u0430\u043F\u0443\u0441\u043A \u043F\u0440\u043E\u043F\u0443\u0449\u0435\u043D", "err");
+      return;
+    }
+    currentSrcdoc = next;
     lastHash = { html: hash2(read(state.entry)), css: hash2(listFiles().filter((p) => /\.css$/i.test(p)).map(read).join("")), js: hash2(getDoc("js")) };
     frame.srcdoc = currentSrcdoc;
     emit("preview:run", { reason, size: currentSrcdoc.length });
@@ -45737,13 +46045,22 @@ ${code2}
     setTimeout(applyDevice, 80);
   }
   function popout() {
+    const html2 = srcdoc();
+    if (window.runlet?.popout) {
+      Promise.resolve(window.runlet.popout(html2)).then((ok) => {
+        if (ok) toast("\u041F\u0440\u0435\u0434\u043F\u0440\u043E\u0441\u043C\u043E\u0442\u0440 \u043E\u0442\u043A\u0440\u044B\u0442 \u0432 \u043D\u043E\u0432\u043E\u043C \u043E\u043A\u043D\u0435", "ok");
+        else toast("\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u043E\u0442\u043A\u0440\u044B\u0442\u044C \u043E\u043A\u043D\u043E \u043F\u0440\u0435\u0434\u043F\u0440\u043E\u0441\u043C\u043E\u0442\u0440\u0430", "err");
+      }).catch(() => toast("\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u043E\u0442\u043A\u0440\u044B\u0442\u044C \u043E\u043A\u043D\u043E \u043F\u0440\u0435\u0434\u043F\u0440\u043E\u0441\u043C\u043E\u0442\u0440\u0430", "err"));
+      return;
+    }
     const w = window.open("", "runlet-preview", "width=1000,height=760");
     if (!w) {
       toast("\u0411\u0440\u0430\u0443\u0437\u0435\u0440 \u0437\u0430\u0431\u043B\u043E\u043A\u0438\u0440\u043E\u0432\u0430\u043B \u043D\u043E\u0432\u043E\u0435 \u043E\u043A\u043D\u043E", "err");
       return;
     }
+    w.opener = null;
     w.document.open();
-    w.document.write(srcdoc());
+    w.document.write(html2);
     w.document.close();
     toast("\u041F\u0440\u0435\u0434\u043F\u0440\u043E\u0441\u043C\u043E\u0442\u0440 \u043E\u0442\u043A\u0440\u044B\u0442 \u0432 \u043D\u043E\u0432\u043E\u043C \u043E\u043A\u043D\u0435", "ok");
   }
@@ -46104,7 +46421,7 @@ ${listFiles().map((f) => `- \`${f}\``).join("\n")}
 `;
   }
   function generateSEO() {
-    const title = state.projectName || "\u041C\u043E\u044F \u0441\u0442\u0440\u0430\u043D\u0438\u0446\u0430";
+    const title = esc(String(state.projectName || "\u041C\u043E\u044F \u0441\u0442\u0440\u0430\u043D\u0438\u0446\u0430").slice(0, 120));
     return `<!-- SEO -->
 <meta name="description" content="${title} \u2014 \u043E\u043F\u0438\u0441\u0430\u043D\u0438\u0435 \u0441\u0442\u0440\u0430\u043D\u0438\u0446\u044B">
 <meta name="keywords" content="runlet, html, css, javascript">
@@ -46120,12 +46437,13 @@ ${listFiles().map((f) => `- \`${f}\``).join("\n")}
 
 <!-- Schema.org -->
 <script type="application/ld+json">
-${JSON.stringify({ "@context": "https://schema.org", "@type": "WebSite", name: title, url: "https://example.com/" }, null, 2)}
+${JSON.stringify({ "@context": "https://schema.org", "@type": "WebSite", name: String(state.projectName || "").slice(0, 120), url: "https://example.com/" }, null, 2).replace(/</g, "\\u003c")}
 <\/script>`;
   }
   function generateAltFor(path) {
-    const name2 = path.split("/").pop().replace(/\.[^.]+$/, "").replace(/[-_]/g, " ");
-    return name2.charAt(0).toUpperCase() + name2.slice(1);
+    const name2 = String(path).split("/").pop().replace(/\.[^.]+$/, "").replace(/[-_]/g, " ");
+    const clean = name2.replace(/[^\p{L}\p{N} _-]/gu, "").slice(0, 100).trim();
+    return clean.charAt(0).toUpperCase() + clean.slice(1) || "\u0418\u0437\u043E\u0431\u0440\u0430\u0436\u0435\u043D\u0438\u0435";
   }
   function accessibleWrap(html2) {
     return html2.replace(/<img\b([^>]*?)>/gi, (m, a) => /alt=/.test(a) ? m : `<img${a} alt="${generateAltFor((/src=["']([^"']+)/.exec(a) || [])[1] || "image")}">`).replace(/<button\b([^>]*)>\s*<\/button>/gi, (m, a) => `<button${a} aria-label="\u041A\u043D\u043E\u043F\u043A\u0430"></button>`).replace(/<a\b([^>]*?)>\s*<\/a>/gi, (m, a) => `<a${a}>\u041F\u043E\u0434\u0440\u043E\u0431\u043D\u0435\u0435</a>`);
@@ -46139,7 +46457,16 @@ ${JSON.stringify({ "@context": "https://schema.org", "@type": "WebSite", name: t
       [/\bon\w+\s*=/g, "\u0438\u043D\u043B\u0430\u0439\u043D-\u043E\u0431\u0440\u0430\u0431\u043E\u0442\u0447\u0438\u043A \u0441\u043E\u0431\u044B\u0442\u0438\u0439", "low"],
       [/https?:\/\/[^\s"']+/g, "\u0432\u043D\u0435\u0448\u043D\u0438\u0439 \u0440\u0435\u0441\u0443\u0440\u0441 \u2014 \u043F\u0440\u043E\u0432\u0435\u0440\u044C\u0442\u0435 \u0435\u0433\u043E \u0434\u043E\u0432\u0435\u0440\u0438\u0435", "info"],
       [/localStorage\.setItem\s*\([^,]+,\s*(?!JSON)/g, "\u0432 localStorage \u043F\u0438\u0448\u0435\u0442\u0441\u044F \u043D\u0435 JSON \u2014 \u043F\u0440\u043E\u0432\u0435\u0440\u044C\u0442\u0435 \u0442\u0438\u043F", "low"],
-      [/password|token|secret|api[_-]?key/gi, "\u043F\u043E\u0445\u043E\u0436\u0435 \u043D\u0430 \u0441\u0435\u043A\u0440\u0435\u0442 \u0432 \u043A\u043E\u0434\u0435 \u2014 \u043D\u0435 \u043F\u0443\u0431\u043B\u0438\u043A\u0443\u0439\u0442\u0435 \u0435\u0433\u043E", "high"]
+      [/password|token|secret|api[_-]?key/gi, "\u043F\u043E\u0445\u043E\u0436\u0435 \u043D\u0430 \u0441\u0435\u043A\u0440\u0435\u0442 \u0432 \u043A\u043E\u0434\u0435 \u2014 \u043D\u0435 \u043F\u0443\u0431\u043B\u0438\u043A\u0443\u0439\u0442\u0435 \u0435\u0433\u043E", "high"],
+      [/javascript\s*:/gi, "javascript: URL \u2014 \u043A\u043B\u0430\u0441\u0441\u0438\u0447\u0435\u0441\u043A\u0438\u0439 XSS-\u0432\u0435\u043A\u0442\u043E\u0440", "high"],
+      [/data:text\/html/gi, "data:text/html \u043C\u043E\u0436\u0435\u0442 \u0432\u044B\u043F\u043E\u043B\u043D\u0438\u0442\u044C \u043F\u0440\u043E\u0438\u0437\u0432\u043E\u043B\u044C\u043D\u044B\u0439 \u043A\u043E\u0434", "high"],
+      [/setTimeout\s*\(\s*['"]/g, "setTimeout \u0441\u043E \u0441\u0442\u0440\u043E\u043A\u043E\u0439 \u2014 \u043D\u0435\u044F\u0432\u043D\u044B\u0439 eval", "high"],
+      [/postMessage\s*\([^,]+,\s*['"]\*['"]/g, "postMessage \u0441 targetOrigin=* \u2014 \u0443\u0442\u0435\u0447\u043A\u0430 \u0434\u0430\u043D\u043D\u044B\u0445 \u0434\u0440\u0443\u0433\u043E\u043C\u0443 \u043E\u043A\u043D\u0443", "medium"],
+      [/target\s*=\s*['"]_blank['"](?![^>]*noopener)/gi, "target=_blank \u0431\u0435\u0437 rel=noopener \u2014 tabnabbing", "medium"],
+      [/\bsrcdoc\s*=/gi, "srcdoc \u0441 \u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u0435\u043B\u044C\u0441\u043A\u0438\u043C\u0438 \u0434\u0430\u043D\u043D\u044B\u043C\u0438 \u2014 \u043F\u0440\u043E\u0432\u0435\u0440\u044C\u0442\u0435 \u0438\u0437\u043E\u043B\u044F\u0446\u0438\u044E iframe", "medium"],
+      [/document\.cookie/gi, "\u0447\u0442\u0435\u043D\u0438\u0435 document.cookie \u2014 \u043F\u0440\u043E\u0432\u0435\u0440\u044C\u0442\u0435, \u0447\u0442\u043E \u0442\u0430\u043C \u043D\u0435\u0442 \u0442\u043E\u043A\u0435\u043D\u043E\u0432", "low"],
+      [/\bwindow\.open\s*\(/g, "window.open \u2014 \u0432\u043E\u0437\u043C\u043E\u0436\u0435\u043D \u0444\u0438\u0448\u0438\u043D\u0433 \u0447\u0435\u0440\u0435\u0437 \u043D\u043E\u0432\u043E\u0435 \u043E\u043A\u043D\u043E", "low"],
+      [/\blocalStorage\s*\.\s*setItem\s*\([^,]+,\s*[^)]*password/gi, "\u043F\u0430\u0440\u043E\u043B\u044C \u0432 localStorage \u2014 \u0434\u043E\u0441\u0442\u0443\u043F\u0435\u043D \u043B\u044E\u0431\u043E\u043C\u0443 \u0441\u043A\u0440\u0438\u043F\u0442\u0443 \u0441\u0442\u0440\u0430\u043D\u0438\u0446\u044B", "high"]
     ];
     for (const [re, msg, sev] of rules) {
       const hits = [...code2.matchAll(re)];
@@ -46165,6 +46492,75 @@ ${JSON.stringify({ "@context": "https://schema.org", "@type": "WebSite", name: t
     if (!html2.includes("<main") && /<div/.test(html2)) tips.push("\u0418\u0441\u043F\u043E\u043B\u044C\u0437\u0443\u0439\u0442\u0435 <main> \u0438 \u0434\u0440\u0443\u0433\u0438\u0435 \u0441\u0435\u043C\u0430\u043D\u0442\u0438\u0447\u0435\u0441\u043A\u0438\u0435 \u0442\u0435\u0433\u0438.");
     tips.push("\u041C\u0438\u043D\u0438\u0444\u0438\u0446\u0438\u0440\u0443\u0439\u0442\u0435 CSS/JS \u043F\u0435\u0440\u0435\u0434 \u043F\u0443\u0431\u043B\u0438\u043A\u0430\u0446\u0438\u0435\u0439 (\u043A\u043E\u043C\u0430\u043D\u0434\u0430 \xAB\u041C\u0438\u043D\u0438\u0444\u0438\u0446\u0438\u0440\u043E\u0432\u0430\u0442\u044C\xBB).");
     return tips;
+  }
+  function safeCalc(expr) {
+    if (typeof expr !== "string" || expr.length > 200) throw new Error("\u0412\u044B\u0440\u0430\u0436\u0435\u043D\u0438\u0435 \u0441\u043B\u0438\u0448\u043A\u043E\u043C \u0434\u043B\u0438\u043D\u043D\u043E\u0435");
+    const ast = parseExpressionAt2(expr, 0, { ecmaVersion: "latest" });
+    if (ast.end !== expr.trim().length) throw new Error("\u041B\u0438\u0448\u043D\u0438\u0435 \u0441\u0438\u043C\u0432\u043E\u043B\u044B \u043F\u043E\u0441\u043B\u0435 \u0432\u044B\u0440\u0430\u0436\u0435\u043D\u0438\u044F");
+    const binary = {
+      "+": (a, b) => a + b,
+      "-": (a, b) => a - b,
+      "*": (a, b) => a * b,
+      "/": (a, b) => a / b,
+      "%": (a, b) => a % b,
+      "**": (a, b) => a ** b
+    };
+    const unary = { "+": (a) => +a, "-": (a) => -a };
+    const mathFns = {
+      abs: Math.abs,
+      floor: Math.floor,
+      ceil: Math.ceil,
+      round: Math.round,
+      sqrt: Math.sqrt,
+      pow: Math.pow,
+      min: Math.min,
+      max: Math.max,
+      sin: Math.sin,
+      cos: Math.cos,
+      tan: Math.tan,
+      log: Math.log,
+      exp: Math.exp,
+      trunc: Math.trunc,
+      sign: Math.sign,
+      cbrt: Math.cbrt
+    };
+    const mathConsts = { PI: Math.PI, E: Math.E, LN2: Math.LN2, LN10: Math.LN10, SQRT2: Math.SQRT2 };
+    function ev(n, depth) {
+      if (depth > 30) throw new Error("\u0421\u043B\u0438\u0448\u043A\u043E\u043C \u0433\u043B\u0443\u0431\u043E\u043A\u043E\u0435 \u0432\u044B\u0440\u0430\u0436\u0435\u043D\u0438\u0435");
+      switch (n.type) {
+        case "Literal":
+          if (typeof n.value !== "number" || !Number.isFinite(n.value)) throw new Error("\u0420\u0430\u0437\u0440\u0435\u0448\u0435\u043D\u044B \u0442\u043E\u043B\u044C\u043A\u043E \u0447\u0438\u0441\u043B\u0430");
+          return n.value;
+        case "ParenthesizedExpression":
+          return ev(n.expression, depth + 1);
+        case "UnaryExpression": {
+          const f = unary[n.operator];
+          if (!f || n.prefix !== true) throw new Error("\u041D\u0435\u0434\u043E\u043F\u0443\u0441\u0442\u0438\u043C\u044B\u0439 \u0443\u043D\u0430\u0440\u043D\u044B\u0439 \u043E\u043F\u0435\u0440\u0430\u0442\u043E\u0440");
+          return f(ev(n.argument, depth + 1));
+        }
+        case "BinaryExpression": {
+          const f = binary[n.operator];
+          if (!f) throw new Error("\u041D\u0435\u0434\u043E\u043F\u0443\u0441\u0442\u0438\u043C\u044B\u0439 \u043E\u043F\u0435\u0440\u0430\u0442\u043E\u0440");
+          const v = f(ev(n.left, depth + 1), ev(n.right, depth + 1));
+          if (!Number.isFinite(v)) throw new Error("\u0420\u0435\u0437\u0443\u043B\u044C\u0442\u0430\u0442 \u043D\u0435 \u0447\u0438\u0441\u043B\u043E");
+          return v;
+        }
+        case "MemberExpression":
+          if (n.object.type === "Identifier" && n.object.name === "Math" && !n.computed && n.property.type === "Identifier" && Object.prototype.hasOwnProperty.call(mathConsts, n.property.name)) return mathConsts[n.property.name];
+          throw new Error("\u0414\u043E\u0441\u0442\u0443\u043F \u043A \u043E\u0431\u044A\u0435\u043A\u0442\u0430\u043C \u0437\u0430\u043F\u0440\u0435\u0449\u0451\u043D");
+        case "CallExpression":
+          if (n.callee.type === "MemberExpression" && n.callee.object.type === "Identifier" && n.callee.object.name === "Math" && !n.callee.computed && n.callee.property.type === "Identifier" && Object.prototype.hasOwnProperty.call(mathFns, n.callee.property.name) && n.arguments.length <= 4 && n.arguments.every((a) => a.type !== "SpreadElement")) {
+            const args = n.arguments.map((a) => ev(a, depth + 1));
+            const v = mathFns[n.callee.property.name](...args);
+            if (!Number.isFinite(v)) throw new Error("\u0420\u0435\u0437\u0443\u043B\u044C\u0442\u0430\u0442 \u043D\u0435 \u0447\u0438\u0441\u043B\u043E");
+            return v;
+          }
+          throw new Error("\u0412\u044B\u0437\u043E\u0432\u044B \u0444\u0443\u043D\u043A\u0446\u0438\u0439 \u0437\u0430\u043F\u0440\u0435\u0449\u0435\u043D\u044B");
+        default:
+          throw new Error("\u041D\u0435\u0434\u043E\u043F\u0443\u0441\u0442\u0438\u043C\u044B\u0439 \u044D\u043B\u0435\u043C\u0435\u043D\u0442 \u0432\u044B\u0440\u0430\u0436\u0435\u043D\u0438\u044F");
+      }
+    }
+    return ev(ast, 0);
   }
   async function processImage(src, { width = null, height = null, format = "image/png", quality = 0.85 } = {}) {
     return new Promise((resolve, reject) => {
@@ -46240,11 +46636,13 @@ jobs:
     return kind === "gitlab" ? body.replace("runs-on: ubuntu-latest", "image: node:20").replace("uses: actions/checkout@v4", "script: echo checkout") : body;
   }
   function embedCode(opts = {}) {
-    const id2 = encodeURIComponent(state.projectName);
-    const params = new URLSearchParams({ theme: opts.theme || "dark", run: opts.run !== false ? "1" : "0", v: "1" });
-    return `<iframe src="https://runlet.app/embed/${id2}?${params}" width="100%" height="${opts.height || 520}"
+    const id2 = encodeURIComponent(String(state.projectName).slice(0, 100));
+    const theme2 = ["dark", "light", "contrast"].includes(opts.theme) ? opts.theme : "dark";
+    const height = Math.max(120, Math.min(4e3, Math.round(Number(opts.height) || 520)));
+    const params = new URLSearchParams({ theme: theme2, run: opts.run !== false ? "1" : "0", v: "1" });
+    return `<iframe src="https://runlet.app/embed/${id2}?${params}" width="100%" height="${height}"
   style="border:0;border-radius:20px;overflow:hidden"
-  loading="lazy" title="${esc(state.projectName)}" sandbox="allow-scripts allow-forms"></iframe>`;
+  loading="lazy" referrerpolicy="no-referrer" title="${esc(String(state.projectName).slice(0, 100))}" sandbox="allow-scripts allow-forms"></iframe>`;
   }
   function staticSite() {
     const html2 = read(state.entry);
@@ -46349,7 +46747,7 @@ ${f.content}
             title: path
           },
           el("span", { class: "twist", text: isDir ? "\u25BE" : "" }),
-          f && isImage(path) && /^data:image/.test(f.content) ? el("img", { class: "tree-thumb", src: f.content, alt: "" }) : el("span", { class: "ftype", text: iconFor(path, isDir) }),
+          f && isImage(path) && safeDataSrc(f.content) ? el("img", { class: "tree-thumb", src: safeDataSrc(f.content), alt: "" }) : el("span", { class: "ftype", text: iconFor(path, isDir) }),
           el("span", { class: "fname", text: name2.replace(/\/$/, "") }),
           el("span", { class: "tree-meta", text: isDir ? "" : fmtBytes(f?.content?.length || 0) }),
           el("span", { class: "fmenu", text: "\u22EF" })
@@ -46486,16 +46884,17 @@ ${f.content}
       onOk: (root) => {
         const name2 = root.querySelector("#dlgName").value.trim();
         if (!name2) return false;
+        const safeName = esc(name2.slice(0, 200));
         const path = folder ? name2.replace(/\/$/, "") + "/README.md" : name2;
         if (exists(path)) {
           toast("\u0422\u0430\u043A\u043E\u0439 \u0444\u0430\u0439\u043B \u0443\u0436\u0435 \u0435\u0441\u0442\u044C", "err");
           return false;
         }
         let content2 = "";
-        if (folder) content2 = "# " + name2 + "\n";
-        else if (/\.html$/i.test(path)) content2 = '<!DOCTYPE html>\n<html lang="ru">\n<head><meta charset="utf-8"><title>' + name2 + "</title></head>\n<body>\n  \n</body>\n</html>";
-        else if (/\.css$/i.test(path)) content2 = "/* " + name2 + " */\n";
-        else if (/\.js$/i.test(path)) content2 = "// " + name2 + "\n";
+        if (folder) content2 = "# " + name2.replace(/[\r\n]/g, "") + "\n";
+        else if (/\.html$/i.test(path)) content2 = '<!DOCTYPE html>\n<html lang="ru">\n<head><meta charset="utf-8"><title>' + safeName + "</title></head>\n<body>\n  \n</body>\n</html>";
+        else if (/\.css$/i.test(path)) content2 = "/* " + name2.replace(/\*\//g, "").slice(0, 200) + " */\n";
+        else if (/\.js$/i.test(path)) content2 = "// " + name2.replace(/[\r\n]/g, "").slice(0, 200) + "\n";
         else if (/\.json$/i.test(path)) content2 = "{\n  \n}\n";
         write(path, content2);
         renderTree();
@@ -46632,7 +47031,11 @@ ${f.content}
   async function uploadFiles(fileList) {
     let n = 0;
     for (const file of fileList) {
-      const path = file.webkitRelativePath || file.name;
+      const path = safePathKey(file.webkitRelativePath || file.name);
+      if (!path) {
+        toast("\u041F\u0440\u043E\u043F\u0443\u0449\u0435\u043D \u0444\u0430\u0439\u043B \u0441 \u043D\u0435\u0431\u0435\u0437\u043E\u043F\u0430\u0441\u043D\u044B\u043C \u0438\u043C\u0435\u043D\u0435\u043C: " + String(file.name).slice(0, 80), "warn");
+        continue;
+      }
       let content2;
       if (/\.(png|jpe?g|gif|webp|ico|woff2?|ttf|otf|mp3|wav|mp4|webm)$/i.test(path)) {
         content2 = await new Promise((res) => {
@@ -46656,6 +47059,7 @@ ${f.content}
     toast("\u0421\u043A\u0430\u0447\u0430\u043D\u043E: " + path, "ok");
   }
   function dataUriToBlob(uri) {
+    if (!safeDataSrc(uri)) throw new Error("\u043D\u0435\u0431\u0435\u0437\u043E\u043F\u0430\u0441\u043D\u044B\u0439 data URI");
     const [meta2, payload] = [uri.slice(5, uri.indexOf(",")), uri.slice(uri.indexOf(",") + 1)];
     if (/;base64/i.test(meta2)) {
       const bin = atob(payload), bytes = new Uint8Array(bin.length);
@@ -46680,6 +47084,8 @@ ${f.content}
     const entries = unzipSync(buf);
     let count2 = 0;
     for (const [name2, data3] of Object.entries(entries)) {
+      const path = safePathKey(name2);
+      if (!path) continue;
       if (name2.endsWith("/") || name2 === "runlet.project.json") continue;
       let content2;
       try {
@@ -46692,7 +47098,7 @@ ${f.content}
         for (const b of data3) bin += String.fromCharCode(b);
         content2 = `data:${mimeOf(name2)};base64,` + btoa(bin);
       }
-      write(name2, content2);
+      write(path, content2);
       count2++;
     }
     renderTree();
@@ -46737,11 +47143,26 @@ ${f.content}
       onOk: async (root) => {
         const url = root.querySelector("#dlgUrl").value.trim();
         if (!url) return false;
+        let u;
         try {
-          const res = await fetch(url);
+          u = new URL(url);
+        } catch (_) {
+          toast("\u041D\u0435\u043A\u043E\u0440\u0440\u0435\u043A\u0442\u043D\u044B\u0439 URL", "err");
+          return false;
+        }
+        if (u.protocol !== "https:" || u.username || u.password || url.length > 2e3 || /^(localhost|127\.|10\.|192\.168\.|169\.254\.|172\.(1[6-9]|2\d|3[01])\.|\[::1\])/i.test(u.hostname)) {
+          toast("\u0420\u0430\u0437\u0440\u0435\u0448\u0435\u043D\u044B \u0442\u043E\u043B\u044C\u043A\u043E \u043F\u0443\u0431\u043B\u0438\u0447\u043D\u044B\u0435 HTTPS-\u0430\u0434\u0440\u0435\u0441\u0430", "err");
+          return false;
+        }
+        try {
+          const controller = new AbortController();
+          const timer = setTimeout(() => controller.abort(), 15e3);
+          const res = await fetch(u.href, { credentials: "omit", referrerPolicy: "no-referrer", signal: controller.signal });
+          clearTimeout(timer);
           if (!res.ok) throw new Error("HTTP " + res.status);
-          const text = await res.text();
-          const name2 = url.split("/").pop().split("?")[0] || "imported.html";
+          if (+res.headers.get("content-length") > 4 * 1024 * 1024) throw new Error("\u0444\u0430\u0439\u043B \u0441\u043B\u0438\u0448\u043A\u043E\u043C \u0431\u043E\u043B\u044C\u0448\u043E\u0439");
+          const text = (await res.text()).slice(0, 4 * 1024 * 1024);
+          const name2 = (u.pathname.split("/").pop() || "imported.html").replace(/[^\w.-]/g, "").slice(0, 120) || "imported.html";
           if (/\.html?$/i.test(name2)) await importSingleHtml(new File([text], name2, { type: "text/html" }));
           else {
             write(name2, text);
@@ -46852,7 +47273,8 @@ ${f.content}
       const f = state.files[p];
       const tile = el("div", { class: "tile" });
       const isImg = isImage(p);
-      tile.innerHTML = `<div class="tile-ico">${isImg && /^data:image/.test(f.content) ? `<img src="${esc(f.content)}" style="width:100%;height:64px;object-fit:contain;border-radius:8px">` : /\.mp3|wav/.test(p) ? "\u{1F3B5}" : /\.mp4|webm/.test(p) ? "\u{1F3AC}" : "\u{1F524}"}</div>
+      const src = isImg ? safeDataSrc(f.content) : "";
+      tile.innerHTML = `<div class="tile-ico">${src ? `<img src="${esc(src)}" style="width:100%;height:64px;object-fit:contain;border-radius:8px">` : /\.mp3|wav/.test(p) ? "\u{1F3B5}" : /\.mp4|webm/.test(p) ? "\u{1F3AC}" : "\u{1F524}"}</div>
       <b>${esc(p.split("/").pop())}</b><small>${fmtBytes(f.content.length)} \xB7 ${esc(mimeOf(p))}</small>`;
       const row = el(
         "div",
@@ -46907,9 +47329,10 @@ ${f.content}
     const f = state.files[path], c = f.content;
     const isImg = /^data:image/.test(c) || /\.svg$/i.test(path);
     let inner = "";
-    if (isImg) inner = `<img src="${esc(c)}" style="max-width:100%;max-height:50vh;border-radius:14px;background:repeating-conic-gradient(#222 0 25%,#333 0 50%) 50%/20px 20px">`;
-    else if (/\.mp3|wav/.test(path)) inner = `<audio controls src="${esc(c)}" style="width:100%"></audio>`;
-    else if (/\.mp4|webm/.test(path)) inner = `<video controls src="${esc(c)}" style="max-width:100%;max-height:50vh;border-radius:14px"></video>`;
+    const src = safeDataSrc(c);
+    if (isImg && src) inner = `<img src="${esc(src)}" style="max-width:100%;max-height:50vh;border-radius:14px;background:repeating-conic-gradient(#222 0 25%,#333 0 50%) 50%/20px 20px">`;
+    else if (/\.mp3|wav/.test(path) && src) inner = `<audio controls src="${esc(src)}" style="width:100%"></audio>`;
+    else if (/\.mp4|webm/.test(path) && src) inner = `<video controls src="${esc(src)}" style="max-width:100%;max-height:50vh;border-radius:14px"></video>`;
     else inner = `<p class="muted">\u0411\u0438\u043D\u0430\u0440\u043D\u044B\u0439 \u0444\u0430\u0439\u043B: ${esc(mimeOf(path))}</p>`;
     ctx.modal({
       title: path,
@@ -47076,14 +47499,29 @@ ${f.content}
   }
 
   // app/src/core/analyzer.js
+  var MAX_ANALYZE_TOTAL = 4 * 1024 * 1024;
   function analysisJob() {
+    const files = {};
+    let total = 0;
+    for (const [name2, content2] of Object.entries(allTextFiles())) {
+      if (typeof name2 !== "string" || name2.length > 300 || name2.includes("\0") || name2.includes("\\")) continue;
+      if (typeof content2 !== "string") continue;
+      total += content2.length;
+      if (total > MAX_ANALYZE_TOTAL) break;
+      files[name2] = content2.slice(0, 2 * 1024 * 1024);
+    }
     return {
-      files: allTextFiles(),
-      entry: state.entry,
-      deps: state.deps.map((d) => typeof d === "string" ? d : d.id),
-      locale: state.settings.locale,
+      files,
+      entry: String(state.entry || "index.html").slice(0, 300),
+      deps: state.deps.map((d) => typeof d === "string" ? d.slice(0, 80) : String(d?.id || "").slice(0, 80)),
+      locale: String(state.settings.locale || "ru").slice(0, 8),
       active: state.activePane
     };
+  }
+  function apiToken() {
+    const meta2 = document.querySelector('meta[name="runlet-api-token"]');
+    const t2 = meta2?.getAttribute("content") || "";
+    return /^[a-f0-9]{32,128}$/i.test(t2) ? t2 : "";
   }
   var pending = 0;
   async function runAnalysis2({ silent = false, force = false } = {}) {
@@ -47096,12 +47534,27 @@ ${f.content}
       if (window.runlet?.analyze) {
         report = await window.runlet.analyze(job);
       } else {
-        const res = await fetch("/api/analyze", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(job)
-        });
-        if (res.ok) report = await res.json();
+        const token = apiToken();
+        const body = JSON.stringify(job);
+        if (body.length > MAX_ANALYZE_TOTAL) throw new Error("analysis job too large");
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), 2e4);
+        try {
+          const res = await fetch("/api/analyze", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", ...token ? { "X-Runlet-Token": token } : {} },
+            body,
+            signal: controller.signal,
+            credentials: "same-origin",
+            referrerPolicy: "no-referrer"
+          });
+          if (res.ok) {
+            const text = await res.text();
+            if (text.length < 8 * 1024 * 1024) report = JSON.parse(text);
+          }
+        } finally {
+          clearTimeout(timer);
+        }
       }
     } catch (e) {
       console.warn("[runlet] python engine unavailable:", e.message);
@@ -47512,7 +47965,10 @@ ${summary.steps.map((s) => "- " + s.text).join("\n")}
     for (const n of (b.network || []).slice(0, 4)) chips.push(`<span class="chip">\u{1F310} <b>${esc(n.method || "fetch")}</b> ${esc(String(n.url).slice(0, 40))}</span>`);
     for (const t2 of (b.timers || []).slice(0, 3)) chips.push(`<span class="chip">\u23F1 ${esc(t2.kind || "timer")}</span>`);
     for (const s of (b.storage || []).slice(0, 4)) chips.push(`<span class="chip">\u{1F4BE} <b>${esc(s.store)}</b> ${esc(s.key)}</span>`);
-    for (const c of (b.colors || []).slice(0, 6)) chips.push(`<span class="chip">\u{1F3A8} <b style="color:${esc(c.value)}">\u25A0</b> ${esc(c.value)}</span>`);
+    for (const c of (b.colors || []).slice(0, 6)) {
+      const col = sanitizeColor(c.value, "transparent");
+      chips.push(`<span class="chip">\u{1F3A8} <b style="color:${col}">\u25A0</b> ${esc(String(c.value).slice(0, 40))}</span>`);
+    }
     if (!chips.length) return "";
     return `<div class="section"><h3>\u041F\u043E\u0432\u0435\u0434\u0435\u043D\u0438\u0435 \u043A\u043E\u0434\u0430</h3><div class="chips">${chips.join("")}</div></div>`;
   }
@@ -48485,37 +48941,214 @@ data.forEach((v, i) => { ctx.fillStyle = '#7c6cf6'; ctx.fillRect(i * 95 + 20, 24
     }
     host.querySelector("#plugUrl").onclick = () => ctx.modal({
       title: "\u0423\u0441\u0442\u0430\u043D\u043E\u0432\u0438\u0442\u044C \u043F\u043B\u0430\u0433\u0438\u043D \u043F\u043E \u0441\u0441\u044B\u043B\u043A\u0435",
-      body: `<div class="field"><label>URL JS-\u0444\u0430\u0439\u043B\u0430</label><input id="plugSrc" placeholder="https://example.com/plugin.js"></div>
-      <p class="muted" style="font-size:11px">\u041A\u043E\u0434 \u0432\u044B\u043F\u043E\u043B\u043D\u044F\u0435\u0442\u0441\u044F \u0432 \u043F\u0435\u0441\u043E\u0447\u043D\u0438\u0446\u0435: \u0434\u043E\u0441\u0442\u0443\u043F\u0435\u043D \u0442\u043E\u043B\u044C\u043A\u043E Runlet.pluginAPI.</p>`,
+      body: `<div class="field"><label>URL JS-\u0444\u0430\u0439\u043B\u0430 (\u0442\u043E\u043B\u044C\u043A\u043E HTTPS)</label><input id="plugSrc" placeholder="https://example.com/plugin.js"></div>
+      <div class="beginner">\u26A0 \u0421\u0442\u043E\u0440\u043E\u043D\u043D\u0438\u0439 \u043A\u043E\u0434 \u0432\u044B\u043F\u043E\u043B\u043D\u044F\u0435\u0442\u0441\u044F \u0432 \u043E\u0442\u0434\u0435\u043B\u044C\u043D\u043E\u043C sandboxed iframe \u0431\u0435\u0437 \u0434\u043E\u0441\u0442\u0443\u043F\u0430 \u043A DOM \u0440\u0435\u0434\u0430\u043A\u0442\u043E\u0440\u0430, \u0444\u0430\u0439\u043B\u0430\u043C \u041E\u0421 \u0438 \u0441\u0435\u0442\u0438. \u0420\u0430\u0437\u0440\u0435\u0448\u0435\u043D\u044B \u0442\u043E\u043B\u044C\u043A\u043E \u044F\u0432\u043D\u043E \u043E\u043F\u0438\u0441\u0430\u043D\u043D\u044B\u0435 \u043A\u043E\u043C\u0430\u043D\u0434\u044B.</div>`,
       okText: "\u0423\u0441\u0442\u0430\u043D\u043E\u0432\u0438\u0442\u044C",
       onOk: async (root) => {
         const url = root.querySelector("#plugSrc").value.trim();
         if (!url) return false;
+        let u;
         try {
-          const code2 = await (await fetch(url)).text();
-          installPluginCode(code2, url);
+          u = new URL(url);
+        } catch (_) {
+          toast("\u041D\u0435\u043A\u043E\u0440\u0440\u0435\u043A\u0442\u043D\u044B\u0439 URL", "err");
+          return false;
+        }
+        if (u.protocol !== "https:" || u.username || u.password || url.length > 2e3) {
+          toast("\u0420\u0430\u0437\u0440\u0435\u0448\u0435\u043D\u044B \u0442\u043E\u043B\u044C\u043A\u043E HTTPS-\u0441\u0441\u044B\u043B\u043A\u0438 \u0431\u0435\u0437 \u043B\u043E\u0433\u0438\u043D\u0430/\u043F\u0430\u0440\u043E\u043B\u044F", "err");
+          return false;
+        }
+        try {
+          const res = await fetch(u.href, { credentials: "omit", referrerPolicy: "no-referrer" });
+          if (!res.ok) throw new Error("HTTP " + res.status);
+          const code2 = await res.text();
+          if (code2.length > 2e5) throw new Error("\u0444\u0430\u0439\u043B \u043F\u043B\u0430\u0433\u0438\u043D\u0430 \u0441\u043B\u0438\u0448\u043A\u043E\u043C \u0431\u043E\u043B\u044C\u0448\u043E\u0439 (>200 \u041A\u0411)");
+          installPluginCode(code2, u.hostname);
         } catch (e) {
           toast("\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u0437\u0430\u0433\u0440\u0443\u0437\u0438\u0442\u044C \u043F\u043B\u0430\u0433\u0438\u043D: " + e.message, "err");
         }
       }
     });
   }
+  var PLUGIN_SAFE_COMMANDS = /* @__PURE__ */ new Set([
+    "run",
+    "analyze",
+    "format",
+    "save",
+    "theme",
+    "density",
+    "palette",
+    "snippets",
+    "cssLab",
+    "jsTools",
+    "htmlTools",
+    "colorTool",
+    "contrastTool",
+    "tour",
+    "learn",
+    "features",
+    "plugins",
+    "librarySearch",
+    "consoleClear",
+    "refreshInspectors",
+    "breakpoint",
+    "rotateDevice",
+    "toggleGrid",
+    "previewFullscreen",
+    "bundleSize",
+    "perfTips",
+    "lighthouse",
+    "a11yReport",
+    "screenReader"
+  ]);
+  var PLUGIN_SAFE_METHODS = /* @__PURE__ */ new Set([
+    "toast",
+    "log",
+    "emit",
+    "insertText",
+    "setDoc",
+    "getDoc",
+    "analyze",
+    "runCommand",
+    "readFile",
+    "writeFile"
+  ]);
   function installPluginCode(code2, name2 = "custom") {
-    try {
-      const sandbox = new Function("api", "console", "window", "document", "fetch", `"use strict";
-${code2}
-return (typeof register === 'function') ? register(api) : (typeof module !== 'undefined' && module.exports) || null;`);
-      const result = sandbox(pluginAPI, { log: (...a) => toast(a.join(" "), "info") }, void 0, void 0, void 0);
-      if (result && typeof result === "object") {
-        if (result.commands) for (const [id2, def] of Object.entries(result.commands)) ctx.registerCommand?.(id2, def);
-        if (result.name) state.plugins.push(result.name);
-      }
-      toast("\u041F\u043B\u0430\u0433\u0438\u043D \u0443\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D: " + name2, "ok");
-      renderPlugins();
-      return true;
-    } catch (e) {
-      toast("\u041E\u0448\u0438\u0431\u043A\u0430 \u043F\u043B\u0430\u0433\u0438\u043D\u0430: " + e.message, "err");
+    if (typeof code2 !== "string" || !code2.trim() || code2.length > 2e5 || code2.includes("\0")) {
+      toast("\u041D\u0435\u043A\u043E\u0440\u0440\u0435\u043A\u0442\u043D\u044B\u0439 \u043A\u043E\u0434 \u043F\u043B\u0430\u0433\u0438\u043D\u0430", "err");
       return false;
+    }
+    const nonce = Math.random().toString(36).slice(2) + Date.now().toString(36);
+    const iframe = document.createElement("iframe");
+    iframe.setAttribute("sandbox", "allow-scripts");
+    iframe.setAttribute("aria-hidden", "true");
+    iframe.style.cssText = "position:fixed;left:-9999px;width:1px;height:1px;border:0;opacity:0";
+    const cfg = {
+      nonce,
+      code: code2,
+      files: Object.keys(state.files).slice(0, 100).map((p) => String(p).slice(0, 200)),
+      projectName: String(state.projectName).slice(0, 100),
+      methods: [...PLUGIN_SAFE_METHODS],
+      safeCommands: [...PLUGIN_SAFE_COMMANDS]
+    };
+    const shim = `(function(){
+    var C = window.__PLUGIN_CFG__;
+    var post = function(m){ try { parent.postMessage(Object.assign({__plugin:1, nonce:C.nonce}, m), '*'); } catch(e){} };
+    var api = {};
+    C.methods.forEach(function(m){ api[m] = function(){
+      var args = [].slice.call(arguments).slice(0, 4).map(function(a){
+        if (typeof a === 'string') return a.slice(0, 200000);
+        if (typeof a === 'number' || typeof a === 'boolean' || a === null) return a;
+        return String(a).slice(0, 1000);
+      });
+      post({ method: m, args: args });
+    }; });
+    api.state = Object.freeze({ files: Object.freeze(C.files.slice()), projectName: C.projectName,
+                                safeCommands: Object.freeze(C.safeCommands.slice()) });
+    api.version = '1.0';
+    try {
+      var fn = new Function('api', 'console', '"use strict";
+' + C.code +
+        '
+return (typeof register === "function") ? register(api) : null;');
+      var manifest = fn(api, { log: function(){}, warn: function(){}, error: function(){}, info: function(){} });
+      var clean = null;
+      try { clean = JSON.parse(JSON.stringify(manifest || {})); } catch(e) { clean = null; }
+      post({ ready: true, manifest: clean });
+    } catch (e) { post({ error: String((e && e.message) || e).slice(0, 300) }); }
+  })();`;
+    const cfgJson = JSON.stringify(cfg).replace(/</g, "\\u003c").replace(/\u2028/g, "\\u2028").replace(/\u2029/g, "\\u2029");
+    iframe.srcdoc = `<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline' 'unsafe-eval'; connect-src 'none'; img-src 'none'; style-src 'none'; form-action 'none'; base-uri 'none'; object-src 'none'"></head><body><script>window.__PLUGIN_CFG__=` + cfgJson + ";<\/script><script>" + shim + "<\/script></body></html>";
+    let done = false;
+    const cleanup = () => {
+      if (done) return;
+      done = true;
+      window.removeEventListener("message", handler);
+      clearTimeout(killTimer);
+      setTimeout(() => iframe.remove(), 50);
+    };
+    const killTimer = setTimeout(cleanup, 3e4);
+    function handler(e) {
+      const d = e.data;
+      if (!d || d.__plugin !== 1 || d.nonce !== nonce) return;
+      if (e.source !== iframe.contentWindow) return;
+      if (e.origin !== "null" && e.origin !== location.origin) return;
+      if (d.error) {
+        toast("\u041E\u0448\u0438\u0431\u043A\u0430 \u043F\u043B\u0430\u0433\u0438\u043D\u0430: " + String(d.error).slice(0, 200), "err");
+        cleanup();
+        return;
+      }
+      if (d.ready) {
+        const m = d.manifest && typeof d.manifest === "object" ? d.manifest : {};
+        const pname = typeof m.name === "string" ? m.name.replace(/[^\w\s.-]/g, "").slice(0, 60) : "";
+        const cmds = m.commands && typeof m.commands === "object" && !Array.isArray(m.commands) ? m.commands : {};
+        let registered = 0;
+        for (const [id2, def] of Object.entries(cmds).slice(0, 20)) {
+          if (!/^[\w-]{1,60}$/.test(id2) || !def || typeof def !== "object") continue;
+          const target = String(def.command || "").slice(0, 80);
+          if (!PLUGIN_SAFE_COMMANDS.has(target)) continue;
+          const title = String(def.title || id2).replace(/[<>&"']/g, "").slice(0, 80);
+          ctx.registerCommand?.("plugin:" + id2, {
+            title,
+            group: "\u041F\u043B\u0430\u0433\u0438\u043D\u044B",
+            icon: "\u{1F50C}",
+            run: () => ctx.runCommand?.(target)
+          });
+          registered++;
+        }
+        if (pname) state.plugins.push(pname);
+        toast(`\u041F\u043B\u0430\u0433\u0438\u043D \xAB${pname || name2}\xBB \u0443\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D (${registered} \u043A\u043E\u043C\u0430\u043D\u0434)`, "ok");
+        renderPlugins();
+        cleanup();
+        return;
+      }
+      if (typeof d.method === "string" && PLUGIN_SAFE_METHODS.has(d.method)) {
+        executePluginMethod(d.method, Array.isArray(d.args) ? d.args : []);
+      }
+    }
+    window.addEventListener("message", handler);
+    document.body.appendChild(iframe);
+    return true;
+  }
+  function executePluginMethod(method, args) {
+    const str = (v, n = 2e5) => typeof v === "string" ? v.slice(0, n) : String(v ?? "").slice(0, n);
+    try {
+      switch (method) {
+        case "toast":
+        case "log":
+          toast(str(args[0], 300), "info", "\u041F\u043B\u0430\u0433\u0438\u043D");
+          break;
+        case "emit":
+          if (/^[\w:.-]{1,60}$/.test(str(args[0], 60))) emit(str(args[0], 60), args[1]);
+          break;
+        case "insertText":
+          insertText(str(args[0]), str(args[1], 10) || state.activePane);
+          break;
+        case "setDoc":
+          setDoc(str(args[0]), str(args[1], 10) || state.activePane);
+          break;
+        case "getDoc":
+          break;
+        // async read not exposed to remote plugins
+        case "analyze":
+          runAnalysis2({ silent: true });
+          break;
+        case "readFile":
+          break;
+        // no synchronous file read across the boundary
+        case "writeFile": {
+          const path = str(args[0], 300);
+          if (/^[\w./-]{1,300}$/.test(path) && !path.includes("..")) write(path, str(args[1]));
+          break;
+        }
+        case "runCommand": {
+          const id2 = str(args[0], 80);
+          if (PLUGIN_SAFE_COMMANDS.has(id2)) ctx.runCommand?.(id2);
+          break;
+        }
+      }
+    } catch (e) {
+      toast("\u041F\u043B\u0430\u0433\u0438\u043D: " + e.message, "err");
     }
   }
   function openPlugin(id2) {
@@ -48551,7 +49184,10 @@ return (typeof register === 'function') ? register(api) : (typeof module !== 'un
       onMount: (root) => {
         const out = root.querySelector("#termOut"), inp = root.querySelector("#termIn");
         const print = (s) => {
-          out.innerHTML += `<div>${esc(s)}</div>`;
+          const row = document.createElement("div");
+          row.textContent = String(s).slice(0, 4e3);
+          out.appendChild(row);
+          while (out.children.length > 300) out.removeChild(out.firstChild);
           out.scrollTop = out.scrollHeight;
         };
         const run2 = () => {
@@ -48598,7 +49234,7 @@ return (typeof register === 'function') ? register(api) : (typeof module !== 'un
         const inp = root.querySelector("#calcIn"), out = root.querySelector("#calcOut");
         const update = () => {
           try {
-            out.textContent = "= " + Function('"use strict";return (' + inp.value + ")")();
+            out.textContent = "= " + safeCalc(inp.value);
           } catch (e) {
             out.textContent = "\u041E\u0448\u0438\u0431\u043A\u0430: " + e.message;
           }
@@ -49142,7 +49778,13 @@ ${p.map((x2, i4) => `  --brand-${i4 + 1}: ${x2};`).join("\n")}
         ${bool("\u0410\u0432\u0442\u043E\u0437\u0430\u043F\u0443\u0441\u043A \u043F\u0440\u0435\u0434\u043F\u0440\u043E\u0441\u043C\u043E\u0442\u0440\u0430", "autoRun")}${bool("\u0410\u0432\u0442\u043E\u0430\u043D\u0430\u043B\u0438\u0437 \u043A\u043E\u0434\u0430", "autoAnalyze")}
         ${bool("\u0410\u0432\u0442\u043E\u0441\u043E\u0445\u0440\u0430\u043D\u0435\u043D\u0438\u0435", "autoSave")}${bool("CSS hot swap", "hotCss")}${bool("JS hot reload", "hotJs")}
         ${bool("\u041F\u043E\u0434\u0442\u0432\u0435\u0440\u0436\u0434\u0430\u0442\u044C \u0443\u0434\u0430\u043B\u0435\u043D\u0438\u0435", "confirmDelete")}${bool("\u041F\u043E\u0434\u0441\u043A\u0430\u0437\u043A\u0438 \u043F\u0440\u0438 \u043F\u0435\u0440\u0432\u043E\u043C \u0437\u0430\u043F\u0443\u0441\u043A\u0435", "firstRun")}
-      </div><div class="beginner mt8">\u041F\u0440\u0435\u0434\u043F\u0440\u043E\u0441\u043C\u043E\u0442\u0440 \u0440\u0430\u0431\u043E\u0442\u0430\u0435\u0442 \u0432 \u0438\u0437\u043E\u043B\u0438\u0440\u043E\u0432\u0430\u043D\u043D\u043E\u043C iframe (sandbox \u0431\u0435\u0437 allow-same-origin): cookies, localStorage \u0438 \u0441\u0435\u0442\u044C \u043A\u043E\u043D\u0442\u0440\u043E\u043B\u0438\u0440\u0443\u044E\u0442\u0441\u044F \u043C\u043E\u0441\u0442\u043E\u043C \u0440\u0435\u0434\u0430\u043A\u0442\u043E\u0440\u0430.</div>`,
+      </div>
+      <h4 style="margin:12px 0 4px">\u0420\u0430\u0437\u0440\u0435\u0448\u0435\u043D\u0438\u044F sandbox \u043F\u0440\u0435\u0434\u043F\u0440\u043E\u0441\u043C\u043E\u0442\u0440\u0430</h4>
+      <p class="muted" style="font-size:10.5px;margin:0 0 6px">\u041F\u043E \u0443\u043C\u043E\u043B\u0447\u0430\u043D\u0438\u044E \u0432\u044B\u043A\u043B\u044E\u0447\u0435\u043D\u044B \u2014 \u0432\u043A\u043B\u044E\u0447\u0430\u0439\u0442\u0435 \u0442\u043E\u043B\u044C\u043A\u043E \u0434\u043B\u044F \u0434\u043E\u0432\u0435\u0440\u0435\u043D\u043D\u044B\u0445 \u043F\u0440\u043E\u0435\u043A\u0442\u043E\u0432. \u041E\u043F\u0446\u0438\u0438 \u0440\u0430\u0441\u0448\u0438\u0440\u044F\u044E\u0442 \u043F\u0440\u0430\u0432\u0430 \u043A\u043E\u0434\u0430 \u0438\u0437 \u043E\u0442\u043A\u0440\u044B\u0442\u043E\u0439 \u0441\u0441\u044B\u043B\u043A\u0438.</p>
+      <div class="rowflex" id="sandboxOpts">
+        ${[["forms", "\u0424\u043E\u0440\u043C\u044B"], ["popups", "\u041D\u043E\u0432\u044B\u0435 \u043E\u043A\u043D\u0430"], ["modals", "\u041C\u043E\u0434\u0430\u043B\u044C\u043D\u044B\u0435 \u043E\u043A\u043D\u0430"], ["downloads", "\u0421\u043A\u0430\u0447\u0438\u0432\u0430\u043D\u0438\u044F"], ["pointerLock", "Pointer lock"], ["orientationLock", "\u041E\u0440\u0438\u0435\u043D\u0442\u0430\u0446\u0438\u044F"]].map(([k, l]) => `<label class="chk"><input type="checkbox" data-sandbox="${k}" ${s.sandboxPermissions?.[k] ? "checked" : ""}> ${l}</label>`).join("")}
+      </div>
+      <div class="beginner mt8">\u041F\u0440\u0435\u0434\u043F\u0440\u043E\u0441\u043C\u043E\u0442\u0440 \u0440\u0430\u0431\u043E\u0442\u0430\u0435\u0442 \u0432 \u0438\u0437\u043E\u043B\u0438\u0440\u043E\u0432\u0430\u043D\u043D\u043E\u043C iframe (<code class="inline">sandbox</code> \u0431\u0435\u0437 <code class="inline">allow-same-origin</code>): cookies, localStorage \u0438 \u0441\u0435\u0442\u044C \u043A\u043E\u043D\u0442\u0440\u043E\u043B\u0438\u0440\u0443\u044E\u0442\u0441\u044F \u043C\u043E\u0441\u0442\u043E\u043C \u0440\u0435\u0434\u0430\u043A\u0442\u043E\u0440\u0430. \u0421\u043E\u043E\u0431\u0449\u0435\u043D\u0438\u044F \u043F\u0440\u0438\u043D\u0438\u043C\u0430\u044E\u0442\u0441\u044F \u0442\u043E\u043B\u044C\u043A\u043E \u043E\u0442 \u0442\u0435\u043A\u0443\u0449\u0435\u0433\u043E \u0434\u043E\u043A\u0443\u043C\u0435\u043D\u0442\u0430 \u043F\u043E \u043E\u0434\u043D\u043E\u0440\u0430\u0437\u043E\u0432\u043E\u043C\u0443 \u0438\u0434\u0435\u043D\u0442\u0438\u0444\u0438\u043A\u0430\u0442\u043E\u0440\u0443.</div>`,
       keys: `<p class="muted">\u041A\u043B\u0438\u043A\u043D\u0438\u0442\u0435 \u043F\u043E \u043F\u043E\u043B\u044E \u0438 \u043D\u0430\u0436\u043C\u0438\u0442\u0435 \u0441\u043E\u0447\u0435\u0442\u0430\u043D\u0438\u0435 \u043A\u043B\u0430\u0432\u0438\u0448. \u0418\u0437\u043C\u0435\u043D\u0435\u043D\u0438\u044F \u043F\u0440\u0438\u043C\u0435\u043D\u044F\u044E\u0442\u0441\u044F \u0441\u0440\u0430\u0437\u0443.</p>
       <div class="field-row">${Object.entries(s.keybindings).map(([k, v]) => `<div class="field"><label>${esc(commandTitle(k))}</label><input data-key="${k}" value="${esc(v)}" readonly style="cursor:pointer"></div>`).join("")}</div>`,
       theme: `<div class="field-row">
@@ -49201,6 +49843,12 @@ ${p.map((x2, i4) => `  --brand-${i4 + 1}: ${x2};`).join("\n")}
               state.settings.keybindings[inp.dataset.key] = inp.value;
               applySettings();
               toast("\u0413\u043E\u0440\u044F\u0447\u0430\u044F \u043A\u043B\u0430\u0432\u0438\u0448\u0430 \u043E\u0431\u043D\u043E\u0432\u043B\u0435\u043D\u0430", "ok");
+            });
+          });
+          body.querySelectorAll("[data-sandbox]").forEach((inp) => {
+            inp.addEventListener("change", () => {
+              state.settings.sandboxPermissions = { ...state.settings.sandboxPermissions || {}, [inp.dataset.sandbox]: inp.checked };
+              applySettings();
             });
           });
           body.querySelectorAll("[data-preset]").forEach((b) => b.onclick = () => {
@@ -49768,7 +50416,7 @@ frame();`;
         });
         root.querySelector("#collabInvite").onclick = () => location.href = "mailto:?subject=Runlet \u043F\u0440\u043E\u0435\u043A\u0442&body=" + encodeURIComponent(location.href);
         root.querySelector("#collabTeacher").onclick = () => {
-          state.readOnly = true;
+          setReadOnly(true);
           toast("\u0420\u0435\u0436\u0438\u043C \u043F\u0440\u0435\u043F\u043E\u0434\u0430\u0432\u0430\u0442\u0435\u043B\u044F: \u0441\u0442\u0443\u0434\u0435\u043D\u0442\u044B \u0432\u0438\u0434\u044F\u0442 read-only", "ok");
         };
         window.__collabChat = chat;
@@ -49999,7 +50647,7 @@ frame();`;
       insertText(t2, "js");
       toast("\u0422\u0435\u0441\u0442\u044B \u0432\u0441\u0442\u0430\u0432\u043B\u0435\u043D\u044B", "ok");
     });
-    cmd2("aiDocs", "\u0414\u043E\u043A\u0443\u043C\u0435\u043D\u0442\u0430\u0446\u0438\u044F \u0438\u0437 \u043A\u043E\u0434\u0430", "\u0410\u0441\u0441\u0438\u0441\u0442\u0435\u043D\u0442", "\u{1F4D6}", () => ctx.modal({ title: "\u0414\u043E\u043A\u0443\u043C\u0435\u043D\u0442\u0430\u0446\u0438\u044F", wide: true, body: `<pre style="white-space:pre-wrap;font:12px var(--mono)">${generateDocs(getDoc("js"))}</pre>`, okText: "\u0421\u043A\u0430\u0447\u0430\u0442\u044C", onOk: () => download("DOCS.md", generateDocs(getDoc("js")), "text/markdown") }));
+    cmd2("aiDocs", "\u0414\u043E\u043A\u0443\u043C\u0435\u043D\u0442\u0430\u0446\u0438\u044F \u0438\u0437 \u043A\u043E\u0434\u0430", "\u0410\u0441\u0441\u0438\u0441\u0442\u0435\u043D\u0442", "\u{1F4D6}", () => ctx.modal({ title: "\u0414\u043E\u043A\u0443\u043C\u0435\u043D\u0442\u0430\u0446\u0438\u044F", wide: true, body: `<pre style="white-space:pre-wrap;font:12px var(--mono)">${esc(generateDocs(getDoc("js")))}</pre>`, okText: "\u0421\u043A\u0430\u0447\u0430\u0442\u044C", onOk: () => download("DOCS.md", generateDocs(getDoc("js")), "text/markdown") }));
     cmd2("aiReadme", "\u0421\u0433\u0435\u043D\u0435\u0440\u0438\u0440\u043E\u0432\u0430\u0442\u044C README", "\u0410\u0441\u0441\u0438\u0441\u0442\u0435\u043D\u0442", "\u{1F4DD}", () => download("README.md", generateReadme(), "text/markdown"));
     cmd2("aiChangelog", "\u0421\u0433\u0435\u043D\u0435\u0440\u0438\u0440\u043E\u0432\u0430\u0442\u044C changelog", "\u0410\u0441\u0441\u0438\u0441\u0442\u0435\u043D\u0442", "\u{1F4CB}", () => download("CHANGELOG.md", generateChangelog2(), "text/markdown"));
     cmd2("aiRefactor", "\u0420\u0435\u0444\u0430\u043A\u0442\u043E\u0440\u0438\u043D\u0433 \u0432\u044B\u0434\u0435\u043B\u0435\u043D\u043D\u043E\u0433\u043E", "\u0410\u0441\u0441\u0438\u0441\u0442\u0435\u043D\u0442", "\u267B", () => {
@@ -50151,8 +50799,12 @@ POST /api/run</pre>`,
     cmd2("collab", "\u0421\u043E\u0432\u043C\u0435\u0441\u0442\u043D\u043E\u0435 \u0440\u0435\u0434\u0430\u043A\u0442\u0438\u0440\u043E\u0432\u0430\u043D\u0438\u0435", "\u0421\u043E\u0432\u043C\u0435\u0441\u0442\u043D\u0430\u044F \u0440\u0430\u0431\u043E\u0442\u0430", "\u{1F465}", () => collaborationDialog());
     cmd2("collabInvite", "\u041F\u0440\u0438\u0433\u043B\u0430\u0441\u0438\u0442\u044C \u043F\u043E e-mail", "\u0421\u043E\u0432\u043C\u0435\u0441\u0442\u043D\u0430\u044F \u0440\u0430\u0431\u043E\u0442\u0430", "\u2709", () => collaborationDialog());
     cmd2("teacherMode", "\u0420\u0435\u0436\u0438\u043C \u043F\u0440\u0435\u043F\u043E\u0434\u0430\u0432\u0430\u0442\u0435\u043B\u044F", "\u0421\u043E\u0432\u043C\u0435\u0441\u0442\u043D\u0430\u044F \u0440\u0430\u0431\u043E\u0442\u0430", "\u{1F393}", () => {
-      state.readOnly = true;
+      setReadOnly(true);
       toast("\u0420\u0435\u0436\u0438\u043C \u043F\u0440\u0435\u043F\u043E\u0434\u0430\u0432\u0430\u0442\u0435\u043B\u044F \u0432\u043A\u043B\u0451\u043D (read-only)", "ok");
+    });
+    cmd2("toggleReadOnly", "\u0420\u0435\u0436\u0438\u043C \u0442\u043E\u043B\u044C\u043A\u043E \u0434\u043B\u044F \u0447\u0442\u0435\u043D\u0438\u044F", "\u0421\u043E\u0432\u043C\u0435\u0441\u0442\u043D\u0430\u044F \u0440\u0430\u0431\u043E\u0442\u0430", "\u{1F512}", () => {
+      setReadOnly(!state.readOnly);
+      toast(state.readOnly ? "\u0420\u0435\u0434\u0430\u043A\u0442\u0438\u0440\u043E\u0432\u0430\u043D\u0438\u0435 \u0437\u0430\u0431\u043B\u043E\u043A\u0438\u0440\u043E\u0432\u0430\u043D\u043E" : "\u0420\u0435\u0434\u0430\u043A\u0442\u0438\u0440\u043E\u0432\u0430\u043D\u0438\u0435 \u0440\u0430\u0437\u0440\u0435\u0448\u0435\u043D\u043E", "info");
     });
     cmd2("gotoDiag", "\u041F\u0435\u0440\u0435\u0439\u0442\u0438 \u043A \u0434\u0438\u0430\u0433\u043D\u043E\u0441\u0442\u0438\u043A\u0435", "\u0410\u043D\u0430\u043B\u0438\u0437", "\u2197", (arg) => {
       const d = state.report?.diagnostics?.find((x2) => x2.id === arg?.id && x2.line === arg?.line);
@@ -50213,7 +50865,14 @@ POST /api/run</pre>`,
       setDoc
     });
     const restored = await initStorage();
-    state.settings = { ...JSON.parse(JSON.stringify(DEFAULT_SETTINGS)), ...state.settings };
+    const base2 = JSON.parse(JSON.stringify(DEFAULT_SETTINGS));
+    const saved = sanitizeSettings(state.settings);
+    state.settings = {
+      ...base2,
+      ...saved,
+      sandboxPermissions: { ...base2.sandboxPermissions, ...saved.sandboxPermissions || {} },
+      keybindings: { ...base2.keybindings, ...saved.keybindings || {} }
+    };
     initEditors();
     initPreview();
     initFiles();
@@ -50302,7 +50961,16 @@ POST /api/run</pre>`,
         emit("collab:presence", state.collabPeers);
       } else if (m.type === "chat") {
         const chat = window.__collabChat;
-        if (chat) chat.innerHTML += `<div><b>${m.data?.name || "\u0423\u0447\u0430\u0441\u0442\u043D\u0438\u043A"}:</b> ${(m.data?.text || "").replace(/[<>&]/g, "")}</div>`;
+        if (chat) {
+          const row = document.createElement("div");
+          const who = document.createElement("b");
+          who.textContent = String(m.data?.name || "\u0423\u0447\u0430\u0441\u0442\u043D\u0438\u043A").slice(0, 60) + ": ";
+          row.appendChild(who);
+          row.appendChild(document.createTextNode(String(m.data?.text || "").slice(0, 500)));
+          chat.appendChild(row);
+          while (chat.children.length > 200) chat.removeChild(chat.firstChild);
+          chat.scrollTop = chat.scrollHeight;
+        }
         toast(`${m.data?.name || "\u0421\u043E\u0430\u0432\u0442\u043E\u0440"}: ${(m.data?.text || "").slice(0, 60)}`, "info", "\u0427\u0430\u0442");
       }
     };
@@ -50385,8 +51053,16 @@ POST /api/run</pre>`,
   });
   boot().catch((e) => {
     console.error(e);
-    document.body.innerHTML = `<div style="padding:40px;font:16px system-ui;color:#fff;background:#111;height:100vh">
-    <h1>Runlet: \u043E\u0448\u0438\u0431\u043A\u0430 \u0437\u0430\u043F\u0443\u0441\u043A\u0430</h1><pre style="white-space:pre-wrap;color:#ff8">${String(e.stack || e)}</pre>
-    <p>\u041F\u043E\u043F\u0440\u043E\u0431\u0443\u0439\u0442\u0435 \u043F\u0435\u0440\u0435\u0437\u0430\u043F\u0443\u0441\u0442\u0438\u0442\u044C \u043F\u0440\u0438\u043B\u043E\u0436\u0435\u043D\u0438\u0435 \u0438\u043B\u0438 \u0441\u0431\u0440\u043E\u0441\u0438\u0442\u044C \u043D\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0438.</p></div>`;
+    const box = document.createElement("div");
+    box.style.cssText = "padding:40px;font:16px system-ui;color:#fff;background:#111;height:100vh";
+    const h = document.createElement("h1");
+    h.textContent = "Runlet: \u043E\u0448\u0438\u0431\u043A\u0430 \u0437\u0430\u043F\u0443\u0441\u043A\u0430";
+    const pre = document.createElement("pre");
+    pre.style.cssText = "white-space:pre-wrap;color:#ff8";
+    pre.textContent = String(e.stack || e).slice(0, 4e3);
+    const p = document.createElement("p");
+    p.textContent = "\u041F\u043E\u043F\u0440\u043E\u0431\u0443\u0439\u0442\u0435 \u043F\u0435\u0440\u0435\u0437\u0430\u043F\u0443\u0441\u0442\u0438\u0442\u044C \u043F\u0440\u0438\u043B\u043E\u0436\u0435\u043D\u0438\u0435 \u0438\u043B\u0438 \u0441\u0431\u0440\u043E\u0441\u0438\u0442\u044C \u043D\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0438.";
+    box.append(h, pre, p);
+    document.body.replaceChildren(box);
   });
 })();

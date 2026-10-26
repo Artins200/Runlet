@@ -1,5 +1,6 @@
 /* Virtual FS UI: tree, search, uploads, ZIP, libraries, assets, versions, share. */
-import { state, ctx, $, $$, el, esc, on, emit, toast, download, copy, fmtBytes, debounce, uid } from './core.js';
+import { state, ctx, $, $$, el, esc, on, emit, toast, download, copy, fmtBytes, debounce, uid, safeDataSrc } from './core.js';
+import { safePathKey } from './state.js';
 import {
   read, write, exists, remove, rename, copyFile, listFiles, projectSize,
   isText, isImage, mimeOf, makeSnapshot, restoreSnapshot, diffText,
@@ -72,8 +73,8 @@ export function renderTree() {
       const row = el('div', { class: 'tree-row' + (active ? ' active' : ''), draggable: 'true',
                               style: { paddingLeft: (7 + depth * 13) + 'px' }, title: path },
         el('span', { class: 'twist', text: isDir ? '▾' : '' }),
-        f && isImage(path) && /^data:image/.test(f.content) ?
-          el('img', { class: 'tree-thumb', src: f.content, alt: '' }) :
+        f && isImage(path) && safeDataSrc(f.content) ?
+          el('img', { class: 'tree-thumb', src: safeDataSrc(f.content), alt: '' }) :
           el('span', { class: 'ftype', text: iconFor(path, isDir) }),
         el('span', { class: 'fname', text: name.replace(/\/$/, '') }),
         el('span', { class: 'tree-meta', text: isDir ? '' : fmtBytes(f?.content?.length || 0) }),
@@ -158,13 +159,14 @@ export function newFileDialog(folder = false) {
     onOk: root => {
       const name = root.querySelector('#dlgName').value.trim();
       if (!name) return false;
+      const safeName = esc(name.slice(0, 200));
       const path = folder ? name.replace(/\/$/, '') + '/README.md' : name;
       if (exists(path)) { toast('Такой файл уже есть', 'err'); return false; }
       let content = '';
-      if (folder) content = '# ' + name + '\n';
-      else if (/\.html$/i.test(path)) content = '<!DOCTYPE html>\n<html lang="ru">\n<head><meta charset="utf-8"><title>' + name + '</title></head>\n<body>\n  \n</body>\n</html>';
-      else if (/\.css$/i.test(path)) content = '/* ' + name + ' */\n';
-      else if (/\.js$/i.test(path)) content = '// ' + name + '\n';
+      if (folder) content = '# ' + name.replace(/[\r\n]/g, '') + '\n';
+      else if (/\.html$/i.test(path)) content = '<!DOCTYPE html>\n<html lang="ru">\n<head><meta charset="utf-8"><title>' + safeName + '</title></head>\n<body>\n  \n</body>\n</html>';
+      else if (/\.css$/i.test(path)) content = '/* ' + name.replace(/\*\//g, '').slice(0, 200) + ' */\n';
+      else if (/\.js$/i.test(path)) content = '// ' + name.replace(/[\r\n]/g, '').slice(0, 200) + '\n';
       else if (/\.json$/i.test(path)) content = '{\n  \n}\n';
       write(path, content);
       renderTree(); openFile(path);
@@ -266,7 +268,8 @@ export function findReferences(path) {
 export async function uploadFiles(fileList) {
   let n = 0;
   for (const file of fileList) {
-    const path = file.webkitRelativePath || file.name;
+    const path = safePathKey(file.webkitRelativePath || file.name);
+    if (!path) { toast('Пропущен файл с небезопасным именем: ' + String(file.name).slice(0, 80), 'warn'); continue; }
     let content;
     if (/\.(png|jpe?g|gif|webp|ico|woff2?|ttf|otf|mp3|wav|mp4|webm)$/i.test(path)) {
       content = await new Promise(res => { const r = new FileReader(); r.onload = () => res(r.result); r.readAsDataURL(file); });
@@ -284,6 +287,7 @@ export function downloadFile(path) {
   toast('Скачано: ' + path, 'ok');
 }
 function dataUriToBlob(uri) {
+  if (!safeDataSrc(uri)) throw new Error('небезопасный data URI');
   const [meta, payload] = [uri.slice(5, uri.indexOf(',')), uri.slice(uri.indexOf(',') + 1)];
   if (/;base64/i.test(meta)) {
     const bin = atob(payload), bytes = new Uint8Array(bin.length);
@@ -308,6 +312,8 @@ export async function importZip(file) {
   const entries = unzipSync(buf);
   let count = 0;
   for (const [name, data] of Object.entries(entries)) {
+    const path = safePathKey(name);
+    if (!path) continue;                       // blocks zip-slip (../) and __proto__
     if (name.endsWith('/') || name === 'runlet.project.json') continue;
     let content;
     try { content = strFromU8(data); } catch (e) { continue; }
@@ -315,7 +321,7 @@ export async function importZip(file) {
       let bin = ''; for (const b of data) bin += String.fromCharCode(b);
       content = `data:${mimeOf(name)};base64,` + btoa(bin);
     }
-    write(name, content); count++;
+    write(path, content); count++;
   }
   renderTree(); renderAssets();
   emit('project:restoreEditors');
@@ -355,11 +361,21 @@ export function importFromUrl() {
     onOk: async root => {
       const url = root.querySelector('#dlgUrl').value.trim();
       if (!url) return false;
+      let u;
+      try { u = new URL(url); } catch (_) { toast('Некорректный URL', 'err'); return false; }
+      if (u.protocol !== 'https:' || u.username || u.password || url.length > 2000 ||
+          /^(localhost|127\.|10\.|192\.168\.|169\.254\.|172\.(1[6-9]|2\d|3[01])\.|\[::1\])/i.test(u.hostname)) {
+        toast('Разрешены только публичные HTTPS-адреса', 'err'); return false;
+      }
       try {
-        const res = await fetch(url);
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), 15000);
+        const res = await fetch(u.href, { credentials: 'omit', referrerPolicy: 'no-referrer', signal: controller.signal });
+        clearTimeout(timer);
         if (!res.ok) throw new Error('HTTP ' + res.status);
-        const text = await res.text();
-        const name = url.split('/').pop().split('?')[0] || 'imported.html';
+        if (+res.headers.get('content-length') > 4 * 1024 * 1024) throw new Error('файл слишком большой');
+        const text = (await res.text()).slice(0, 4 * 1024 * 1024);
+        const name = (u.pathname.split('/').pop() || 'imported.html').replace(/[^\w.-]/g, '').slice(0, 120) || 'imported.html';
         if (/\.html?$/i.test(name)) await importSingleHtml(new File([text], name, { type: 'text/html' }));
         else { write(name, text); renderTree(); }
         toast('Импортировано: ' + name, 'ok');
@@ -436,8 +452,9 @@ export function renderAssets() {
     const f = state.files[p];
     const tile = el('div', { class: 'tile' });
     const isImg = isImage(p);
-    tile.innerHTML = `<div class="tile-ico">${isImg && /^data:image/.test(f.content) ?
-      `<img src="${esc(f.content)}" style="width:100%;height:64px;object-fit:contain;border-radius:8px">` :
+    const src = isImg ? safeDataSrc(f.content) : '';
+    tile.innerHTML = `<div class="tile-ico">${src ?
+      `<img src="${esc(src)}" style="width:100%;height:64px;object-fit:contain;border-radius:8px">` :
       (/\.mp3|wav/.test(p) ? '🎵' : /\.mp4|webm/.test(p) ? '🎬' : '🔤')}</div>
       <b>${esc(p.split('/').pop())}</b><small>${fmtBytes(f.content.length)} · ${esc(mimeOf(p))}</small>`;
     const row = el('div', { class: 'rowflex mt8' },
@@ -472,9 +489,10 @@ export async function showAssetPreview(path) {
   const f = state.files[path], c = f.content;
   const isImg = /^data:image/.test(c) || /\.svg$/i.test(path);
   let inner = '';
-  if (isImg) inner = `<img src="${esc(c)}" style="max-width:100%;max-height:50vh;border-radius:14px;background:repeating-conic-gradient(#222 0 25%,#333 0 50%) 50%/20px 20px">`;
-  else if (/\.mp3|wav/.test(path)) inner = `<audio controls src="${esc(c)}" style="width:100%"></audio>`;
-  else if (/\.mp4|webm/.test(path)) inner = `<video controls src="${esc(c)}" style="max-width:100%;max-height:50vh;border-radius:14px"></video>`;
+  const src = safeDataSrc(c);
+  if (isImg && src) inner = `<img src="${esc(src)}" style="max-width:100%;max-height:50vh;border-radius:14px;background:repeating-conic-gradient(#222 0 25%,#333 0 50%) 50%/20px 20px">`;
+  else if (/\.mp3|wav/.test(path) && src) inner = `<audio controls src="${esc(src)}" style="width:100%"></audio>`;
+  else if (/\.mp4|webm/.test(path) && src) inner = `<video controls src="${esc(src)}" style="max-width:100%;max-height:50vh;border-radius:14px"></video>`;
   else inner = `<p class="muted">Бинарный файл: ${esc(mimeOf(path))}</p>`;
   ctx.modal({ title: path, wide: false,
     body: `${inner}<div class="field-row mt8">

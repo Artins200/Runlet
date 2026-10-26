@@ -1,5 +1,6 @@
 /* Toolbelt: colours, generators, converters, JSON/assets, automation. */
-import { state, ctx, esc, toast, download, copy, $ } from './core.js';
+import * as acorn from 'acorn';
+import { state, ctx, esc, toast, download, copy, $, sanitizeColor } from './core.js';
 import { read, write, exists, listFiles, mimeOf, projectJSON } from './state.js';
 import { insertText, getDoc, setDoc, getSelection, replaceSelection } from './editor.js';
 import { CDN_LIBS } from './data.js';
@@ -247,7 +248,7 @@ export function generateChangelog() {
     `\n\n### Файлы\n${listFiles().map(f => `- \`${f}\``).join('\n')}\n`;
 }
 export function generateSEO() {
-  const title = state.projectName || 'Моя страница';
+  const title = esc(String(state.projectName || 'Моя страница').slice(0, 120));
   return `<!-- SEO -->\n<meta name="description" content="${title} — описание страницы">\n` +
     `<meta name="keywords" content="runlet, html, css, javascript">\n` +
     `<meta name="author" content="Runlet">\n<link rel="canonical" href="https://example.com/">\n\n` +
@@ -256,11 +257,13 @@ export function generateSEO() {
     `<meta property="og:description" content="${title} — описание страницы">\n` +
     `<meta property="og:image" content="https://example.com/cover.png">\n` +
     `<meta name="twitter:card" content="summary_large_image">\n\n` +
-    `<!-- Schema.org -->\n<script type="application/ld+json">\n${JSON.stringify({ '@context': 'https://schema.org', '@type': 'WebSite', name: title, url: 'https://example.com/' }, null, 2)}\n</script>`;
+    `<!-- Schema.org -->\n<script type="application/ld+json">\n${JSON.stringify({ '@context': 'https://schema.org', '@type': 'WebSite', name: String(state.projectName || '').slice(0, 120), url: 'https://example.com/' }, null, 2).replace(/</g, '\\u003c')}\n</script>`;
 }
 export function generateAltFor(path) {
-  const name = path.split('/').pop().replace(/\.[^.]+$/, '').replace(/[-_]/g, ' ');
-  return name.charAt(0).toUpperCase() + name.slice(1);
+  const name = String(path).split('/').pop().replace(/\.[^.]+$/, '').replace(/[-_]/g, ' ');
+  // alt is injected into an HTML attribute — strip anything quote/angle-like.
+  const clean = name.replace(/[^\p{L}\p{N} _-]/gu, '').slice(0, 100).trim();
+  return (clean.charAt(0).toUpperCase() + clean.slice(1)) || 'Изображение';
 }
 export function accessibleWrap(html) {
   return html.replace(/<img\b([^>]*?)>/gi, (m, a) => /alt=/.test(a) ? m : `<img${a} alt="${generateAltFor((/src=["']([^"']+)/.exec(a) || [])[1] || 'image')}">`)
@@ -276,7 +279,16 @@ export function securityScan(code) {
     [/\bon\w+\s*=/g, 'инлайн-обработчик событий', 'low'],
     [/https?:\/\/[^\s"']+/g, 'внешний ресурс — проверьте его доверие', 'info'],
     [/localStorage\.setItem\s*\([^,]+,\s*(?!JSON)/g, 'в localStorage пишется не JSON — проверьте тип', 'low'],
-    [/password|token|secret|api[_-]?key/gi, 'похоже на секрет в коде — не публикуйте его', 'high']
+    [/password|token|secret|api[_-]?key/gi, 'похоже на секрет в коде — не публикуйте его', 'high'],
+    [/javascript\s*:/gi, 'javascript: URL — классический XSS-вектор', 'high'],
+    [/data:text\/html/gi, 'data:text/html может выполнить произвольный код', 'high'],
+    [/setTimeout\s*\(\s*['"]/g, 'setTimeout со строкой — неявный eval', 'high'],
+    [/postMessage\s*\([^,]+,\s*['"]\*['"]/g, 'postMessage с targetOrigin=* — утечка данных другому окну', 'medium'],
+    [/target\s*=\s*['"]_blank['"](?![^>]*noopener)/gi, 'target=_blank без rel=noopener — tabnabbing', 'medium'],
+    [/\bsrcdoc\s*=/gi, 'srcdoc с пользовательскими данными — проверьте изоляцию iframe', 'medium'],
+    [/document\.cookie/gi, 'чтение document.cookie — проверьте, что там нет токенов', 'low'],
+    [/\bwindow\.open\s*\(/g, 'window.open — возможен фишинг через новое окно', 'low'],
+    [/\blocalStorage\s*\.\s*setItem\s*\([^,]+,\s*[^)]*password/gi, 'пароль в localStorage — доступен любому скрипту страницы', 'high']
   ];
   for (const [re, msg, sev] of rules) {
     const hits = [...code.matchAll(re)];
@@ -303,6 +315,65 @@ export function perfTips() {
   if (!html.includes('<main') && /<div/.test(html)) tips.push('Используйте <main> и другие семантические теги.');
   tips.push('Минифицируйте CSS/JS перед публикацией (команда «Минифицировать»).');
   return tips;
+}
+
+/** Arithmetic-only evaluator: NO access to globals, NO Function/eval. */
+export function safeCalc(expr) {
+  if (typeof expr !== 'string' || expr.length > 200) throw new Error('Выражение слишком длинное');
+  const ast = acorn.parseExpressionAt(expr, 0, { ecmaVersion: 'latest' });
+  if (ast.end !== expr.trim().length) throw new Error('Лишние символы после выражения');
+  const binary = {
+    '+': (a, b) => a + b, '-': (a, b) => a - b, '*': (a, b) => a * b,
+    '/': (a, b) => a / b, '%': (a, b) => a % b, '**': (a, b) => a ** b
+  };
+  const unary = { '+': a => +a, '-': a => -a };
+  const mathFns = {
+    abs: Math.abs, floor: Math.floor, ceil: Math.ceil, round: Math.round,
+    sqrt: Math.sqrt, pow: Math.pow, min: Math.min, max: Math.max,
+    sin: Math.sin, cos: Math.cos, tan: Math.tan, log: Math.log, exp: Math.exp,
+    trunc: Math.trunc, sign: Math.sign, cbrt: Math.cbrt
+  };
+  const mathConsts = { PI: Math.PI, E: Math.E, LN2: Math.LN2, LN10: Math.LN10, SQRT2: Math.SQRT2 };
+  function ev(n, depth) {
+    if (depth > 30) throw new Error('Слишком глубокое выражение');
+    switch (n.type) {
+      case 'Literal':
+        if (typeof n.value !== 'number' || !Number.isFinite(n.value)) throw new Error('Разрешены только числа');
+        return n.value;
+      case 'ParenthesizedExpression': return ev(n.expression, depth + 1);
+      case 'UnaryExpression': {
+        const f = unary[n.operator];
+        if (!f || n.prefix !== true) throw new Error('Недопустимый унарный оператор');
+        return f(ev(n.argument, depth + 1));
+      }
+      case 'BinaryExpression': {
+        const f = binary[n.operator];
+        if (!f) throw new Error('Недопустимый оператор');
+        const v = f(ev(n.left, depth + 1), ev(n.right, depth + 1));
+        if (!Number.isFinite(v)) throw new Error('Результат не число');
+        return v;
+      }
+      case 'MemberExpression':
+        if (n.object.type === 'Identifier' && n.object.name === 'Math' &&
+            !n.computed && n.property.type === 'Identifier' &&
+            Object.prototype.hasOwnProperty.call(mathConsts, n.property.name)) return mathConsts[n.property.name];
+        throw new Error('Доступ к объектам запрещён');
+      case 'CallExpression':
+        if (n.callee.type === 'MemberExpression' && n.callee.object.type === 'Identifier' &&
+            n.callee.object.name === 'Math' && !n.callee.computed &&
+            n.callee.property.type === 'Identifier' &&
+            Object.prototype.hasOwnProperty.call(mathFns, n.callee.property.name) &&
+            n.arguments.length <= 4 && n.arguments.every(a => a.type !== 'SpreadElement')) {
+          const args = n.arguments.map(a => ev(a, depth + 1));
+          const v = mathFns[n.callee.property.name](...args);
+          if (!Number.isFinite(v)) throw new Error('Результат не число');
+          return v;
+        }
+        throw new Error('Вызовы функций запрещены');
+      default: throw new Error('Недопустимый элемент выражения');
+    }
+  }
+  return ev(ast, 0);
 }
 
 /* ── assets (canvas) ────────────────────────────────────────────── */
@@ -370,9 +441,11 @@ jobs:
   return kind === 'gitlab' ? body.replace('runs-on: ubuntu-latest', 'image: node:20').replace('uses: actions/checkout@v4', 'script: echo checkout') : body;
 }
 export function embedCode(opts = {}) {
-  const id = encodeURIComponent(state.projectName);
-  const params = new URLSearchParams({ theme: opts.theme || 'dark', run: opts.run !== false ? '1' : '0', v: '1' });
-  return `<iframe src="https://runlet.app/embed/${id}?${params}" width="100%" height="${opts.height || 520}"\n  style="border:0;border-radius:20px;overflow:hidden"\n  loading="lazy" title="${esc(state.projectName)}" sandbox="allow-scripts allow-forms"></iframe>`;
+  const id = encodeURIComponent(String(state.projectName).slice(0, 100));
+  const theme = ['dark', 'light', 'contrast'].includes(opts.theme) ? opts.theme : 'dark';
+  const height = Math.max(120, Math.min(4000, Math.round(Number(opts.height) || 520)));
+  const params = new URLSearchParams({ theme, run: opts.run !== false ? '1' : '0', v: '1' });
+  return `<iframe src="https://runlet.app/embed/${id}?${params}" width="100%" height="${height}"\n  style="border:0;border-radius:20px;overflow:hidden"\n  loading="lazy" referrerpolicy="no-referrer" title="${esc(String(state.projectName).slice(0, 100))}" sandbox="allow-scripts allow-forms"></iframe>`;
 }
 export function staticSite() {
   const html = read(state.entry);

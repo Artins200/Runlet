@@ -3,7 +3,9 @@ import { JSDOM, VirtualConsole } from 'jsdom';
 import fs from 'node:fs';
 import * as acorn from 'acorn';
 
-const html = fs.readFileSync('app/index.html', 'utf8');
+const ORIGIN = process.env.RUNLET_TEST_ORIGIN || 'http://localhost:4173';
+
+const html = await (await fetch(ORIGIN + '/')).text();
 const bundle = fs.readFileSync('app/dist/bundle.js', 'utf8');
 const vc = new VirtualConsole();
 const base = () => ({
@@ -19,7 +21,7 @@ function polyfill(w) {
   w.matchMedia = b.matchMedia; w.ResizeObserver = b.ResizeObserver;
   w.IntersectionObserver = b.ResizeObserver; w.PerformanceObserver = b.PerformanceObserver;
   w.BroadcastChannel = b.BroadcastChannel; w.CSS = b.CSS;
-  w.fetch = (u, o) => globalThis.fetch(new URL(typeof u === 'string' ? u : u.url, 'http://localhost:4173/'), o);
+  w.fetch = (u, o) => globalThis.fetch(new URL(typeof u === 'string' ? u : u.url, ORIGIN), o);
   w.structuredClone = globalThis.structuredClone;
   w.HTMLCanvasElement.prototype.getContext = b.canvas;
   w.HTMLCanvasElement.prototype.toDataURL = () => 'data:image/png;base64,AA';
@@ -29,7 +31,7 @@ function polyfill(w) {
 }
 
 // 1. boot the editor to obtain srcdoc
-const dom1 = new JSDOM(html, { url: 'http://localhost:4173/', runScripts: 'outside-only',
+const dom1 = new JSDOM(html, { url: ORIGIN + '/', runScripts: 'outside-only',
   pretendToBeVisual: true, virtualConsole: vc, beforeParse: polyfill });
 dom1.window.eval(bundle);
 await new Promise(r => setTimeout(r, 2200));
@@ -44,7 +46,7 @@ const vc2 = new VirtualConsole();
 vc2.on('jsdomError', e => errors.push(e.message));
 vc2.on('error', (...a) => errors.push('console.error: ' + a.map(String).join(' ')));
 const dom2 = new JSDOM(srcdoc, {
-  url: 'http://localhost:4173/preview', runScripts: 'dangerously',
+  url: ORIGIN + '/preview', runScripts: 'dangerously',
   pretendToBeVisual: true, virtualConsole: vc2,
   beforeParse(w) {
     polyfill(w);
@@ -58,9 +60,10 @@ const w = dom2.window;
 w.document.querySelector('#btn')?.dispatchEvent(new w.MouseEvent('click', { bubbles: true }));
 await new Promise(r => setTimeout(r, 200));
 // send a command from "editor"
-w.postMessage({ __rlcmd: true, type: 'eval', data: { expr: '1 + 2', id: 7 } }, '*');
-w.postMessage({ __rlcmd: true, type: 'getDOM', data: {} }, '*');
-w.postMessage({ __rlcmd: true, type: 'getStorage', data: {} }, '*');
+const pfid = w.__RL_CFG__?.fid || '';
+w.postMessage({ __rlcmd: true, fid: pfid, type: 'eval', data: { expr: '1 + 2', id: 7 } }, '*');
+w.postMessage({ __rlcmd: true, fid: pfid, type: 'getDOM', data: {} }, '*');
+w.postMessage({ __rlcmd: true, fid: pfid, type: 'getStorage', data: {} }, '*');
 await new Promise(r => setTimeout(r, 300));
 
 const check = (n, ok, extra = '') => console.log(`${ok ? '✅' : '❌'} ${n}${extra ? ' — ' + extra : ''}`);

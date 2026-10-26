@@ -4,6 +4,7 @@
 */
 import fs from 'node:fs';
 import path from 'node:path';
+import os from 'node:os';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
@@ -127,9 +128,29 @@ async function main() {
       break;
     }
     case 'api': {
+      const port = flag('--port', '7788');
+      let token = process.env.RUNLET_API_TOKEN || flag('--token', '');
+      if (!token) {
+        const home = os.homedir();
+        const candidates = process.platform === 'darwin'
+          ? [path.join(home, 'Library/Application Support/runlet/api-token'),
+             path.join(home, 'Library/Application Support/Runlet/api-token')]
+          : process.platform === 'win32'
+            ? [path.join(process.env.APPDATA || home, 'runlet/api-token'),
+               path.join(process.env.APPDATA || home, 'Runlet/api-token')]
+            : [path.join(home, '.config/runlet/api-token'), path.join(home, '.config/Runlet/api-token')];
+        for (const f of candidates) { try { token = fs.readFileSync(f, 'utf8').trim(); break; } catch (e) { } }
+      }
       try {
-        const r = await fetch('http://127.0.0.1:7788/api/health');
+        const r = await fetch(`http://127.0.0.1:${port}/api/health`);
         console.log('REST API:', await r.json());
+        if (!token) { console.log('Токен не найден. Задайте RUNLET_API_TOKEN или --token <hex> (файл userData/api-token).'); break; }
+        const a = await fetch(`http://127.0.0.1:${port}/api/analyze`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Runlet-Token': token },
+          body: JSON.stringify({ files: { 'index.html': '<html lang="ru"><head><title>ping</title></head><body></body></html>' }, entry: 'index.html' })
+        });
+        const j = await a.json();
+        console.log(`Авторизованный запрос: HTTP ${a.status}, движок ${j.engine || j.error}`);
       } catch (e) { console.log('REST API недоступен — запустите Electron-версию редактора.'); }
       break;
     }

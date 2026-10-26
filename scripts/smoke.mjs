@@ -4,8 +4,10 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+const ORIGIN = process.env.RUNLET_TEST_ORIGIN || 'http://localhost:4173';
+
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const html = fs.readFileSync(path.join(root, 'app/index.html'), 'utf8');
+const html = await (await fetch(ORIGIN + '/')).text();
 const bundle = fs.readFileSync(path.join(root, 'app/dist/bundle.js'), 'utf8');
 const vc = new VirtualConsole();
 const errors = [];
@@ -14,7 +16,7 @@ vc.on('error', (...a) => errors.push('console.error: ' + a.map(String).join(' ')
 vc.on('warn', (...a) => { /* ignore warnings */ });
 
 const dom = new JSDOM(html, {
-  url: 'http://localhost:4173/', runScripts: 'outside-only',
+  url: ORIGIN + '/', runScripts: 'outside-only',
   pretendToBeVisual: true, virtualConsole: vc,
   beforeParse(w) {
     w.matchMedia = q => ({ matches: false, media: q, onchange: null,
@@ -23,7 +25,7 @@ const dom = new JSDOM(html, {
     w.IntersectionObserver = class { observe() {} unobserve() {} disconnect() {} };
     w.PerformanceObserver = class { observe() {} disconnect() {} };
     w.BroadcastChannel = class { constructor() {} postMessage() {} close() {} onmessage = null; };
-    w.fetch = (u, o) => globalThis.fetch(new URL(typeof u === 'string' ? u : u.url, 'http://localhost:4173/'), o);
+    w.fetch = (u, o) => globalThis.fetch(new URL(typeof u === 'string' ? u : u.url, ORIGIN), o);
     w.structuredClone = globalThis.structuredClone;
     w.CSS = { escape: s => String(s).replace(/[^a-zA-Z0-9_-]/g, c => '\\' + c) };
     w.HTMLCanvasElement.prototype.getContext = () => ({

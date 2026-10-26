@@ -67,6 +67,6 @@
     }
   },
   "optionalDependencies": {
-    "electron": "^38.0.0"
+    "electron": "^45.0.0"
   }
 }

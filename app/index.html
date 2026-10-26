@@ -4,6 +4,10 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#0d1020">
+  <!-- Per-process API token, injected by scripts/serve.mjs; stays a harmless
+       placeholder in the Electron file:// build (which uses IPC instead). -->
+  <meta name="runlet-api-token" content="__RUNLET_TOKEN__">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' file: data: blob: https:; script-src 'self' 'unsafe-inline' 'unsafe-eval' file: data: blob: https: http://localhost:* http://127.0.0.1:*; style-src 'self' 'unsafe-inline' file: https:; img-src 'self' data: blob: https: file:; font-src 'self' data: https: file:; connect-src 'self' https: http://localhost:* http://127.0.0.1:* ws: wss: file:; frame-src 'self' data: blob: about:; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self' https:">
   <title>Runlet — редактор HTML / CSS / JS с анализом кода</title>
   <link rel="manifest" href="public/manifest.webmanifest">
   <link rel="icon" href="public/icon.svg" type="image/svg+xml">
@@ -201,7 +205,7 @@
         <div class="preview-stage" id="previewStage">
           <div class="ruler ruler-top" id="rulerTop"></div><div class="ruler ruler-left" id="rulerLeft"></div>
           <div class="preview-frame-wrap" id="previewFrameWrap">
-            <iframe id="previewFrame" title="Предпросмотр" sandbox="allow-scripts allow-modals allow-forms allow-popups allow-downloads allow-pointer-lock allow-orientation-lock"></iframe>
+            <iframe id="previewFrame" title="Предпросмотр" referrerpolicy="no-referrer" sandbox="allow-scripts allow-forms"></iframe>
             <div class="grid-overlay" id="gridOverlay"></div>
             <div class="hover-highlight" id="hoverHighlight"></div>
             <div class="select-highlight" id="selectHighlight"></div>
