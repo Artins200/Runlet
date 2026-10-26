@@ -24,7 +24,7 @@ export const FEATURES = [
     'Загрузка изображений','Предпросмотр изображений','Оптимизация на лету','PNG ↔ JPEG ↔ WebP','Ресайз','Генерация srcset','Placeholder-картинки','Загрузка шрифтов','Предпросмотр шрифтов','@font-face с woff2','SVG-иконки','Inline SVG','Оптимизация SVG','Генератор favicon','Загрузка аудио','Предпросмотр аудио','Загрузка видео','Предпросмотр видео','Видео-постеры','Lottie-анимации','Галерея ассетов','Неиспользуемые ассеты','Переименование со ссылками','Замена ассета','Экспорт ассетов архивом'] },
   { name: 'XI. Совместная работа', from: 361, items: [
     'Ссылка на проект','Короткие ссылки','Read-only ссылка','Приватная ссылка с паролем','Встраивание iframe','Embed-код','Экспорт в CodePen','Экспорт в JSFiddle','Экспорт в StackBlitz','Экспорт в GitHub Gist','Импорт из CodePen','Импорт из GitHub','Импорт по URL','Импорт из pastebin','Совместное редактирование','Курсоры соавторов','Выделения соавторов','Чат в редакторе','Комментарии к строкам','История правок','Роли','Приглашение по e-mail','Трансляция экрана','Режим преподавателя','Запись и воспроизведение'] },
-  { name: 'XII. AI и автоматизация', from: 386, items: [
+  { name: 'XII. Автоматизация', from: 386, items: [
     'Код по описанию','HTML по скриншоту','Объяснение выделенного кода','Автодокументирование','Генерация тестов','Автопочинка ошибок','Рефакторинг','Перевод кода','CSS по описанию','Палитра по бренду','alt-тексты','SEO-метатеги','Микроразметка','Доступная разметка','Анимации по описанию','Автоформат по стилю проекта','Подбор шрифтовой пары','UX-эвристики','Подсказки оптимизации','README','Changelog','Тестовое окружение','Автоперевод интерфейса','A/B-вариации','Проверка безопасности'] },
   { name: 'XIII. Обучение', from: 411, items: [
     'Уроки HTML','Уроки CSS','Уроки JS','Задания с проверкой','Подсказки при ошибках','Режим «как новичку»','Пошаговые туториалы','Демо в один клик','Библиотека рецептов','Ссылки на MDN','Мини-квизы','Достижения и прогресс','Трекер тем','Рекомендации шагов','Сравнение до/после','Визуализация алгоритма','Визуализация DOM','Визуализация каскада','Визуализация event loop','Визуализация async/await'] },
@@ -63,12 +63,12 @@ export const SNIPPETS = [
   { id: 'card', cat: 'html', name: 'Карточка товара', desc: 'Картинка, цена, кнопка', code: `<article class="product">\n  <img src="product.jpg" alt="Название товара" width="320" height="220" loading="lazy">\n  <div class="product-body">\n    <h3>Название товара</h3>\n    <p class="price">4 990 ₽</p>\n    <button type="button" aria-label="Добавить в корзину: Название товара">В корзину</button>\n  </div>\n</article>` },
   { id: 'footer', cat: 'html', name: 'Футер', desc: 'Колонки ссылок и копирайт', code: `<footer class="footer">\n  <div><strong>Компания</strong><a href="#about">О нас</a><a href="#jobs">Вакансии</a></div>\n  <div><strong>Помощь</strong><a href="#faq">FAQ</a><a href="#support">Поддержка</a></div>\n  <small>© 2026. Все права защищены.</small>\n</footer>` },
   { id: 'hero', cat: 'html', name: 'Hero-секция', desc: 'Первый экран с CTA', code: `<section class="hero">\n  <div class="hero-text">\n    <span class="eyebrow">Новое</span>\n    <h1>Заголовок, который цепляет</h1>\n    <p>Короткое описание продукта в одно предложение.</p>\n    <a class="cta" href="#start">Начать бесплатно</a>\n  </div>\n  <img src="hero.png" alt="Иллюстрация продукта" width="520" height="380">\n</section>` },
-  { id: 'modal', cat: 'html', name: 'Модальное окно', desc: 'dialog + CSS + JS', code: `<button id="openModal">Открыть модалку</button>\n<dialog id="modal" class="modal">\n  <form method="dialog"><button class="x" aria-label="Закрыть">✕</button></form>\n  <h2>Диалог</h2><p>Любое содержимое.</p>\n</dialog>\n<script>\n  openModal.onclick = () => modal.showModal();\n  modal.addEventListener('click', e => { if (e.target === modal) modal.close(); });\n</script>` },
+  { id: 'modal', cat: 'html', name: 'Модальное окно', desc: 'dialog + CSS + JS', code: `<button id="openModal">Открыть модалку</button>\n<dialog id="modal" class="modal">\n  <form method="dialog"><button class="x" aria-label="Закрыть"></button></form>\n  <h2>Диалог</h2><p>Любое содержимое.</p>\n</dialog>\n<script>\n  openModal.onclick = () => modal.showModal();\n  modal.addEventListener('click', e => { if (e.target === modal) modal.close(); });\n</script>` },
   { id: 'accordion', cat: 'html', name: 'Аккордеон', desc: 'details с стилизацией', code: `<div class="accordion">\n  <details name="faq" open><summary>Вопрос 1</summary><p>Ответ 1</p></details>\n  <details name="faq"><summary>Вопрос 2</summary><p>Ответ 2</p></details>\n  <details name="faq"><summary>Вопрос 3</summary><p>Ответ 3</p></details>\n</div>` },
   { id: 'tabs', cat: 'html', name: 'Табы', desc: 'ARIA + JS переключение', code: `<div class="tabs" role="tablist">\n  <button role="tab" aria-selected="true" aria-controls="p1" id="t1">Вкладка 1</button>\n  <button role="tab" aria-selected="false" aria-controls="p2" id="t2">Вкладка 2</button>\n</div>\n<div id="p1" role="tabpanel" aria-labelledby="t1">Содержимое 1</div>\n<div id="p2" role="tabpanel" aria-labelledby="t2" hidden>Содержимое 2</div>` },
   { id: 'slider', cat: 'html', name: 'Слайдер', desc: 'scroll-snap галерея', code: `<div class="slider" aria-label="Галерея">\n  <div class="slide">Слайд 1</div><div class="slide">Слайд 2</div><div class="slide">Слайд 3</div>\n</div>\n<style>.slider{display:flex;overflow:auto;scroll-snap-type:x mandatory;gap:12px}.slide{min-width:80%;scroll-snap-align:center;padding:40px;border-radius:18px;background:linear-gradient(135deg,#7c6cf6,#b06cf6);color:#fff}</style>` },
   { id: 'tooltip', cat: 'html', name: 'Тултип', desc: 'CSS-only подсказка', code: `<button class="tip" data-tip="Текст подсказки">Наведи на меня</button>\n<style>\n.tip{position:relative;padding:10px 16px;border:0;border-radius:10px;background:#7c6cf6;color:#fff}\n.tip::after{content:attr(data-tip);position:absolute;bottom:120%;left:50%;transform:translateX(-50%);\n  background:#111;color:#fff;padding:6px 9px;border-radius:8px;white-space:nowrap;opacity:0;pointer-events:none;transition:.2s}\n.tip:hover::after{opacity:1}\n</style>` },
-  { id: 'toastHtml', cat: 'html', name: 'Уведомление (тост)', desc: 'role=status + JS', code: `<div id="toast" class="toast" role="status" aria-live="polite" hidden>Сохранено!</div>\n<script>\n  function notify(text){ const t = document.getElementById('toast');\n    t.textContent = text; t.hidden = false; setTimeout(() => t.hidden = true, 2500); }\n  notify('Привет из Runlet 👋');\n</script>` },
+  { id: 'toastHtml', cat: 'html', name: 'Уведомление (тост)', desc: 'role=status + JS', code: `<div id="toast" class="toast" role="status" aria-live="polite" hidden>Сохранено!</div>\n<script>\n  function notify(text){ const t = document.getElementById('toast');\n    t.textContent = text; t.hidden = false; setTimeout(() => t.hidden = true, 2500); }\n  notify('Привет из Runlet ');\n</script>` },
   { id: 'skip', cat: 'html', name: 'Скип-ссылка', desc: 'Доступность: пропустить к контенту', code: `<a class="skip-link" href="#main">Перейти к содержимому</a>\n<main id="main" tabindex="-1">…</main>\n<style>.skip-link{position:absolute;left:-999px}.skip-link:focus{left:12px;top:12px;z-index:99;padding:10px 14px;background:#fff;color:#111;border-radius:10px}</style>` },
   { id: 'preload', cat: 'html', name: 'preload / preconnect', desc: 'Ускорение загрузки', code: `<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>\n<link rel="preload" as="style" href="style.css">\n<link rel="preload" as="font" type="font/woff2" href="font.woff2" crossorigin>\n<link rel="prefetch" href="next.html">` },
   { id: 'schema', cat: 'html', name: 'Schema.org JSON-LD', desc: 'Микроразметка организации', code: `<script type="application/ld+json">\n{\n  "@context": "https://schema.org",\n  "@type": "Organization",\n  "name": "Моя компания",\n  "url": "https://example.com",\n  "logo": "https://example.com/logo.png"\n}\n</script>` },
@@ -102,7 +102,7 @@ export const SNIPPETS = [
   { id: 'intldate', cat: 'js', name: 'Intl.DateTimeFormat', desc: 'Формат даты', code: `const fmt = new Intl.DateTimeFormat('ru-RU', { dateStyle: 'long', timeStyle: 'short' });\nconsole.log(fmt.format(new Date()));` },
   { id: 'uuid', cat: 'js', name: 'UUID / случайное число', desc: 'crypto.randomUUID', code: `const id = crypto.randomUUID();\nconsole.log(id); // 3a6c…\nconst shortId = Math.random().toString(36).slice(2, 10);` },
   { id: 'mock', cat: 'js', name: 'Мок-данные', desc: 'Генератор пользователей', code: `const names = ['Аня', 'Борис', 'Вика', 'Гоша'];\nconst users = Array.from({ length: 5 }, (_, i) => ({\n  id: i + 1,\n  name: names[i % names.length],\n  age: 18 + Math.floor(Math.random() * 40),\n  color: '#' + Math.floor(Math.random() * 0xffffff).toString(16).padStart(6, '0')\n}));\nconsole.table(users);` },
-  { id: 'test', cat: 'js', name: 'Мини-тест функции', desc: 'assert без библиотек', code: `function assert(condition, message) {\n  if (!condition) throw new Error('❌ ' + message);\n  console.log('✅ ' + message);\n}\nassert(add(2, 3) === 5, '2 + 3 = 5');` }
+  { id: 'test', cat: 'js', name: 'Мини-тест функции', desc: 'assert без библиотек', code: `function assert(condition, message) {\n  if (!condition) throw new Error(' ' + message);\n  console.log(' ' + message);\n}\nassert(add(2, 3) === 5, '2 + 3 = 5');` }
 ];
 export function snippetsFor(cat) { return SNIPPETS.filter(s => s.cat === cat); }
 
@@ -183,12 +183,12 @@ export function mdnLink(term) {
 }
 
 /* ══════════════════════ devices ══════════════════════ */
+/* Three clear presets — no model names, just the form factor. */
 export const DEVICES = {
-  desktop: { w: 1000, h: 600, label: 'Desktop' },
-  iphone: { w: 390, h: 844, label: 'iPhone 14' },
-  ipad: { w: 820, h: 1180, label: 'iPad' },
-  android: { w: 412, h: 915, label: 'Pixel 8' },
-  custom: { w: 1000, h: 600, label: 'Своя ширина' }
+  desktop: { w: 1280, h: 800, label: 'Десктоп', hint: 'Обычное окно ПК' },
+  tablet:  { w: 820,  h: 1180, label: 'Планшет', hint: 'Вертикальный планшет' },
+  phone:   { w: 390,  h: 844, label: 'Телефон', hint: 'Вертикальный смартфон' },
+  custom:  { w: 1000, h: 600, label: 'Свой размер', hint: 'Укажите ширину и высоту' }
 };
 
 /* ══════════════════════ lessons, quizzes, recipes ══════════════════════ */
@@ -221,12 +221,12 @@ export const RECIPES = [
   { t: 'Как узнать контраст цветов?', a: 'Откройте «Анализ» → движок посчитает коэффициент WCAG.' }
 ];
 export const PLUGIN_CATALOG = [
-  { id: 'terminal', name: 'Терминал', icon: '▸', desc: 'Мини-консоль команд редактора' },
-  { id: 'calc', name: 'Калькулятор', icon: '🧮', desc: 'Выражения и px↔rem' },
-  { id: 'regex', name: 'Генератор regex', icon: '.*', desc: 'Подсказки по регуляркам' },
-  { id: 'units', name: 'Конвертер единиц', icon: '⇄', desc: 'px, rem, em, %, ms, deg' },
-  { id: 'notes', name: 'Заметки', icon: '📝', desc: 'Личные заметки к проекту' },
-  { id: 'pomodoro', name: 'Помодоро', icon: '🍅', desc: 'Таймер 25/5 минут' },
-  { id: 'themes', name: 'Генератор тем', icon: '🎨', desc: 'Палитра из одного цвета' },
-  { id: 'diagram', name: 'Диаграммы', icon: '◫', desc: 'Mermaid-подобные схемы' }
+  { id: 'terminal', name: 'Терминал', icon: 'terminal', desc: 'Мини-консоль команд редактора' },
+  { id: 'calc', name: 'Калькулятор', icon: 'sliders', desc: 'Выражения и px↔rem' },
+  { id: 'regex', name: 'Генератор regex', icon: 'brackets', desc: 'Подсказки по регуляркам' },
+  { id: 'units', name: 'Конвертер единиц', icon: 'resize', desc: 'px, rem, em, %, ms, deg' },
+  { id: 'notes', name: 'Заметки', icon: 'journal', desc: 'Личные заметки к проекту' },
+  { id: 'pomodoro', name: 'Помодоро', icon: 'clock', desc: 'Таймер 25/5 минут' },
+  { id: 'themes', name: 'Генератор тем', icon: 'palette', desc: 'Палитра из одного цвета' },
+  { id: 'diagram', name: 'Диаграммы', icon: 'network', desc: 'Простые схемы' }
 ];

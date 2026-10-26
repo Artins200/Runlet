@@ -3,6 +3,15 @@ import fs from 'node:fs';
 import * as acorn from 'acorn';
 
 const ORIGIN = process.env.RUNLET_TEST_ORIGIN || 'http://localhost:4173';
+const CTX = new Proxy({}, {
+  get: (_, k) => {
+    if (k === 'createLinearGradient' || k === 'createRadialGradient') return () => ({ addColorStop() {} });
+    if (k === 'measureText') return () => ({ width: 10 });
+    if (k === 'getImageData') return () => ({ data: new Uint8ClampedArray(4) });
+    return () => {};
+  },
+  set: () => true
+});
 const html = await (await fetch(ORIGIN + '/')).text();
 const bundle = fs.readFileSync('app/dist/bundle.js','utf8');
 const vc = new VirtualConsole(); const errs=[];
@@ -14,7 +23,7 @@ const dom = new JSDOM(html,{url:'http://localhost:4173/',runScripts:'outside-onl
   w.PerformanceObserver=class{observe(){}disconnect(){}}; w.BroadcastChannel=class{postMessage(){}close(){}};
   w.fetch=(u,o)=>globalThis.fetch(new URL(u, ORIGIN),o);
   w.structuredClone=globalThis.structuredClone; w.CSS={escape:s=>s};
-  w.HTMLCanvasElement.prototype.getContext=()=>({clearRect(){},fillRect(){},fillText(){},drawImage(){},createLinearGradient:()=>({addColorStop(){}}),beginPath(){},fill(){},roundRect(){},set fillStyle(v){},set font(v){},set globalAlpha(v){},set textAlign(v){},set textBaseline(v){}});
+  w.HTMLCanvasElement.prototype.getContext = () => CTX;
   w.HTMLCanvasElement.prototype.toDataURL=()=> 'data:image/png;base64,AA';
   w.Range.prototype.getClientRects=function(){return {length:0,item:()=>null,[Symbol.iterator]:function*(){}}};
   w.Range.prototype.getBoundingClientRect=()=>({x:0,y:0,top:0,left:0,right:0,bottom:0,width:0,height:0});

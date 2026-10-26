@@ -133,6 +133,26 @@ try {
   const secOut = (sec.stdout || '') + (sec.stderr || '');
   const secPass = secOut.split('\n').filter(l => l.includes('✅')).length;
   const secFail = secOut.split('\n').filter(l => l.includes('❌')).length;
+  // 12. Live Server smoke
+  const live = await (async () => {
+    try {
+      const idx = await (await fetch(ORIGIN + '/')).text();
+      const token = (/name="runlet-api-token" content="([a-f0-9]{32,128})"/.exec(idx) || [])[1];
+      const put = await fetch(ORIGIN + '/api/live/project', {
+        method: 'PUT', headers: { 'Content-Type': 'application/json', 'X-Runlet-Token': token },
+        body: JSON.stringify({ files: { 'index.html': '<!doctype html><html><body><h1>Live</h1></body></html>' }, entry: 'index.html' })
+      });
+      const page = await fetch(ORIGIN + '/live/');
+      const html = await page.text();
+      const ver = await (await fetch(ORIGIN + '/live/__version')).json();
+      const bad = await fetch(ORIGIN + '/live/../../../etc/passwd');
+      return { put: put.status, page: page.status, injected: /__version/.test(html), ver: ver.v, traversal: bad.status };
+    } catch (e) { return { error: e.message }; }
+  })();
+  ok('Live Server: запуск, раздача и автообновление', live.put === 200 && live.page === 200 && live.injected === true,
+    `PUT ${live.put}, GET ${live.page}, v=${live.ver}`);
+  ok('Live Server: path traversal отклонён', live.traversal === 404, String(live.traversal));
+
   ok('Security suite', sec.status === 0, `${secPass} проверок` + (secFail ? `, ${secFail} упало` : ''));
   if (sec.status !== 0) console.log(secOut.split('\n').filter(l => l.includes('❌')).join('\n').slice(0, 2000));
 } finally {

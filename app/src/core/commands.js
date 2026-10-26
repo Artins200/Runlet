@@ -37,8 +37,13 @@ import {
   gotoLineDialog, colorToolDialog, librarySearchDialog, collaborationDialog,
   selectRailTab, selectInspTab
 } from './ui.js';
-import { ask, generateFromDescription } from './assistant.js';
+import { startLiveServer, stopLiveServer, toggleLiveServer, openSiteWindow, openSiteExternal, liveServerDialog, liveStatus } from './liveserver.js';
+import { toggleWindowedMode, detachEditor, openSiteWindow as openSiteWin, closeAllWindows, windowCount, isWindowed, movePanelWindow } from './windows.js';
+import { addObject, exportToProject, openThreeDWindow, getScene, setScene } from './threeD.js';
+import { makeProject, openProject, exportProject, exportAllProjects, importProjectFile, listProjects } from './projects.js';
+import { icon, deEmoji } from './icons.js';
 import { initLearn, renderLearn, openLesson, initPlugins, renderPlugins, initFeatures, openPlugin } from './extras.js';
+import { showWelcome } from './ui.js';
 import {
   generateTests, generateDocs, generateReadme, generateChangelog, generateSEO,
   accessibleWrap, securityScan, perfTips, refactorSelection, extractCssFromHtml,
@@ -54,172 +59,168 @@ function cmd(id, title, group, icon, fn, opts = {}) {
 
 export function initCommands() {
   /* ── core / UI ──────────────────────────────────────────────── */
-  cmd('run', 'Запустить предпросмотр', 'Основное', '▶', () => { run('full'); toast('Предпросмотр обновлён', 'ok'); });
-  cmd('analyze', 'Проанализировать код', 'Основное', '🧠', () => runAnalysis());
-  cmd('analysisReport', 'Полный отчёт анализа', 'Основное', '📊', () => fullAnalysisReport());
-  cmd('fixAll', 'Исправить безопасные ошибки', 'Основное', '🛠', () => fixAllSafe());
-  cmd('palette', 'Палитра команд', 'Основное', '⌘', () => commandPalette());
-  cmd('format', 'Форматировать активный файл', 'Основное', '⌘', () => formatDoc());
-  cmd('save', 'Сохранить проект', 'Основное', '💾', () => { persistNow(); toast('Проект сохранён', 'ok'); });
-  cmd('download', 'Скачать проект (ZIP)', 'Основное', '⬇', () => exportZip());
-  cmd('settings', 'Настройки', 'Основное', '⚙', () => settingsModal());
-  cmd('shortcuts', 'Горячие клавиши', 'Основное', '⌨', () => shortcutsModal());
-  cmd('theme', 'Сменить тему', 'Основное', '🌓', () => cycleTheme());
-  cmd('density', 'Плотность интерфейса', 'Основное', '↕', () => cycleDensity());
-  cmd('tour', 'Быстрый тур', 'Основное', '🚀', () => startTour());
-  cmd('startScreen', 'Стартовый экран', 'Основное', '🏠', () => showStartScreen());
-  cmd('assistant', 'Открыть ассистента', 'Основное', '✦', () => { selectInspTab('assistant'); setTimeout(() => $('#aiInput')?.focus(), 100); });
-  cmd('learn', 'Открыть обучение', 'Основное', '🎓', () => { selectRailTab('learn'); renderLearn(); });
-  cmd('features', 'Карта 500 идей', 'Основное', '📋', () => { selectRailTab('features'); initFeatures(); });
-  cmd('applySettings', 'Применить настройки', 'Основное', '↻', () => { applySettings(); applyEditorSettings(); }, { hidden: true });
+  cmd('run', 'Запустить предпросмотр', 'Основное', 'play', () => { run('full'); toast('Предпросмотр обновлён', 'ok'); });
+  cmd('analyze', 'Проанализировать код', 'Основное', 'chart', () => runAnalysis());
+  cmd('analysisReport', 'Полный отчёт анализа', 'Основное', 'chart', () => fullAnalysisReport());
+  cmd('fixAll', 'Исправить безопасные ошибки', 'Основное', 'wand', () => fixAllSafe());
+  cmd('palette', 'Палитра команд', 'Основное', 'format', () => commandPalette());
+  cmd('format', 'Форматировать активный файл', 'Основное', 'format', () => formatDoc());
+  cmd('save', 'Сохранить проект', 'Основное', 'save', () => { persistNow(); toast('Проект сохранён', 'ok'); });
+  cmd('download', 'Скачать проект (ZIP)', 'Основное', 'download', () => exportZip());
+  cmd('settings', 'Настройки', 'Основное', 'settings', () => settingsModal());
+  cmd('shortcuts', 'Горячие клавиши', 'Основное', 'keyboard', () => shortcutsModal());
+  cmd('theme', 'Сменить тему', 'Основное', 'theme', () => cycleTheme());
+  cmd('density', 'Плотность интерфейса', 'Основное', 'density', () => cycleDensity());
+  cmd('tour', 'Быстрый тур', 'Основное', 'help', () => startTour());
+  cmd('startScreen', 'Стартовый экран', 'Основное', 'home', () => showStartScreen());
+  cmd('learn', 'Открыть обучение', 'Основное', 'book', () => { selectRailTab('learn'); renderLearn(); });
+  cmd('features', 'Карта 500 идей', 'Основное', 'list', () => { selectRailTab('features'); initFeatures(); });
+  cmd('applySettings', 'Применить настройки', 'Основное', 'refresh', () => { applySettings(); applyEditorSettings(); }, { hidden: true });
 
   /* ── layouts ────────────────────────────────────────────────── */
-  cmd('layoutColumns', 'Раскладка: три колонки', 'Раскладка', '▥', () => applyLayout('columns'));
-  cmd('layoutRows', 'Раскладка: три строки', 'Раскладка', '☰', () => applyLayout('rows'));
-  cmd('layoutTabs', 'Раскладка: вкладки', 'Раскладка', '▤', () => applyLayout('tabs'));
-  cmd('collapsePane', 'Свернуть панель', 'Раскладка', '—', p => collapsePane(typeof p === 'string' ? p : state.activePane));
-  cmd('fullscreenPane', 'Панель на весь экран', 'Раскладка', '⛶', p => fullscreenPane(typeof p === 'string' ? p : state.activePane));
+  cmd('layoutColumns', 'Раскладка: три колонки', 'Раскладка', 'columns', () => applyLayout('columns'));
+  cmd('layoutRows', 'Раскладка: три строки', 'Раскладка', 'rows', () => applyLayout('rows'));
+  cmd('layoutTabs', 'Раскладка: вкладки', 'Раскладка', 'tabs', () => applyLayout('tabs'));
+  cmd('collapsePane', 'Свернуть панель', 'Раскладка', 'minus', p => collapsePane(typeof p === 'string' ? p : state.activePane));
+  cmd('fullscreenPane', 'Панель на весь экран', 'Раскладка', 'maximize', p => fullscreenPane(typeof p === 'string' ? p : state.activePane));
 
   /* ── editing ────────────────────────────────────────────────── */
-  cmd('formatHtml', 'Форматировать HTML', 'Редактирование', '⌘', () => formatDoc('html'));
-  cmd('formatCss', 'Форматировать CSS', 'Редактирование', '⌘', () => formatDoc('css'));
-  cmd('formatJs', 'Форматировать JS', 'Редактирование', '⌘', () => formatDoc('js'));
-  cmd('minifyHtml', 'Минифицировать HTML', 'Редактирование', '⇤', () => minifyDoc('html'));
-  cmd('minifyCss', 'Минифицировать CSS', 'Редактирование', '⇤', () => minifyDoc('css'));
-  cmd('minifyJs', 'Минифицировать JS', 'Редактирование', '⇤', () => minifyDoc('js'));
-  cmd('sortCss', 'Сортировать CSS-свойства', 'Редактирование', '⇅', () => sortCssProps('css'));
-  cmd('trimTrailing', 'Убрать пробелы в конце строк', 'Редактирование', '⌫', () => { trimTrailing(); toast('Пробелы удалены', 'ok'); });
-  cmd('tabsToSpaces', 'Табы → пробелы', 'Редактирование', '→', () => tabsToSpaces());
-  cmd('spacesToTabs', 'Пробелы → табы', 'Редактирование', '←', () => spacesToTabs());
-  cmd('foldAll', 'Свернуть все регионы', 'Редактирование', '⌄', () => toggleFoldAll());
-  cmd('unfoldAll', 'Развернуть всё', 'Редактирование', '⌃', () => unfoldAllPane());
-  cmd('snippets', 'Вставить сниппет', 'Редактирование', '✦', () => snippetsModal());
-  cmd('emmet', 'Развернуть Emmet', 'Редактирование', '⚡', () => expandEmmet());
-  cmd('gotoLine', 'Перейти к строке', 'Редактирование', '↗', () => gotoLineDialog());
-  cmd('duplicateLine', 'Дублировать строку', 'Редактирование', '⧉', () => cmCommand('duplicateLine'));
-  cmd('moveLineUp', 'Переместить строку вверх', 'Редактирование', '↑', () => cmCommand('moveLineUp'));
-  cmd('moveLineDown', 'Переместить строку вниз', 'Редактирование', '↓', () => cmCommand('moveLineDown'));
-  cmd('toggleComment', 'Закомментировать строку', 'Редактирование', '//', () => cmCommand('toggleComment'));
-  cmd('multiCursor', 'Мультикурсор (Ctrl+D)', 'Редактирование', '⋮', () => cmCommand('selectNextOccurrence'));
-  cmd('selectAllOccurrences', 'Выделить все вхождения', 'Редактирование', '◎', () => cmCommand('selectSelectionMatches'));
-  cmd('complete', 'Автодополнение', 'Редактирование', '⌨', () => cmCommand('startCompletion'));
-  cmd('find', 'Найти в файле', 'Редактирование', '🔍', () => cmCommand('find'));
-  cmd('undo', 'Отменить', 'Редактирование', '↶', () => { const v = getActiveEditor(); if (v) { undo(v); v.focus(); } });
-  cmd('redo', 'Повторить', 'Редактирование', '↷', () => { const v = getActiveEditor(); if (v) { redo(v); v.focus(); } });
+  cmd('formatHtml', 'Форматировать HTML', 'Редактирование', 'format', () => formatDoc('html'));
+  cmd('formatCss', 'Форматировать CSS', 'Редактирование', 'format', () => formatDoc('css'));
+  cmd('formatJs', 'Форматировать JS', 'Редактирование', 'format', () => formatDoc('js'));
+  cmd('minifyHtml', 'Минифицировать HTML', 'Редактирование', 'indent', () => minifyDoc('html'));
+  cmd('minifyCss', 'Минифицировать CSS', 'Редактирование', 'indent', () => minifyDoc('css'));
+  cmd('minifyJs', 'Минифицировать JS', 'Редактирование', 'indent', () => minifyDoc('js'));
+  cmd('sortCss', 'Сортировать CSS-свойства', 'Редактирование', 'list', () => sortCssProps('css'));
+  cmd('trimTrailing', 'Убрать пробелы в конце строк', 'Редактирование', 'scissors', () => { trimTrailing(); toast('Пробелы удалены', 'ok'); });
+  cmd('tabsToSpaces', 'Табы → пробелы', 'Редактирование', 'arrowRight', () => tabsToSpaces());
+  cmd('spacesToTabs', 'Пробелы → табы', 'Редактирование', 'arrowLeft', () => spacesToTabs());
+  cmd('foldAll', 'Свернуть все регионы', 'Редактирование', 'chevronDown', () => toggleFoldAll());
+  cmd('unfoldAll', 'Развернуть всё', 'Редактирование', 'chevronUp', () => unfoldAllPane());
+  cmd('snippets', 'Вставить сниппет', 'Редактирование', 'brackets', () => snippetsModal());
+  cmd('emmet', 'Развернуть Emmet', 'Редактирование', 'wand', () => expandEmmet());
+  cmd('gotoLine', 'Перейти к строке', 'Редактирование', 'arrowRight', () => gotoLineDialog());
+  cmd('duplicateLine', 'Дублировать строку', 'Редактирование', 'copy', () => cmCommand('duplicateLine'));
+  cmd('moveLineUp', 'Переместить строку вверх', 'Редактирование', 'arrowUp', () => cmCommand('moveLineUp'));
+  cmd('moveLineDown', 'Переместить строку вниз', 'Редактирование', 'arrowDown', () => cmCommand('moveLineDown'));
+  cmd('toggleComment', 'Закомментировать строку', 'Редактирование', 'code', () => cmCommand('toggleComment'));
+  cmd('multiCursor', 'Мультикурсор (Ctrl+D)', 'Редактирование', 'chevronRight', () => cmCommand('selectNextOccurrence'));
+  cmd('selectAllOccurrences', 'Выделить все вхождения', 'Редактирование', 'chevronRight', () => cmCommand('selectSelectionMatches'));
+  cmd('complete', 'Автодополнение', 'Редактирование', 'keyboard', () => cmCommand('startCompletion'));
+  cmd('find', 'Найти в файле', 'Редактирование', 'search', () => cmCommand('find'));
+  cmd('undo', 'Отменить', 'Редактирование', 'chevronRight', () => { const v = getActiveEditor(); if (v) { undo(v); v.focus(); } });
+  cmd('redo', 'Повторить', 'Редактирование', 'chevronRight', () => { const v = getActiveEditor(); if (v) { redo(v); v.focus(); } });
 
   /* ── generators / labs ──────────────────────────────────────── */
-  cmd('cssLab', 'CSS-лаборатория', 'Генераторы', '◐', () => cssLabModal());
-  cmd('jsTools', 'JS-инструменты', 'Генераторы', '⚙', () => jsToolsModal());
-  cmd('htmlTools', 'HTML-генераторы', 'Генераторы', '🧰', () => htmlToolsModal());
-  cmd('contrastTool', 'Проверка контраста WCAG', 'Генераторы', '◑', () => contrastTool());
-  cmd('colorTool', 'Конвертер цветов', 'Генераторы', '🎨', () => colorToolDialog());
-  cmd('librarySearch', 'Найти CDN-библиотеку', 'Генераторы', '📚', () => librarySearchDialog());
-  cmd('generateSEO', 'SEO-метатеги', 'Генераторы', '🔎', () => { insertText(generateSEO(), 'html'); toast('SEO-теги вставлены', 'ok'); });
-  cmd('extractCss', 'Извлечь CSS из HTML', 'Генераторы', '⇤', () => extractCssFromHtml());
-  cmd('darkTheme', 'Тёмная тема из светлой', 'Генераторы', '🌙', () => { setDoc(darkThemeFrom(getDoc('css')), 'css'); toast('Цвета инвертированы', 'ok'); });
-  cmd('mockData', 'Мок-данные JSON', 'Генераторы', '🎲', () => insertText(generateMockData(6), 'js'));
+  cmd('cssLab', 'CSS-лаборатория', 'Генераторы', 'palette', () => cssLabModal());
+  cmd('jsTools', 'JS-инструменты', 'Генераторы', 'settings', () => jsToolsModal());
+  cmd('htmlTools', 'HTML-генераторы', 'Генераторы', 'braces', () => htmlToolsModal());
+  cmd('contrastTool', 'Проверка контраста WCAG', 'Генераторы', 'chevronRight', () => contrastTool());
+  cmd('colorTool', 'Конвертер цветов', 'Генераторы', 'palette', () => colorToolDialog());
+  cmd('librarySearch', 'Найти CDN-библиотеку', 'Генераторы', 'chevronRight', () => librarySearchDialog());
+  cmd('generateSEO', 'SEO-метатеги', 'Генераторы', 'chevronRight', () => { insertText(generateSEO(), 'html'); toast('SEO-теги вставлены', 'ok'); });
+  cmd('extractCss', 'Извлечь CSS из HTML', 'Генераторы', 'indent', () => extractCssFromHtml());
+  cmd('darkTheme', 'Тёмная тема из светлой', 'Генераторы', 'chevronRight', () => { setDoc(darkThemeFrom(getDoc('css')), 'css'); toast('Цвета инвертированы', 'ok'); });
+  cmd('mockData', 'Мок-данные JSON', 'Генераторы', 'chevronRight', () => insertText(generateMockData(6), 'js'));
 
   /* ── files / project ────────────────────────────────────────── */
-  cmd('newFile', 'Новый файл', 'Файлы', '＋', () => newFileDialog(false));
-  cmd('newFolder', 'Новая папка', 'Файлы', '📁', () => newFileDialog(true));
-  cmd('upload', 'Загрузить файлы', 'Файлы', '↑', () => $('#hiddenFileInput')?.click());
-  cmd('renameFile', 'Переименовать файл', 'Файлы', '✎', () => renameDialog(Object.values(state.panes).find(p => p) || state.entry));
-  cmd('deleteFile', 'Удалить файл', 'Файлы', '🗑', () => deleteConfirm(Object.values(state.panes).find(p => p) || state.entry));
-  cmd('duplicateFile', 'Дублировать файл', 'Файлы', '⧉', () => { const p = state.activeFile; if (!exists(p)) return; const ext = p.split('.').pop(); const n = p.replace('.' + ext, '-copy.' + ext); write(n, read(p)); renderTree(); toast('Дублирован: ' + n, 'ok'); });
-  cmd('findReferences', 'Найти все ссылки на файл', 'Файлы', '🔗', () => findReferences(state.activeFile));
-  cmd('downloadFile', 'Скачать активный файл', 'Файлы', '⬇', () => downloadFile(state.activeFile));
-  cmd('exportZip', 'Экспорт проекта в ZIP', 'Файлы', '📦', () => exportZip());
-  cmd('importZip', 'Импорт из ZIP', 'Файлы', '📥', () => $('#hiddenZipInput')?.click());
-  cmd('importHtml', 'Импорт одиночного HTML', 'Файлы', '📄', () => $('#hiddenHtmlInput')?.click());
-  cmd('importUrl', 'Импорт по URL', 'Файлы', '🌐', () => importFromUrl());
-  cmd('exportSingleHtml', 'Экспорт в один HTML', 'Файлы', '📃', () => exportSingleHtml());
-  cmd('exportStaticSite', 'Экспорт статического сайта', 'Файлы', '🌍', () => exportStaticSite());
-  cmd('exportAssets', 'Экспорт ассетов ZIP', 'Файлы', '🖼', () => exportZip({ assetsOnly: true }));
-  cmd('cleanupAssets', 'Удалить неиспользуемые ассеты', 'Файлы', '🧹', () => cleanupAssets());
-  cmd('snapshot', 'Создать снапшот версии', 'Файлы', '◷', () => snapshotDialog());
-  cmd('versions', 'История версий и diff', 'Файлы', '🕘', () => versionsDialog());
-  cmd('share', 'Поделиться проектом', 'Файлы', '🔗', () => shareDialog());
-  cmd('findInProject', 'Поиск по проекту', 'Файлы', '🔍', () => { selectRailTab('search'); setTimeout(() => $('#globalSearch')?.focus(), 100); });
-  cmd('replaceAll', 'Заменить по всему проекту', 'Файлы', '⇄', () => replaceAllInProject());
-  cmd('demo', 'Загрузить демо-проект', 'Файлы', '⚡', () => { resetProject(); run('full'); toast('Демо загружено', 'ok'); });
-  cmd('writeVirtual', 'Записать виртуальный файл', 'Файлы', '', p => { if (p?.path) write(p.path, p.content || ''); }, { hidden: true });
+  cmd('newFile', 'Новый файл', 'Файлы', 'chevronRight', () => newFileDialog(false));
+  cmd('newFolder', 'Новая папка', 'Файлы', 'chevronRight', () => newFileDialog(true));
+  cmd('upload', 'Загрузить файлы', 'Файлы', 'arrowUp', () => $('#hiddenFileInput')?.click());
+  cmd('renameFile', 'Переименовать файл', 'Файлы', 'chevronRight', () => renameDialog(Object.values(state.panes).find(p => p) || state.entry));
+  cmd('deleteFile', 'Удалить файл', 'Файлы', 'chevronRight', () => deleteConfirm(Object.values(state.panes).find(p => p) || state.entry));
+  cmd('duplicateFile', 'Дублировать файл', 'Файлы', 'copy', () => { const p = state.activeFile; if (!exists(p)) return; const ext = p.split('.').pop(); const n = p.replace('.' + ext, '-copy.' + ext); write(n, read(p)); renderTree(); toast('Дублирован: ' + n, 'ok'); });
+  cmd('findReferences', 'Найти все ссылки на файл', 'Файлы', 'link', () => findReferences(state.activeFile));
+  cmd('downloadFile', 'Скачать активный файл', 'Файлы', 'download', () => downloadFile(state.activeFile));
+  cmd('exportZip', 'Экспорт проекта в ZIP', 'Файлы', 'archive', () => exportZip());
+  cmd('importZip', 'Импорт из ZIP', 'Файлы', 'download', () => $('#hiddenZipInput')?.click());
+  cmd('importHtml', 'Импорт одиночного HTML', 'Файлы', 'file', () => $('#hiddenHtmlInput')?.click());
+  cmd('importUrl', 'Импорт по URL', 'Файлы', 'globe', () => importFromUrl());
+  cmd('exportSingleHtml', 'Экспорт в один HTML', 'Файлы', 'chevronRight', () => exportSingleHtml());
+  cmd('exportStaticSite', 'Экспорт статического сайта', 'Файлы', 'chevronRight', () => exportStaticSite());
+  cmd('exportAssets', 'Экспорт ассетов ZIP', 'Файлы', 'image', () => exportZip({ assetsOnly: true }));
+  cmd('cleanupAssets', 'Удалить неиспользуемые ассеты', 'Файлы', 'trash', () => cleanupAssets());
+  cmd('snapshot', 'Создать снапшот версии', 'Файлы', 'history', () => snapshotDialog());
+  cmd('versions', 'История версий и diff', 'Файлы', 'chevronRight', () => versionsDialog());
+  cmd('share', 'Поделиться проектом', 'Файлы', 'link', () => shareDialog());
+  cmd('findInProject', 'Поиск по проекту', 'Файлы', 'search', () => { selectRailTab('search'); setTimeout(() => $('#globalSearch')?.focus(), 100); });
+  cmd('replaceAll', 'Заменить по всему проекту', 'Файлы', 'resize', () => replaceAllInProject());
+  cmd('demo', 'Загрузить демо-проект', 'Файлы', 'wand', () => { resetProject(); run('full'); toast('Демо загружено', 'ok'); });
+  cmd('writeVirtual', 'Записать виртуальный файл', 'Файлы', 'chevronRight', p => { if (p?.path) write(p.path, p.content || ''); }, { hidden: true });
 
   /* ── preview / devices ──────────────────────────────────────── */
-  cmd('rotateDevice', 'Повернуть устройство', 'Предпросмотр', '⟳', () => rotateDevice());
-  cmd('toggleGrid', 'Сетка поверх предпросмотра', 'Предпросмотр', '▦', () => toggleGrid());
-  cmd('toggleRulers', 'Линейки и измерение', 'Предпросмотр', '📏', () => toggleRulers());
-  cmd('eyedropper', 'Пипетка цвета', 'Предпросмотр', '◉', () => eyedropper());
-  cmd('inspectMode', 'Инспектор элементов', 'Предпросмотр', '⌖', () => toggleInspect());
-  cmd('previewFullscreen', 'Предпросмотр на весь экран', 'Предпросмотр', '⛶', () => previewFullscreen());
-  cmd('popout', 'Открыть предпросмотр в окне', 'Предпросмотр', '↗', () => popout());
-  cmd('reloadPreview', 'Перезагрузить предпросмотр', 'Предпросмотр', '↻', () => run('full'));
-  cmd('toggleJs', 'Включить/выключить JS', 'Предпросмотр', 'JS', () => { const c = $('#optJs'); c.checked = !c.checked; c.dispatchEvent(new Event('change')); });
-  cmd('toggleExternal', 'Блокировать внешние ресурсы', 'Предпросмотр', '🌐', () => { const c = $('#optExternal'); c.checked = !c.checked; c.dispatchEvent(new Event('change')); });
-  cmd('emulateReducedMotion', 'Эмуляция reduced-motion', 'Предпросмотр', '🎞', () => { const s = $('#optMotion'); s.value = s.value === 'reduce' ? 'no-preference' : 'reduce'; s.dispatchEvent(new Event('change')); });
-  cmd('rtl', 'RTL-разметка', 'Предпросмотр', '↔', () => { const s = $('#optLocale'); s.value = s.value === 'ar' ? 'ru' : 'ar'; s.dispatchEvent(new Event('change')); });
-  cmd('schemeEmulation', 'Эмуляция цветовой схемы', 'Предпросмотр', '🌗', () => { const s = $('#optScheme'); s.value = s.value === 'dark' ? 'light' : 'dark'; s.dispatchEvent(new Event('change')); });
+  cmd('rotateDevice', 'Повернуть устройство', 'Предпросмотр', 'rotate', () => rotateDevice());
+  cmd('toggleGrid', 'Сетка поверх предпросмотра', 'Предпросмотр', 'grid', () => toggleGrid());
+  cmd('toggleRulers', 'Линейки и измерение', 'Предпросмотр', 'ruler', () => toggleRulers());
+  cmd('eyedropper', 'Пипетка цвета', 'Предпросмотр', 'target', () => eyedropper());
+  cmd('inspectMode', 'Инспектор элементов', 'Предпросмотр', 'target', () => toggleInspect());
+  cmd('previewFullscreen', 'Предпросмотр на весь экран', 'Предпросмотр', 'maximize', () => previewFullscreen());
+  cmd('popout', 'Открыть предпросмотр в окне', 'Предпросмотр', 'arrowRight', () => popout());
+  cmd('reloadPreview', 'Перезагрузить предпросмотр', 'Предпросмотр', 'refresh', () => run('full'));
+  cmd('toggleJs', 'Включить/выключить JS', 'Предпросмотр', 'chevronRight', () => { const c = $('#optJs'); c.checked = !c.checked; c.dispatchEvent(new Event('change')); });
+  cmd('toggleExternal', 'Блокировать внешние ресурсы', 'Предпросмотр', 'globe', () => { const c = $('#optExternal'); c.checked = !c.checked; c.dispatchEvent(new Event('change')); });
+  cmd('emulateReducedMotion', 'Эмуляция reduced-motion', 'Предпросмотр', 'chevronRight', () => { const s = $('#optMotion'); if (!s) return; s.value = s.value === 'reduce' ? 'no-preference' : 'reduce'; s.dispatchEvent(new Event('change')); });
+  cmd('rtl', 'RTL-разметка', 'Предпросмотр', 'resize', () => { const s = $('#optLocale'); if (!s) return; s.value = s.value === 'ar' ? 'ru' : 'ar'; s.dispatchEvent(new Event('change')); });
+  cmd('schemeEmulation', 'Эмуляция цветовой схемы', 'Предпросмотр', 'chevronRight', () => { const s = $('#optScheme'); if (!s) return; s.value = s.value === 'dark' ? 'light' : 'dark'; s.dispatchEvent(new Event('change')); });
 
   /* ── console / debugging ────────────────────────────────────── */
-  cmd('consoleClear', 'Очистить консоль', 'Отладка', '🧹', () => { state.logs = []; renderConsole(); send('clearTrace', {}); });
-  cmd('breakpoint', 'Добавить точку останова', 'Отладка', '🔴', () => addBreakpointDialog());
-  cmd('refreshInspectors', 'Обновить инспекторы', 'Отладка', '↻', () => refreshInspectors());
-  cmd('stepInto', 'Step into', 'Отладка', '↓', () => { state.traceIndex = Math.max(0, state.traceIndex + 1); renderDebugPanel(); });
-  cmd('stepOver', 'Step over', 'Отладка', '→', () => { state.traceIndex = Math.min(state.trace.length - 1, state.traceIndex + 1); renderDebugPanel(); });
-  cmd('resume', 'Resume', 'Отладка', '▶', () => { state.traceIndex = state.trace.length - 1; renderDebugPanel(); });
-  cmd('screenReader', 'Эмуляция скринридера', 'Доступность', '🔊', () => screenReader());
-  cmd('a11yReport', 'Отчёт о доступности', 'Доступность', '♿', () => { selectInspTab('dom'); emulateA11y(); });
-  cmd('keyboardCheck', 'Проверка фокуса', 'Доступность', '⌨', () => { emulateA11y(); toast('Проверьте порядок Tab в предпросмотре', 'info'); });
+  cmd('consoleClear', 'Очистить консоль', 'Отладка', 'trash', () => { state.logs = []; renderConsole(); send('clearTrace', {}); });
+  cmd('breakpoint', 'Добавить точку останова', 'Отладка', 'chevronRight', () => addBreakpointDialog());
+  cmd('refreshInspectors', 'Обновить инспекторы', 'Отладка', 'refresh', () => refreshInspectors());
+  cmd('stepInto', 'Step into', 'Отладка', 'arrowDown', () => { state.traceIndex = Math.max(0, state.traceIndex + 1); renderDebugPanel(); });
+  cmd('stepOver', 'Step over', 'Отладка', 'arrowRight', () => { state.traceIndex = Math.min(state.trace.length - 1, state.traceIndex + 1); renderDebugPanel(); });
+  cmd('resume', 'Resume', 'Отладка', 'play', () => { state.traceIndex = state.trace.length - 1; renderDebugPanel(); });
+  cmd('screenReader', 'Эмуляция скринридера', 'Доступность', 'eye', () => screenReader());
+  cmd('a11yReport', 'Отчёт о доступности', 'Доступность', 'shield', () => { selectInspTab('dom'); emulateA11y(); });
+  cmd('keyboardCheck', 'Проверка фокуса', 'Доступность', 'keyboard', () => { emulateA11y(); toast('Проверьте порядок Tab в предпросмотре', 'info'); });
 
-  /* ── AI / automation ────────────────────────────────────────── */
-  cmd('aiExplain', 'Объяснить код', 'Ассистент', '❓', () => { selectInspTab('assistant'); ask('что делает код?'); });
-  cmd('aiExplainSelection', 'Объяснить выделенное', 'Ассистент', '🔍', () => { const s = getSelection(); if (!s) return toast('Сначала выделите код', 'warn'); selectInspTab('assistant'); ask('объясни выделенный код: ' + s.slice(0, 200)); });
-  cmd('aiFix', 'Автопочинка ошибок', 'Ассистент', '🛠', () => { selectInspTab('assistant'); ask('исправь ошибки'); });
-  cmd('aiTests', 'Сгенерировать тесты', 'Ассистент', '🧪', () => { const t = generateTests(getDoc('js')); insertText(t, 'js'); toast('Тесты вставлены', 'ok'); });
-  cmd('aiDocs', 'Документация из кода', 'Ассистент', '📖', () => ctx.modal({ title: 'Документация', wide: true, body: `<pre style="white-space:pre-wrap;font:12px var(--mono)">${esc(generateDocs(getDoc('js')))}</pre>`, okText: 'Скачать', onOk: () => download('DOCS.md', generateDocs(getDoc('js')), 'text/markdown') }));
-  cmd('aiReadme', 'Сгенерировать README', 'Ассистент', '📝', () => download('README.md', generateReadme(), 'text/markdown'));
-  cmd('aiChangelog', 'Сгенерировать changelog', 'Ассистент', '📋', () => download('CHANGELOG.md', generateChangelog(), 'text/markdown'));
-  cmd('aiRefactor', 'Рефакторинг выделенного', 'Ассистент', '♻', () => { const s = getSelection() || getDoc('js'); const out = refactorSelection(s); if (getSelection()) insertText(out); else setDoc(out, 'js'); toast('Рефакторинг применён', 'ok'); });
-  cmd('aiSecurity', 'Проверка безопасности', 'Ассистент', '🔒', () => {
-    const f = securityScan(Object.values(allTextFiles()).join('\n'));
-    ctx.modal({ title: 'Проверка безопасности', wide: true,
-      body: f.length ? `<div class="list-rows">${f.map(x => `<div class="list-row"><b>[${x.sev}]</b><div class="grow">${x.msg}</div><small>строка ~${x.line}</small></div>`).join('')}</div>` : '<p>Явных угроз не найдено ✅</p>', okText: 'Закрыть' });
+  /* ── code tools (deterministic, offline) ────────────────────── */
+  cmd('codeTests', 'Каркас тестов', 'Инструменты кода', 'chevronRight', () => { insertText(generateTests(getDoc('js')), 'js'); toast('Каркас тестов вставлен', 'ok'); });
+  cmd('codeDocs', 'Документация из кода', 'Инструменты кода', 'chevronRight', () => ctx.modal({ title: 'Документация', wide: true,
+    body: `<pre style="white-space:pre-wrap;font:12px var(--mono)">${esc(generateDocs(getDoc('js')))}</pre>`,
+    okText: 'Скачать', onOk: () => download('DOCS.md', generateDocs(getDoc('js')), 'text/markdown') }));
+  cmd('codeReadme', 'README проекта', 'Инструменты кода', 'chevronRight', () => download('README.md', generateReadme(), 'text/markdown'));
+  cmd('codeChangelog', 'Changelog', 'Инструменты кода', 'chevronRight', () => download('CHANGELOG.md', generateChangelog(), 'text/markdown'));
+  cmd('codeRefactor', 'Простой рефакторинг', 'Инструменты кода', 'chevronRight', () => {
+    const s = getSelection() || getDoc('js'), out = refactorSelection(s);
+    if (getSelection()) insertText(out); else setDoc(out, 'js');
+    toast('var→let, ==→=== применены', 'ok');
   });
-  cmd('aiGenerate', 'Сгенерировать код по описанию', 'Ассистент', '✦', () => ctx.modal({
-    title: 'Генерация кода по описанию', narrow: true,
-    body: `<div class="field"><label>Опишите, что нужно</label><input id="genDesc" placeholder="сделай карточку товара с кнопкой"></div>
-      <p class="muted" style="font-size:11px">Работает офлайн на шаблонах: форма, карточка, кнопка, hero, модальное окно, табы, аккордеон, график, градиент, сетка…</p>`,
-    okText: 'Создать',
-    onOk: root => { const d = root.querySelector('#genDesc').value; const g = generateFromDescription(d); insertText(g.code, g.lang); toast(g.note, 'ok'); }
-  }));
-  cmd('aiPerf', 'Советы по оптимизации', 'Ассистент', '⚡', () => ctx.modal({ title: 'Оптимизация', body: '<ul>' + perfTips().map(t => `<li>${t}</li>`).join('') + '</ul>', okText: 'Ок' }));
-  cmd('a11yMarkup', 'Доступная разметка', 'Ассистент', '♿', () => { setDoc(accessibleWrap(getDoc('html')), 'html'); toast('alt и aria-label добавлены', 'ok'); });
+  cmd('securityScan', 'Проверка безопасности', 'Инструменты кода', 'chevronRight', () => {
+    const f = securityScan(Object.values(allTextFiles()).join('\n'));
+    ctx.modal({ title: 'Проверка безопасности', wide: true, okText: 'Закрыть',
+      body: f.length ? `<div class="list-rows">${f.map(x => `<div class="list-row"><b>[${x.sev}]</b><div class="grow">${esc(x.msg)}</div><small>строка ~${x.line}</small></div>`).join('')}</div>` : '<p>Явных угроз не найдено.</p>' });
+  });
+  cmd('codePerf', 'Советы по оптимизации', 'Инструменты кода', 'chevronRight', () => ctx.modal({ title: 'Оптимизация',
+    body: '<ul>' + perfTips().map(t => `<li>${esc(t)}</li>`).join('') + '</ul>', okText: 'Ок' }));
+  cmd('a11yMarkup', 'Доступная разметка', 'Инструменты кода', 'chevronRight', () => { setDoc(accessibleWrap(getDoc('html')), 'html'); toast('alt и aria-label добавлены', 'ok'); });
 
   /* ── learning ───────────────────────────────────────────────── */
-  cmd('lessons', 'Интерактивные уроки', 'Обучение', '📘', () => { selectRailTab('learn'); renderLearn(); openLesson(LESSONS[0]); });
-  cmd('quiz', 'Мини-квизы', 'Обучение', '🧠', () => { selectRailTab('learn'); renderLearn(); $('[data-lt="quiz"]')?.click(); });
-  cmd('recipes', 'Библиотека рецептов', 'Обучение', '📖', () => { selectRailTab('learn'); renderLearn(); $('[data-lt="recipes"]')?.click(); });
-  cmd('visualizations', 'Визуализация event loop', 'Обучение', '🎬', () => { selectRailTab('learn'); renderLearn(); $('[data-lt="viz"]')?.click(); });
-  cmd('eventLoop', 'Event loop / async-await', 'Обучение', '🔄', () => cmdRun('visualizations'));
+  cmd('lessons', 'Интерактивные уроки', 'Обучение', 'book', () => { selectRailTab('learn'); renderLearn(); openLesson(LESSONS[0]); });
+  cmd('quiz', 'Мини-квизы', 'Обучение', 'chart', () => { selectRailTab('learn'); renderLearn(); $('[data-lt="quiz"]')?.click(); });
+  cmd('recipes', 'Библиотека рецептов', 'Обучение', 'book', () => { selectRailTab('learn'); renderLearn(); $('[data-lt="recipes"]')?.click(); });
+  cmd('visualizations', 'Визуализация event loop', 'Обучение', 'play', () => { selectRailTab('learn'); renderLearn(); $('[data-lt="viz"]')?.click(); });
+  cmd('eventLoop', 'Event loop / async-await', 'Обучение', 'chevronRight', () => cmdRun('visualizations'));
 
   /* ── perf / PWA ─────────────────────────────────────────────── */
-  cmd('perfTips', 'Советы по производительности', 'Перфоманс', '⚡', () => cmdRun('aiPerf'));
-  cmd('benchmark', 'Бенчмарк рендера', 'Перфоманс', '⏱', () => {
+  cmd('perfTips', 'Советы по производительности', 'Перфоманс', 'wand', () => cmdRun('codePerf'));
+  cmd('benchmark', 'Бенчмарк рендера', 'Перфоманс', 'chevronRight', () => {
     const t0 = performance.now(); run('full');
     setTimeout(() => ctx.modal({ title: 'Бенчмарк рендера', narrow: true,
       body: `<div class="gen-preview" style="background:var(--card-2);color:var(--text)">Время до обновления iframe: <b>${Math.round(performance.now() - t0)} мс</b><br>Размер srcdoc: <b>${srcdoc().length}</b> символов<br>Элементов: <b>${state.perf?.elements || '—'}</b></div>`, okText: 'Ок' }), 900);
   });
-  cmd('lighthouse', 'Lighthouse-подобная оценка', 'Перфоманс', '📈', () => { selectInspTab('perf'); refreshInspectors(); });
-  cmd('bundleSize', 'Размер бандла', 'Перфоманс', '📦', () => toast(`Размер проекта: ${(projectSize() / 1024).toFixed(1)} КБ`, 'info'));
-  cmd('lazyLoad', 'Добавить loading="lazy"', 'Перфоманс', '🖼', () => {
+  cmd('lighthouse', 'Lighthouse-подобная оценка', 'Перфоманс', 'chart', () => { selectInspTab('perf'); refreshInspectors(); });
+  cmd('bundleSize', 'Размер бандла', 'Перфоманс', 'archive', () => toast(`Размер проекта: ${(projectSize() / 1024).toFixed(1)} КБ`, 'info'));
+  cmd('lazyLoad', 'Добавить loading="lazy"', 'Перфоманс', 'image', () => {
     const html = getDoc('html').replace(/<img\b(?![^>]*loading=)/gi, '<img loading="lazy"');
     setDoc(html, 'html'); toast('loading="lazy" добавлен', 'ok');
   });
-  cmd('installPWA', 'Установить как приложение', 'PWA', '📲', () => {
+  cmd('installPWA', 'Установить как приложение', 'PWA', 'window', () => {
     if (window.__pwaPrompt) { window.__pwaPrompt.prompt(); toast('Установка приложения', 'ok'); }
     else toast('Откройте меню браузера → «Установить приложение»', 'info');
   });
-  cmd('offlineCheck', 'Проверить офлайн-режим', 'PWA', '📴', () => toast(navigator.onLine ? 'Онлайн. Service Worker кэширует ресурсы.' : 'Офлайн — редактор работает из кэша', 'info'));
-  cmd('coldStart', 'Холодный запуск', 'PWA', '❄', () => {
+  cmd('offlineCheck', 'Проверить офлайн-режим', 'PWA', 'server', () => toast(navigator.onLine ? 'Онлайн. Service Worker кэширует ресурсы.' : 'Офлайн — редактор работает из кэша', 'info'));
+  cmd('coldStart', 'Холодный запуск', 'PWA', 'gauge', () => {
     const nav = typeof performance.getEntriesByType === 'function' ? performance.getEntriesByType('navigation') : [];
     const t = nav[0] || {};
     ctx.modal({ title: 'Холодный запуск', narrow: true,
@@ -227,24 +228,24 @@ export function initCommands() {
   });
 
   /* ── extensibility / ecosystem ──────────────────────────────── */
-  cmd('plugins', 'Плагины', 'Экосистема', '🔌', () => { selectRailTab('plugins'); renderPlugins(); });
-  cmd('pluginMarket', 'Маркетплейс плагинов', 'Экосистема', '🏪', () => { selectRailTab('plugins'); renderPlugins(); toast('Доступны встроенные плагины + установка по ссылке', 'info'); });
-  cmd('workflow', 'GitHub Actions workflow', 'Экосистема', '⚙', () => { download('.github-workflows-build.yml', workflowYAML('github'), 'text/yaml'); toast('Workflow скачан', 'ok'); });
-  cmd('gitlabCI', 'GitLab CI', 'Экосистема', '🦊', () => download('.gitlab-ci.yml', workflowYAML('gitlab'), 'text/yaml'));
-  cmd('embed', 'Embed-код', 'Экосистема', '📺', () => { copy(embedCode()); toast('Embed-код скопирован', 'ok'); });
-  cmd('gist', 'Экспорт в GitHub Gist', 'Экосистема', '🐙', () => shareDialog());
-  cmd('cli', 'CLI для проектов', 'Экосистема', '▸', () => ctx.modal({ title: 'CLI Runlet', wide: false,
+  cmd('plugins', 'Плагины', 'Экосистема', 'puzzle', () => { selectRailTab('plugins'); renderPlugins(); });
+  cmd('pluginMarket', 'Маркетплейс плагинов', 'Экосистема', 'puzzle', () => { selectRailTab('plugins'); renderPlugins(); toast('Доступны встроенные плагины + установка по ссылке', 'info'); });
+  cmd('workflow', 'GitHub Actions workflow', 'Экосистема', 'settings', () => { download('.github-workflows-build.yml', workflowYAML('github'), 'text/yaml'); toast('Workflow скачан', 'ok'); });
+  cmd('gitlabCI', 'GitLab CI', 'Экосистема', 'package', () => download('.gitlab-ci.yml', workflowYAML('gitlab'), 'text/yaml'));
+  cmd('embed', 'Embed-код', 'Экосистема', 'chevronRight', () => { copy(embedCode()); toast('Embed-код скопирован', 'ok'); });
+  cmd('gist', 'Экспорт в GitHub Gist', 'Экосистема', 'package', () => shareDialog());
+  cmd('cli', 'CLI для проектов', 'Экосистема', 'terminal', () => ctx.modal({ title: 'CLI Runlet', wide: false,
     body: `<p class="muted">Файл <code class="inline">cli/runlet.mjs</code> управляет проектами из терминала:</p>
       <pre style="font:11px var(--mono);background:var(--code-bg);padding:10px;border-radius:12px">node cli/runlet.mjs list
 node cli/runlet.mjs analyze index.html
 node cli/runlet.mjs build -o dist/index.html
 node cli/runlet.mjs serve --port 7788</pre>`, okText: 'Ок' }));
-  cmd('webhook', 'Вебхуки на сохранение', 'Экосистема', '🔔', () => ctx.modal({ title: 'Webhooks', narrow: true,
+  cmd('webhook', 'Вебхуки на сохранение', 'Экосистема', 'info', () => ctx.modal({ title: 'Webhooks', narrow: true,
     body: `<div class="field"><label>URL для POST при сохранении</label><input id="hookUrl" placeholder="https://example.com/hook"></div>
       <p class="muted" style="font-size:11px">События: save, analyze, publish. Требуется CORS.</p>`,
     okText: 'Сохранить',
     onOk: root => { state.webhookUrl = root.querySelector('#hookUrl').value; toast('Webhook сохранён', 'ok'); } }));
-  cmd('restApi', 'REST API редактора', 'Экосистема', '🌐', () => ctx.modal({ title: 'REST API', wide: false,
+  cmd('restApi', 'REST API редактора', 'Экосистема', 'globe', () => ctx.modal({ title: 'REST API', wide: false,
     body: `<p class="muted">Локальный сервер (Electron: порт 7788, web: /api):</p>
       <pre style="font:11px var(--mono)">GET  /api/health
 POST /api/analyze      {files, entry}
@@ -252,33 +253,56 @@ GET  /api/project
 PUT  /api/project
 GET  /api/files
 POST /api/run</pre>`, okText: 'Ок' }));
-  cmd('terminalPlugin', 'Плагин-терминал', 'Экосистема', '▸', () => openPlugin('terminal'));
+  cmd('terminalPlugin', 'Плагин-терминал', 'Экосистема', 'terminal', () => openPlugin('terminal'));
 
   /* ── collaboration ──────────────────────────────────────────── */
-  cmd('collab', 'Совместное редактирование', 'Совместная работа', '👥', () => collaborationDialog());
-  cmd('collabInvite', 'Пригласить по e-mail', 'Совместная работа', '✉', () => collaborationDialog());
-  cmd('teacherMode', 'Режим преподавателя', 'Совместная работа', '🎓', () => { setReadOnly(true); toast('Режим преподавателя вклён (read-only)', 'ok'); });
-  cmd('toggleReadOnly', 'Режим только для чтения', 'Совместная работа', '🔒', () => { setReadOnly(!state.readOnly); toast(state.readOnly ? 'Редактирование заблокировано' : 'Редактирование разрешено', 'info'); });
+  cmd('collab', 'Совместное редактирование', 'Совместная работа', 'users', () => collaborationDialog());
+  cmd('collabInvite', 'Пригласить по e-mail', 'Совместная работа', 'link', () => collaborationDialog());
+  cmd('teacherMode', 'Режим преподавателя', 'Совместная работа', 'book', () => { setReadOnly(true); toast('Режим преподавателя вклён (read-only)', 'ok'); });
+  cmd('toggleReadOnly', 'Режим только для чтения', 'Совместная работа', 'shield', () => { setReadOnly(!state.readOnly); toast(state.readOnly ? 'Редактирование заблокировано' : 'Редактирование разрешено', 'info'); });
 
   /* ── diagnostics helpers ────────────────────────────────────── */
-  cmd('gotoDiag', 'Перейти к диагностике', 'Анализ', '↗', arg => {
+  cmd('gotoDiag', 'Перейти к диагностике', 'Анализ', 'arrowRight', arg => {
     const d = state.report?.diagnostics?.find(x => x.id === arg?.id && x.line === arg?.line);
     if (d) gotoDiagnostic(d);
   });
-  cmd('explainDiag', 'Объяснить замечание', 'Анализ', '❓', arg => {
+  cmd('explainDiag', 'Объяснить замечание', 'Анализ', 'chevronRight', arg => {
     const d = state.report?.diagnostics?.find(x => x.id === arg?.id && x.line === arg?.line);
     if (!d) return;
-    selectInspTab('assistant');
-    ask(`Объясни проблему ${d.id}: ${d.msg}. ${d.why || ''}`);
+    ctx.modal({ title: d.id + ' — пояснение', wide: false, okText: 'К строке',
+      body: `<p><b>${esc(d.msg)}</b></p>
+        ${d.why ? `<div class="beginner">${esc(d.why)}</div>` : ''}
+        ${d.fix ? `<p class="muted">Что делать: ${esc(d.fix)}</p>` : ''}
+        <p class="muted" style="font-size:11px">${esc(d.file)}:${d.line}</p>`,
+      onOk: () => gotoDiagnostic(d) });
   });
-  cmd('exportReportMd', 'Отчёт в Markdown', 'Анализ', '⬇', () => exportReport('md'));
-  cmd('exportReportJson', 'Отчёт в JSON', 'Анализ', '⬇', () => exportReport('json'));
-  cmd('copyReport', 'Скопировать отчёт', 'Анализ', '📋', () => { copy(reportMarkdown()); toast('Отчёт скопирован', 'ok'); });
-  cmd('securityScan', 'Сканировать безопасность', 'Анализ', '🔒', () => cmdRun('aiSecurity'));
+  cmd('exportReportMd', 'Отчёт в Markdown', 'Анализ', 'download', () => exportReport('md'));
+  cmd('exportReportJson', 'Отчёт в JSON', 'Анализ', 'download', () => exportReport('json'));
+  cmd('copyReport', 'Скопировать отчёт', 'Анализ', 'list', () => { copy(reportMarkdown()); toast('Отчёт скопирован', 'ok'); });
+
+  /* ── projects, live server, windows, 3D ─────────────────────── */
+  cmd('projectManager', 'Меню проектов', 'Проект', 'folder', () => ctx.showStartScreen?.());
+  cmd('exportProject', 'Экспорт проекта', 'Проект', 'archive', () => exportProject(''));
+  cmd('exportAllProjects', 'Экспорт всех проектов', 'Проект', 'download', () => exportAllProjects());
+  cmd('importProject', 'Импорт проекта', 'Проект', 'upload', () => $('#hiddenProjectInput')?.click());
+  cmd('newProject', 'Новый проект', 'Проект', 'plus', () => ctx.showStartScreen?.());
+  cmd('liveServer', 'Live Server', 'Сервер', 'server', () => toggleLiveServer());
+  cmd('liveServerDialog', 'Настройки Live Server', 'Сервер', 'server', () => liveServerDialog());
+  cmd('openSite', 'Сайт в окне', 'Сервер', 'window', () => ctx.openSiteWindow?.());
+  cmd('openSiteExternal', 'Открыть сайт в браузере', 'Сервер', 'external', () => openSiteExternal());
+  cmd('windowedMode', 'Оконный режим', 'Окна', 'window', () => ctx.toggleWindows?.());
+  cmd('closeWindows', 'Закрыть все окна', 'Окна', 'close', () => closeAllWindows());
+  cmd('previewWindow', 'Предпросмотр в окне', 'Окна', 'window', () => ctx.openPreviewWindow?.());
+  cmd('detachEditor', 'Редактор в окне', 'Окна', 'window', p => detachEditor(typeof p === 'string' ? p : state.activePane));
+  cmd('openThreeD', '3D-редактор', '3D', 'cube', () => { selectRailTab('three'); emit('three:show'); });
+  cmd('openThreeWindow', '3D в окне', '3D', 'window', () => ctx.openThreeWindow?.());
+  cmd('threeAdd', 'Добавить объект', '3D', 'plus', () => { selectRailTab('three'); addObject('cube'); });
+  cmd('threeExport', 'Экспорт 3D в проект', '3D', 'download', () => exportToProject());
+  cmd('helpWelcome', 'Как работать', 'Основное', 'info', () => showWelcome());
 
   /* ── misc helpers (hidden from palette) ─────────────────────── */
-  cmd('openFile', 'Открыть файл', 'Файлы', '📄', p => { if (typeof p === 'string') openFile(p); }, { hidden: true });
-  cmd('openPanel', 'Открыть панель', 'Основное', '', p => { if (typeof p === 'string') selectInspTab(p); }, { hidden: true });
+  cmd('openFile', 'Открыть файл', 'Файлы', 'file', p => { if (typeof p === 'string') openFile(p); }, { hidden: true });
+  cmd('openPanel', 'Открыть панель', 'Основное', 'chevronRight', p => { if (typeof p === 'string') selectInspTab(p); }, { hidden: true });
 }
 
 function cmdRun(id) { return runCommand(id); }

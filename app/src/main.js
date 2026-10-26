@@ -1,15 +1,21 @@
 /* Runlet bootstrap. Works both inside Electron and as a standalone web app. */
 import { state, ctx, on, emit, $, $$, toast, debounce, registerCommand, DEFAULT_SETTINGS,
          runCommand, commands } from './core/core.js';
-import { initStorage, startAutoSave, persistNow, projectJSON, listFiles, read, write, exists, sanitizeSettings } from './core/state.js';
+import { initStorage, startAutoSave, persistNow, projectJSON, listFiles, read, write, exists, sanitizeSettings, applySettings } from './core/state.js';
 import { initEditors, applyEditorSettings, setPaneFile, goto, getDoc, setDoc, focusPane } from './core/editor.js';
 import { initPreview, run, applyDevice, refreshInspectors, send } from './core/preview.js';
 import { initFiles, renderTree, openFile, renderLibs, renderAssets } from './core/files.js';
 import { initPanels, renderAnalysis, renderConsole, renderDebug } from './core/panels.js';
-import { initAssistant } from './core/assistant.js';
 import { initLearn, renderLearn, initPlugins, renderPlugins, initFeatures, pluginAPI } from './core/extras.js';
 import { initCommands } from './core/commands.js';
-import { initUI, applyLayout, modal, closeModal, selectInspTab, selectRailTab } from './core/ui.js';
+import { initUI, applyLayout, modal, closeModal, selectInspTab, selectRailTab,
+         showStartScreen, showWelcome, hydrateIcons } from './core/ui.js';
+import { initProjects, openProject, listProjects } from './core/projects.js';
+import { initWindows, toggleWindowedMode, openSiteWindow, openWindow, movePanelWindow,
+         detachEditor, windowCount } from './core/windows.js';
+import { initThreeD, openThreeDWindow } from './core/threeD.js';
+import { initLiveServer, liveStatus, toggleLiveServer } from './core/liveserver.js';
+import { srcdoc } from './core/preview.js';
 import { runAnalysis, scheduleAnalysis } from './core/analyzer.js';
 import { coverage } from './core/data.js';
 
@@ -23,7 +29,20 @@ async function boot() {
     refreshInspectors, selectInspTab, selectRailTab,
     collabSend: (type, data) => collab?.postMessage({ type, data, from: CLIENT_ID, at: Date.now() }),
     renderTree, renderLibs, renderAssets, renderAnalysis, renderConsole, renderDebug,
-    applyEditorSettings, focusPane, getDoc, setDoc
+    applyEditorSettings, focusPane, getDoc, setDoc,
+    openProject, listProjects, toggleWindowedMode,
+    // new subsystems
+    showStartScreen, showWelcome, hydrateIcons,
+    applySettings,
+    run, analyze: () => runAnalysis(), srcdoc, liveStatus,
+    toggleWindows: toggleWindowedMode,
+    openSiteWindowRaw: (url, html) => openSiteWindow(url, html),
+    openPreviewWindow: () => openWindow({ id: 'preview', title: 'Предпросмотр', icon: 'monitor',
+      width: 900, height: 640, html: srcdoc() }),
+    openThreeWindow: openThreeDWindow,
+    movePanelWindow, detachEditor, windowCount,
+    setNativeFrame: v => window.runlet?.setFrame?.(v),
+    toggleLiveServer
   });
 
   const restored = await initStorage();
@@ -35,16 +54,22 @@ async function boot() {
     keybindings: { ...base.keybindings, ...(saved.keybindings || {}) }
   };
 
+  initProjects();
   initEditors();
   initPreview();
   initFiles();
   initPanels();
-  initAssistant();
   initLearn();
   initPlugins();
   initFeatures();
+  initThreeD();
+  initWindows();
+  initLiveServer();
   initCommands();
   initUI();
+  hydrateIcons();
+  if (window.runlet?.setFrame && state.settings.nativeFrame) window.runlet.setFrame(true);
+  if (state.settings.windowedMode && !state.settings.showLauncher) setTimeout(() => toggleWindowedMode(), 900);
 
   applyEditorSettings();
   applyLayout(state.layout);
@@ -165,7 +190,10 @@ function publicAPI() {
     project: () => projectJSON(),
     openFile, goto, getDoc, setDoc,
     coverage: () => coverage(),
-    srcdoc: () => run('full'),
+    projects: () => listProjects(), openProject, showStartScreen, showWelcome,
+    toggleWindowedMode, liveStatus, toggleLiveServer,
+    srcdoc: () => srcdoc(),
+    scene3d: () => import('./core/threeD.js').then(m => m.getScene()),
     console: {
       clear: () => { state.logs = []; renderConsole(); },
       logs: () => state.logs

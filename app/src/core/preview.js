@@ -40,16 +40,19 @@ export function initPreview() {
   applySandbox();
   frame.addEventListener('load', () => emit('preview:load'));
 
-  const dev = $('#deviceSelect');
-  dev?.addEventListener('change', () => {
-    state.device = dev.value;
-    const d = DEVICES[dev.value];
-    state.deviceSize = { w: d.w, h: d.h };
-    $('#viewportWidth').value = d.w; $('#viewportHeight').value = d.h;
-    applyDevice(); emit('device:changed');
+  // Three clear form factors: desktop / tablet / phone (+ custom size).
+  $$('#deviceSwitch [data-device]').forEach(btn => {
+    btn.addEventListener('click', () => setDevice(btn.dataset.device));
   });
-  $('#viewportWidth')?.addEventListener('change', e => { state.deviceSize.w = +e.target.value || 400; $('#deviceSelect').value = 'custom'; applyDevice(); });
-  $('#viewportHeight')?.addEventListener('change', e => { state.deviceSize.h = +e.target.value || 400; $('#deviceSelect').value = 'custom'; applyDevice(); });
+  $('#viewportWidth')?.addEventListener('change', e => {
+    state.deviceSize.w = Math.max(240, Math.min(2400, +e.target.value || 400));
+    setDeviceButtons('custom'); applyDevice();
+  });
+  $('#viewportHeight')?.addEventListener('change', e => {
+    state.deviceSize.h = Math.max(200, Math.min(3000, +e.target.value || 400));
+    setDeviceButtons('custom'); applyDevice();
+  });
+  setDevice(state.device || 'desktop');
   $('#zoomSelect')?.addEventListener('change', e => { state.zoom = e.target.value === 'fit' ? 'fit' : +e.target.value; applyDevice(); });
   $('#optAutoRun')?.addEventListener('change', e => { state.autoRun = e.target.checked; state.settings.autoRun = e.target.checked; });
   $('#optJs')?.addEventListener('change', e => { state.jsEnabled = e.target.checked; run('full'); });
@@ -91,6 +94,21 @@ export function initPreview() {
   });
   applyDevice();
   setTimeout(() => run('full'), 100);
+}
+
+export function setDeviceButtons(name) {
+  $$('#deviceSwitch [data-device]').forEach(b => b.classList.toggle('active', b.dataset.device === name));
+  const d = DEVICES[name];
+  const hint = $('#previewHint');
+  if (hint && d) hint.textContent = `${d.label} · ${d.hint} · ${state.deviceSize.w}×${state.deviceSize.h}`;
+}
+export function setDevice(name) {
+  const d = DEVICES[name] || DEVICES.desktop;
+  state.device = name;
+  state.deviceSize = { w: d.w, h: d.h };
+  const w = $('#viewportWidth'), h = $('#viewportHeight');
+  if (w) w.value = d.w; if (h) h.value = d.h;
+  setDeviceButtons(name); applyDevice(); emit('device:changed', name);
 }
 
 let runTimer = null;

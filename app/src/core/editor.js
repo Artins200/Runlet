@@ -129,18 +129,18 @@ function completionSource(context) {
   } else {
     options = JS_COMPLETIONS.map(k => ({
       label: k, type: /^[A-Z]/.test(k) ? 'class' : 'variable',
-      info: DOCS[k]?.[0] || '', detail: DOCS[k] ? '📖 MDN' : 'глобал'
+      info: DOCS[k]?.[0] || '', detail: DOCS[k] ? ' MDN' : 'глобал'
     }));
-    for (const [k, v] of Object.entries(DOCS)) options.push({ label: k, type: 'property', info: v[0], detail: '📖' });
+    for (const [k, v] of Object.entries(DOCS)) options.push({ label: k, type: 'property', info: v[0], detail: '' });
   }
   // snippets for this language
   for (const s of SNIPPETS.filter(x => x.cat === pane).slice(0, 40)) {
     options.push(snippetCompletion(escapeSnippet(s.code), {
-      label: '✦ ' + s.name, detail: s.desc, type: 'text', boost: 2
+      label: ' ' + s.name, detail: s.desc, type: 'text', boost: 2
     }));
   }
   for (const s of state.userSnippets.filter(x => x.cat === pane)) {
-    options.push(snippetCompletion(escapeSnippet(s.code), { label: '★ ' + s.name, detail: 'мой сниппет', type: 'text', boost: 3 }));
+    options.push(snippetCompletion(escapeSnippet(s.code), { label: ' ' + s.name, detail: 'мой сниппет', type: 'text', boost: 3 }));
   }
   // words from current document
   const words = new Set((doc.match(/[A-Za-z_$][\w$]{2,}/g) || []).slice(-400));
@@ -167,7 +167,7 @@ const hover = hoverTooltip((view, pos) => {
       const box = document.createElement('div');
       box.style.cssText = 'padding:10px 12px;max-width:330px;font:12px var(--sans);line-height:1.5';
       box.innerHTML = '<b style="color:var(--accent)">' + esc(word) + '</b><div style="margin:5px 0;color:var(--muted)">' + esc(info[0]) + '</div>' +
-        '<a href="' + mdnLink(word) + '" target="_blank" style="color:var(--info);font-size:11px">📖 Открыть MDN ↗</a>';
+        '<a href="' + mdnLink(word) + '" target="_blank" style="color:var(--info);font-size:11px"> Открыть MDN ↗</a>';
       return box;
     }
   };

@@ -1,16 +1,21 @@
 /* Runlet shared core: state, tiny event bus, DOM helpers, settings, i18n. */
 
 export const DEFAULT_SETTINGS = {
-  theme: 'auto', accent: '#7c6cf6', density: 'comfy',
+  theme: 'auto', accent: '#4f8ff7', density: 'comfy',
   fontSize: 13, fontFamily: 'mono', lineHeight: 1.6, tabSize: 2,
   showWhitespace: false, showInvisibles: true, wrap: false,
   cursorStyle: 'smooth', smoothScroll: true, stickyHeaders: true,
   minimap: true, breadcrumbs: true, autoRun: true, autoRunDelay: 650,
   autoAnalyze: true, autoAnalyzeDelay: 1600, autoSave: true, autoSaveInterval: 20,
   formatOnPaste: true, trimTrailingWhitespace: true,
-  presets: 'balanced', locale: 'ru', firstRun: true,
+  presets: 'balanced', locale: 'ru', firstRun: true, welcomeSeen: false,
   pythonEngine: true, hotCss: true, hotJs: true, codeToPreview: true,
   timeLimit: 4000, confirmDelete: true,
+  showLauncher: true, windowedMode: false, nativeFrame: false, livePort: 5500,
+  // Customisable quick-action toolbar. Commands come from the registry;
+  // users can replace any entry from a preset list in Settings -> Buttons.
+  toolbarButtons: ['run', 'liveServer', 'openSite', 'format', 'save', 'download', 'exportProject', 'importProject'],
+  toolbarSecondary: ['analyze', 'windowedMode', 'openThreeD', 'tour', 'helpWelcome'],
   // Least-privilege sandbox for the preview iframe. Enabling these widens the
   // attack surface for untrusted/shared projects — keep them off by default.
   sandboxPermissions: { popups: false, modals: false, downloads: false,
@@ -18,12 +23,13 @@ export const DEFAULT_SETTINGS = {
   keybindings: {
     'run': 'Ctrl+Enter', 'format': 'Ctrl+Shift+F', 'save': 'Ctrl+S',
     'download': 'Ctrl+Shift+S', 'palette': 'Ctrl+Shift+P', 'analyze': 'Ctrl+Shift+A',
-    'assistant': 'Ctrl+Shift+I', 'snippets': 'Ctrl+Shift+K', 'shortcuts': 'F1',
+    'snippets': 'Ctrl+Shift+K', 'shortcuts': 'F1',
     'newFile': 'Ctrl+Alt+N', 'findInProject': 'Ctrl+Shift+J',
     'toggleComment': 'Ctrl+/', 'duplicateLine': 'Ctrl+Shift+D',
     'moveLineUp': 'Alt+ArrowUp', 'moveLineDown': 'Alt+ArrowDown',
     'multiCursor': 'Ctrl+D', 'layoutColumns': 'Alt+1', 'layoutRows': 'Alt+2',
-    'layoutTabs': 'Alt+3', 'previewFullscreen': 'Alt+Enter'
+    'layoutTabs': 'Alt+3', 'previewFullscreen': 'Alt+Enter',
+    'liveServer': 'Ctrl+Shift+L', 'windowedMode': 'Ctrl+Shift+W'
   }
 };
 
@@ -40,13 +46,13 @@ export const DEFAULT_FILES = {
 <body>
   <main class="card">
     <span class="badge">Runlet studio</span>
-    <h1>Привет, Runlet! 👋</h1>
+    <h1>Привет, Runlet!</h1>
     <p>Пиши код слева — результат появится справа. А вкладка «Анализ» расскажет, что делает код и где ошибки.</p>
     <div class="row">
       <button id="btn">Нажми меня</button>
       <button class="ghost" id="reset">Сбросить</button>
     </div>
-    <div id="output" class="output"> here will be the result </div>
+    <div id="output" class="output">Здесь появится результат</div>
   </main>
   <script src="script.js"></script>
 </body>
@@ -157,6 +163,7 @@ export const state = {
   computedStyles: {},
   perf: {},
   consoleFilter: 'all',
+  welcomeSeen: false,
   consoleSearch: '',
   consoleGroup: true,
   inspectMode: false,
@@ -167,6 +174,7 @@ export const state = {
   device: 'desktop',
   deviceSize: { w: 1000, h: 600 },
   zoom: 'fit',
+  windowedMode: false, liveServer: null,
   userSnippets: [],
   plugins: [],
   progress: {},
@@ -253,7 +261,7 @@ export async function copy(text) {
   }
 }
 export function toast(msg, type = 'info', title = '') {
-  const icons = { ok: '✓', err: '✕', warn: '⚠', info: 'ℹ' };
+  const icons = { ok: '', err: '', warn: '', info: 'ℹ' };
   const box = $('#toasts'); if (!box) return;
   const node = el('div', { class: 'toast ' + type },
     el('span', { class: 't-icon', text: icons[type] || '•' }),
@@ -286,7 +294,7 @@ const I18N = {
     'Libraries': 'Libraries', 'Assets': 'Assets', 'Plugins': 'Plugins',
     'Lessons': 'Lessons', 'Ideas': 'Ideas', 'Analysis': 'Analysis',
     'Console': 'Console', 'Debug': 'Debug', 'Network': 'Network',
-    'Storage': 'Storage', 'Perf': 'Perf', 'Assistant': 'Assistant', 'Log': 'Log',
+    'Storage': 'Storage', 'Perf': 'Perf', 'Log': 'Log',
     'Preview': 'Preview', 'Settings': 'Settings', 'Tour': 'Tour'
   }
 };
@@ -304,7 +312,7 @@ export function applyLocale() {
     ['[data-rail-tab="features"]', 'Ideas'], ['[data-insp-tab="analysis"]', 'Analysis'],
     ['[data-insp-tab="console"]', 'Console'], ['[data-insp-tab="debug"]', 'Debug'],
     ['[data-insp-tab="network"]', 'Network'], ['[data-insp-tab="storage"]', 'Storage'],
-    ['[data-insp-tab="perf"]', 'Perf'], ['[data-insp-tab="assistant"]', 'Assistant'],
+    ['[data-sub-tab="perf"]', 'Perf'],
     ['[data-insp-tab="log"]', 'Log'], ['[data-cmd="settings"]', 'Settings'],
     ['[data-cmd="tour"] span', 'Tour']
   ];

@@ -23,6 +23,7 @@ const IS_DEV = process.env.RUNLET_DEV === '1';
 const MAX_IPC_TEXT = 4 * 1024 * 1024;       // 4 MB per IPC text payload
 const MAX_API_BODY = 6 * 1024 * 1024;       // 6 MB per REST body
 const ENGINE_TIMEOUT = 15000;
+let nativeFrame = false;
 
 let win = null;
 let engine = null;
@@ -118,11 +119,11 @@ function analyze(job) {
 }
 
 /* ── window ────────────────────────────────────────────────────── */
-function createWindow() {
-  win = new BrowserWindow({
-    width: 1580, height: 980, minWidth: 1000, minHeight: 640,
+function createWindow(bounds = null) {
+  const w = new BrowserWindow({
+    width: 1680, height: 1020, minWidth: 1280, minHeight: 800,
     backgroundColor: '#0b0d18',
-    frame: false, resizable: true, thickFrame: true, show: false,
+    frame: nativeFrame, resizable: true, thickFrame: true, show: false,
     icon: path.join(ROOT, 'public', 'icon.svg'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
@@ -142,7 +143,9 @@ function createWindow() {
       autoplayPolicy: 'user-gesture-required'
     }
   });
-  win.once('ready-to-show', () => win.show());
+  win = w;
+  if (bounds && !bounds._placeholder) { try { w.setBounds(bounds); } catch (_) { } }
+  win.once('ready-to-show', () => win?.show());
   if (IS_DEV) win.loadURL('http://localhost:4173').catch(() => win.loadFile(APP_INDEX));
   else win.loadFile(APP_INDEX);
 
@@ -170,7 +173,7 @@ function createWindow() {
   });
   wc.on('will-attach-webview', event => event.preventDefault());
   wc.session.setPermissionRequestHandler((_wc, permission, callback) => callback(false));
-  wc.on('closed', () => { win = null; });
+  wc.on('closed', () => { if (win === w) win = null; });
 }
 
 /** Isolated pop-out window for the preview. data: URL => opaque origin, no opener. */
@@ -178,7 +181,7 @@ function openPreviewPopout(html) {
   const text = safeText(html, 8 * 1024 * 1024);
   if (!text) return false;
   const popup = new BrowserWindow({
-    width: 1000, height: 760, title: 'Runlet — предпросмотр',
+    width: 1200, height: 820, title: 'Runlet — предпросмотр',
     backgroundColor: '#ffffff', autoHideMenuBar: true,
     webPreferences: {
       contextIsolation: true, sandbox: true, nodeIntegration: false,
@@ -191,6 +194,96 @@ function openPreviewPopout(html) {
   popup.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   popup.webContents.session.setPermissionRequestHandler((_w, _p, cb) => cb(false));
   return true;
+}
+
+/* ── Live Server (native HTTP server for the virtual project) ───── */
+let liveServer = null, liveFiles = {}, liveEntry = 'index.html', liveVersion = 1, livePort = 5500;
+const LIVE_MIME = {
+  '.html': 'text/html; charset=utf-8', '.htm': 'text/html; charset=utf-8',
+  '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8',
+  '.mjs': 'text/javascript; charset=utf-8', '.json': 'application/json; charset=utf-8',
+  '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg',
+  '.gif': 'image/gif', '.webp': 'image/webp', '.ico': 'image/x-icon',
+  '.woff2': 'font/woff2', '.woff': 'font/woff', '.ttf': 'font/ttf',
+  '.mp3': 'audio/mpeg', '.mp4': 'video/mp4', '.webm': 'video/webm',
+  '.txt': 'text/plain; charset=utf-8', '.md': 'text/markdown; charset=utf-8',
+  '.xml': 'application/xml', '.map': 'application/json'
+};
+function liveSafeName(n) {
+  if (typeof n !== 'string' || !n || n.length > 300 || n.includes('\0') || n.includes('\\')) return null;
+  if (n.startsWith('/') || /^[A-Za-z]:/.test(n) || n.split('/').some(x => x === '..' || x === '')) return null;
+  return n;
+}
+function setLiveProject(project) {
+  if (!project || typeof project !== 'object' || !project.files || typeof project.files !== 'object') return false;
+  const next = {};
+  let total = 0;
+  for (const [name, content] of Object.entries(project.files).slice(0, 300)) {
+    const key = liveSafeName(name);
+    if (!key || typeof content !== 'string') continue;
+    total += content.length;
+    if (total > 8 * 1024 * 1024) break;
+    next[key] = content;
+  }
+  if (!Object.keys(next).length) return false;
+  liveFiles = next;
+  liveEntry = liveSafeName(project.entry) || (next['index.html'] ? 'index.html' : Object.keys(next)[0]);
+  liveVersion++;
+  return true;
+}
+function liveBody(content, ext) {
+  if (/^data:/i.test(content)) {
+    const comma = content.indexOf(',');
+    const meta = content.slice(5, comma), payload = content.slice(comma + 1);
+    if (/;base64/i.test(meta)) return { body: Buffer.from(payload, 'base64'), type: meta.split(';')[0] };
+    return { body: Buffer.from(decodeURIComponent(payload), 'utf8'), type: meta.split(';')[0] };
+  }
+  return { body: Buffer.from(content, 'utf8'), type: LIVE_MIME[ext] || 'application/octet-stream' };
+}
+function liveHandler(req, res) {
+  let pathname;
+  try { pathname = decodeURIComponent(new URL(req.url, 'http://127.0.0.1').pathname); }
+  catch (_) { return res.writeHead(400).end('bad url'); }
+  if (pathname === '/__runlet_live_version') {
+    res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+    return res.end(JSON.stringify({ v: liveVersion }));
+  }
+  let name = pathname.replace(/^\/+/, '') || liveEntry;
+  if (!liveFiles[name]) {
+    if (!path.extname(name) && liveFiles['index.html']) name = 'index.html';
+    else if (!liveFiles[name]) {
+      res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
+      return res.end('404 — файл не найден в проекте');
+    }
+  }
+  const ext = path.extname(name).toLowerCase();
+  const out = liveBody(liveFiles[name], ext);
+  const headers = { 'Content-Type': out.type, 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' };
+  if (/text\/html/i.test(out.type)) {
+    const script = `<script>(function(){var v=${liveVersion};setInterval(function(){fetch('/__runlet_live_version').then(function(r){return r.json()}).then(function(d){if(d.v!==v)location.reload()})},900)})();<\/script>`;
+    let html = out.body.toString('utf8');
+    html = /<\/body>/i.test(html) ? html.replace(/<\/body>/i, script + '</body>') : html + script;
+    res.writeHead(200, headers); return res.end(html);
+  }
+  res.writeHead(200, headers); return res.end(out.body);
+}
+function startLive(port, project) {
+  const p = Math.max(1024, Math.min(65535, Number(port) || 5500));
+  if (!setLiveProject(project)) return { ok: false, error: 'пустой проект' };
+  if (liveServer && livePort === p) return { ok: true, url: `http://127.0.0.1:${p}/`, port: p, version: liveVersion };
+  if (liveServer) { try { liveServer.close(); } catch (_) { } liveServer = null; }
+  return new Promise(resolve => {
+    const srv = http.createServer(liveHandler);
+    srv.on('error', e => resolve({ ok: false, error: e.message }));
+    srv.listen(p, '127.0.0.1', () => {
+      liveServer = srv; livePort = p;
+      resolve({ ok: true, url: `http://127.0.0.1:${p}/`, port: p, version: liveVersion });
+    });
+  });
+}
+function stopLive() {
+  if (liveServer) { try { liveServer.close(); } catch (_) { } liveServer = null; }
+  liveFiles = {}; return { ok: true };
 }
 
 function buildMenu() {
@@ -302,6 +395,27 @@ function registerIPC() {
     return !!safe;
   });
   ipcMain.handle('preview:popout', (_, html) => openPreviewPopout(html));
+  ipcMain.handle('live:start', async (_, payload) => {
+    if (!isPlainObject(payload)) return { ok: false, error: 'bad payload' };
+    return startLive(payload.port, payload.project);
+  });
+  ipcMain.handle('live:update', (_, payload) => {
+    if (!isPlainObject(payload) || !setLiveProject(payload.project)) return { ok: false };
+    return { ok: true, version: liveVersion };
+  });
+  ipcMain.handle('live:stop', () => stopLive());
+  ipcMain.handle('live:status', () => ({ ok: !!liveServer, url: liveServer ? `http://127.0.0.1:${livePort}/` : '', port: livePort, version: liveVersion }));
+  ipcMain.handle('live:external', () => {
+    if (!liveServer) return false;
+    shell.openExternal(`http://127.0.0.1:${livePort}/`); return true;
+  });
+  ipcMain.handle('win:frame', (_, useFrame) => {
+    nativeFrame = !!useFrame;
+    const old = win, bounds = old?.getBounds();
+    createWindow(bounds);
+    try { old?.close(); } catch (_) { }
+    return true;
+  });
 }
 
 /* ── REST API (127.0.0.1 only + random token + Host/Origin checks) ─ */
@@ -424,4 +538,4 @@ app.whenReady().then(() => {
   app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
 });
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
-app.on('before-quit', () => { try { engine?.kill(); } catch (_) { } });
+app.on('before-quit', () => { try { engine?.kill(); } catch (_) { } stopLive(); });

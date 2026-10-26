@@ -467,7 +467,7 @@ export function askPassword() {
     overlay.style.cssText = 'position:fixed;inset:0;z-index:99999;display:grid;place-items:center;background:rgba(4,5,14,.88);font:14px system-ui;color:#fff';
     const card = document.createElement('div');
     card.style.cssText = 'background:#181b2c;border:1px solid #ffffff22;border-radius:20px;padding:24px;width:min(380px,92vw);box-shadow:0 20px 60px #0008';
-    const h = document.createElement('h2'); h.textContent = '🔒 Проект защищён паролем'; h.style.cssText = 'margin:0 0 8px;font-size:18px';
+    const h = document.createElement('h2'); h.textContent = ' Проект защищён паролем'; h.style.cssText = 'margin:0 0 8px;font-size:18px';
     const p = document.createElement('p'); p.textContent = 'Ссылка зашифрована AES-GCM. Введите пароль, чтобы открыть проект.'; p.style.cssText = 'color:#979cb9;font-size:12px;line-height:1.5';
     const input = document.createElement('input');
     input.type = 'password'; input.placeholder = 'Пароль';

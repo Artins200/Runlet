@@ -4,8 +4,8 @@
   "description": "Редактор HTML/CSS/JS с Python-анализом кода и живым предпросмотром",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#0b0d18",
-  "theme_color": "#7c6cf6",
+  "background_color": "#0e1116",
+  "theme_color": "#0e1116",
   "lang": "ru",
   "icons": [
     { "src": "/public/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
