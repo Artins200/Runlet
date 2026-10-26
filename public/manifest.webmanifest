@@ -1,0 +1,13 @@
+{
+  "name": "Runlet Studio — HTML/CSS/JS редактор",
+  "short_name": "Runlet",
+  "description": "Редактор HTML/CSS/JS с Python-анализом кода и живым предпросмотром",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0b0d18",
+  "theme_color": "#7c6cf6",
+  "lang": "ru",
+  "icons": [
+    { "src": "/public/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

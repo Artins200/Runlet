@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="ru" data-theme="dark" data-density="comfy">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0d1020">
+  <title>Runlet — редактор HTML / CSS / JS с анализом кода</title>
+  <link rel="manifest" href="public/manifest.webmanifest">
+  <link rel="icon" href="public/icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="dist/styles.css">
+</head>
+<body>
+<div id="app" class="app-shell">
+
+  <!-- ══════════════════ title bar ══════════════════ -->
+  <header id="titlebar" class="titlebar">
+    <div class="brand">
+      <div class="brand-mark" aria-hidden="true">
+        <svg viewBox="0 0 32 32" width="22" height="22"><path d="M8 9 3 16l5 7M24 9l5 7-5 7M19 6l-6 20" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <div class="brand-text"><strong>Runlet</strong><span class="brand-sub">studio</span></div>
+      <span class="pill pill-accent" id="engineBadge">Python-движок</span>
+    </div>
+    <div class="project-chip">
+      <svg viewBox="0 0 24 24" width="14" height="14" class="ico"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>
+      <input id="projectName" value="Мой проект" spellcheck="false" aria-label="Имя проекта">
+      <span id="dirtyDot" class="dirty-dot" title="Есть несохранённые изменения"></span>
+    </div>
+    <button class="btn btn-ghost palette-trigger" data-cmd="palette">
+      <svg viewBox="0 0 24 24" width="15" height="15" class="ico"><circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="2"/><path d="m20 20-4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      <span>Поиск команд</span><kbd>Ctrl ⇧ P</kbd>
+    </button>
+    <div class="title-spacer"></div>
+    <div class="title-meta"><span id="readyIndicator" class="ready"><i></i>готов</span></div>
+    <div id="winControls" class="win-controls"></div>
+  </header>
+
+  <!-- ══════════════════ quick toolbar ══════════════════ -->
+  <div id="toolbar" class="toolbar">
+    <div class="tool-group">
+      <button class="btn btn-run" data-cmd="run" title="Запустить (Ctrl+Enter)">
+        <svg viewBox="0 0 24 24" width="16" height="16" class="ico"><path d="M7 4.5 19 12 7 19.5Z" fill="currentColor"/></svg>
+        <span>Запустить</span>
+      </button>
+      <button class="btn btn-ghost" data-cmd="format" title="Форматировать"><svg viewBox="0 0 24 24" width="16" height="16" class="ico"><path d="M4 6h16M4 10h10M4 14h16M4 18h7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>
+      <button class="btn btn-ghost" data-cmd="save" title="Сохранить проект"><svg viewBox="0 0 24 24" width="16" height="16" class="ico"><path d="M5 3h11l3 3v15H5zM8 3v6h8V3M8 21v-7h8v7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg></button>
+      <button class="btn btn-ghost" data-cmd="download" title="Скачать"><svg viewBox="0 0 24 24" width="16" height="16" class="ico"><path d="M12 3v12m0 0 4-4m-4 4-4-4M4 19h16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+    </div>
+    <div class="tool-sep"></div>
+    <div class="tool-group layout-group" role="group" aria-label="Раскладка">
+      <button class="btn btn-icon" data-cmd="layoutColumns" title="Три колонки"><svg viewBox="0 0 24 24" width="16" height="16" class="ico"><rect x="3" y="4" width="5" height="16" rx="1.5" fill="currentColor"/><rect x="9.5" y="4" width="5" height="16" rx="1.5" fill="currentColor"/><rect x="16" y="4" width="5" height="16" rx="1.5" fill="currentColor"/></svg></button>
+      <button class="btn btn-icon" data-cmd="layoutRows" title="Три строки"><svg viewBox="0 0 24 24" width="16" height="16" class="ico"><rect x="3" y="4" width="18" height="4.5" rx="1.5" fill="currentColor"/><rect x="3" y="9.7" width="18" height="4.5" rx="1.5" fill="currentColor"/><rect x="3" y="15.4" width="18" height="4.5" rx="1.5" fill="currentColor"/></svg></button>
+      <button class="btn btn-icon" data-cmd="layoutTabs" title="Вкладки"><svg viewBox="0 0 24 24" width="16" height="16" class="ico"><path d="M3 7a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z" fill="none" stroke="currentColor" stroke-width="1.8"/></svg></button>
+    </div>
+    <div class="tool-sep"></div>
+    <div class="tool-group">
+      <button class="btn btn-icon" data-cmd="theme" title="Тема"><svg viewBox="0 0 24 24" width="16" height="16" class="ico"><path d="M12 3a9 9 0 1 0 9 9 7 7 0 0 1-9-9Z" fill="currentColor"/></svg></button>
+      <label class="accent-pick" title="Акцентный цвет"><input type="color" id="accentInput" value="#7c6cf6"></label>
+      <button class="btn btn-icon" data-cmd="density" title="Плотность интерфейса"><svg viewBox="0 0 24 24" width="16" height="16" class="ico"><path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>
+      <button class="btn btn-icon" data-cmd="settings" title="Настройки"><svg viewBox="0 0 24 24" width="16" height="16" class="ico"><circle cx="12" cy="12" r="3.2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M12 2v3m0 14v3M2 12h3m14 0h3M5 5l2 2m10 10 2 2M19 5l-2 2M7 17l-2 2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>
+    </div>
+    <div class="tool-spacer"></div>
+    <div class="tool-group">
+      <button class="btn btn-ghost" data-cmd="tour" title="Быстрый тур"><span>Тур</span></button>
+      <button class="btn btn-ghost" data-cmd="learn" title="Обучение"><span>Обучение</span></button>
+      <button class="btn btn-ghost btn-ai" data-cmd="assistant" title="Ассистент"><span>✦ Ассистент</span></button>
+      <button class="btn btn-analyze" data-cmd="analyze" title="Проанализировать код">
+        <svg viewBox="0 0 24 24" width="17" height="17" class="ico"><path d="M4 19V5m0 14h16M7 15l4-5 3 3 5-7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span>Анализ кода</span><span class="analyze-badge" id="analyzeBadge">0</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- ══════════════════ workspace ══════════════════ -->
+  <main id="workspace" class="workspace">
+    <!-- left rail -->
+    <aside id="rail" class="rail card">
+      <div class="rail-tabs" id="railTabs">
+        <button class="rail-tab active" data-rail-tab="files">Файлы</button>
+        <button class="rail-tab" data-rail-tab="search">Поиск</button>
+        <button class="rail-tab" data-rail-tab="libs">Библиотеки</button>
+        <button class="rail-tab" data-rail-tab="assets">Ассеты</button>
+        <button class="rail-tab" data-rail-tab="plugins">Плагины</button>
+        <button class="rail-tab" data-rail-tab="learn">Уроки</button>
+        <button class="rail-tab" data-rail-tab="features">Идеи</button>
+      </div>
+      <div class="rail-body" id="railBody">
+        <div class="rail-panel active" data-rail="files">
+          <div class="rail-actions">
+            <button class="mini-btn" data-cmd="newFile" title="Новый файл">＋ файл</button>
+            <button class="mini-btn" data-cmd="newFolder" title="Новая папка">＋ папка</button>
+            <button class="mini-btn" data-cmd="upload" title="Загрузить с компьютера">↑ загрузить</button>
+            <button class="mini-btn" data-cmd="snapshot" title="Снапшот">◷ версия</button>
+          </div>
+          <div class="file-filter"><input id="fileFilter" placeholder="Фильтр по имени…" spellcheck="false"></div>
+          <div class="file-tree" id="fileTree"></div>
+          <div class="rail-foot" id="projectSize">0 КБ</div>
+        </div>
+        <div class="rail-panel" data-rail="search">
+          <div class="search-block">
+            <input id="globalSearch" placeholder="Найти в проекте…" spellcheck="false">
+            <label class="chk"><input type="checkbox" id="searchRegex"> regex</label>
+            <div class="replace-row"><input id="globalReplace" placeholder="Заменить на…"><button class="mini-btn" data-cmd="replaceAll">Заменить всё</button></div>
+            <div id="searchResults" class="search-results"></div>
+          </div>
+        </div>
+        <div class="rail-panel" data-rail="libs"><div id="libsPanel" class="panel-scroll"></div></div>
+        <div class="rail-panel" data-rail="assets"><div id="assetsPanel" class="panel-scroll"></div></div>
+        <div class="rail-panel" data-rail="plugins"><div id="pluginsPanel" class="panel-scroll"></div></div>
+        <div class="rail-panel" data-rail="learn"><div id="learnPanel" class="panel-scroll"></div></div>
+        <div class="rail-panel" data-rail="features"><div id="featuresPanel" class="panel-scroll"></div></div>
+      </div>
+    </aside>
+    <div class="splitter v-splitter" data-splitter="rail"></div>
+
+    <!-- editors -->
+    <section id="editors" class="editors layout-columns" data-layout="columns">
+      <div class="editor-pane card" data-pane="html">
+        <div class="pane-head">
+          <div class="pane-tab" data-pane-tab="html"><span class="lang-dot html"></span><strong>HTML</strong><span class="pane-file" data-pane-file="html">index.html</span><span class="pane-dirty"></span></div>
+          <div class="pane-tools">
+            <button class="pane-btn" data-cmd="formatHtml" title="Форматировать HTML">⌘</button>
+            <button class="pane-btn" data-cmd="minifyHtml" title="Минифицировать">⇤</button>
+            <button class="pane-btn" data-cmd="snippets" title="Сниппеты">✦</button>
+            <button class="pane-btn" data-cmd="foldAll" title="Свернуть всё">⌄</button>
+            <button class="pane-btn" data-cmd="collapsePane" data-arg="html" title="Свернуть панель">—</button>
+            <button class="pane-btn" data-cmd="fullscreenPane" data-arg="html" title="На весь экран">⛶</button>
+          </div>
+        </div>
+        <div class="pane-editor"><div class="cm-host" data-cm="html"></div><div class="minimap" data-minimap="html"></div></div>
+        <div class="pane-foot"><span class="crumbs" data-crumbs="html">index.html</span><span class="pane-pos" data-pos="html">1:1</span></div>
+      </div>
+      <div class="splitter h-splitter" data-splitter="e1"></div>
+      <div class="editor-pane card" data-pane="css">
+        <div class="pane-head">
+          <div class="pane-tab" data-pane-tab="css"><span class="lang-dot css"></span><strong>CSS</strong><span class="pane-file" data-pane-file="css">style.css</span><span class="pane-dirty"></span></div>
+          <div class="pane-tools">
+            <button class="pane-btn" data-cmd="cssLab" title="CSS-лаборатория">◐</button>
+            <button class="pane-btn" data-cmd="formatCss" title="Форматировать CSS">⌘</button>
+            <button class="pane-btn" data-cmd="minifyCss" title="Минифицировать">⇤</button>
+            <button class="pane-btn" data-cmd="sortCss" title="Сортировать свойства">⇅</button>
+            <button class="pane-btn" data-cmd="collapsePane" data-arg="css" title="Свернуть">—</button>
+            <button class="pane-btn" data-cmd="fullscreenPane" data-arg="css" title="На весь экран">⛶</button>
+          </div>
+        </div>
+        <div class="pane-editor"><div class="cm-host" data-cm="css"></div><div class="minimap" data-minimap="css"></div></div>
+        <div class="pane-foot"><span class="crumbs" data-crumbs="css">style.css</span><span class="pane-pos" data-pos="css">1:1</span></div>
+      </div>
+      <div class="splitter h-splitter" data-splitter="e2"></div>
+      <div class="editor-pane card" data-pane="js">
+        <div class="pane-head">
+          <div class="pane-tab" data-pane-tab="js"><span class="lang-dot js"></span><strong>JS</strong><span class="pane-file" data-pane-file="js">script.js</span><span class="pane-dirty"></span></div>
+          <div class="pane-tools">
+            <button class="pane-btn" data-cmd="jsTools" title="JS-инструменты">⚙</button>
+            <button class="pane-btn" data-cmd="formatJs" title="Форматировать JS">⌘</button>
+            <button class="pane-btn" data-cmd="minifyJs" title="Минифицировать">⇤</button>
+            <button class="pane-btn" data-cmd="collapsePane" data-arg="js" title="Свернуть">—</button>
+            <button class="pane-btn" data-cmd="fullscreenPane" data-arg="js" title="На весь экран">⛶</button>
+          </div>
+        </div>
+        <div class="pane-editor"><div class="cm-host" data-cm="js"></div><div class="minimap" data-minimap="js"></div></div>
+        <div class="pane-foot"><span class="crumbs" data-crumbs="js">script.js</span><span class="pane-pos" data-pos="js">1:1</span></div>
+      </div>
+    </section>
+    <div class="splitter v-splitter" data-splitter="dock"></div>
+
+    <!-- right dock: preview + inspector -->
+    <aside id="dock" class="dock">
+      <div id="previewCard" class="preview-card card">
+        <div class="preview-head">
+          <span class="preview-title"><span class="live-dot"></span> Предпросмотр</span>
+          <div class="preview-tools">
+            <select id="deviceSelect" class="mini-select" title="Устройство">
+              <option value="desktop">🖥 Desktop</option><option value="iphone">📱 iPhone 14</option>
+              <option value="ipad">平板 iPad</option><option value="android">🤖 Android</option>
+              <option value="custom">↔ Своя ширина</option>
+            </select>
+            <input id="viewportWidth" class="num-input" type="number" value="1000" min="240" max="2400" title="Ширина">
+            <span class="dim-x">×</span>
+            <input id="viewportHeight" class="num-input" type="number" value="600" min="200" max="3000" title="Высота">
+            <select id="zoomSelect" class="mini-select" title="Масштаб"><option value="1">100%</option><option value="0.5">50%</option><option value="0.75">75%</option><option value="fit" selected>fit</option></select>
+            <button class="pane-btn" data-cmd="rotateDevice" title="Повернуть">⟳</button>
+            <button class="pane-btn" data-cmd="toggleGrid" title="Сетка">▦</button>
+            <button class="pane-btn" data-cmd="toggleRulers" title="Линейки">📏</button>
+            <button class="pane-btn" data-cmd="eyedropper" title="Пипетка цвета">◉</button>
+            <button class="pane-btn" data-cmd="inspectMode" title="Инспектор элементов">⌖</button>
+            <button class="pane-btn" data-cmd="previewFullscreen" title="Полный экран">⛶</button>
+            <button class="pane-btn" data-cmd="popout" title="Открыть в окне">↗</button>
+          </div>
+        </div>
+        <div class="preview-options" id="previewOptions">
+          <label class="chk"><input type="checkbox" id="optAutoRun" checked> авто</label>
+          <label class="chk"><input type="checkbox" id="optJs" checked> JS</label>
+          <label class="chk"><input type="checkbox" id="optExternal" checked> внешние</label>
+          <label class="chk"><input type="checkbox" id="optAlerts" checked> alert→тост</label>
+          <label class="chk"><input type="checkbox" id="optPersistLogs" checked> логи</label>
+          <select id="optScheme" class="mini-select" title="prefers-color-scheme"><option value="auto">тема auto</option><option value="light">light</option><option value="dark">dark</option></select>
+          <select id="optMotion" class="mini-select" title="prefers-reduced-motion"><option value="no-preference">motion</option><option value="reduce">reduce</option></select>
+          <select id="optLocale" class="mini-select" title="Локаль"><option value="ru">RU</option><option value="en">EN</option><option value="ar">RTL</option></select>
+        </div>
+        <div class="preview-stage" id="previewStage">
+          <div class="ruler ruler-top" id="rulerTop"></div><div class="ruler ruler-left" id="rulerLeft"></div>
+          <div class="preview-frame-wrap" id="previewFrameWrap">
+            <iframe id="previewFrame" title="Предпросмотр" sandbox="allow-scripts allow-modals allow-forms allow-popups allow-downloads allow-pointer-lock allow-orientation-lock"></iframe>
+            <div class="grid-overlay" id="gridOverlay"></div>
+            <div class="hover-highlight" id="hoverHighlight"></div>
+            <div class="select-highlight" id="selectHighlight"></div>
+            <div class="guide guide-v" id="guideV"></div><div class="guide guide-h" id="guideH"></div>
+          </div>
+          <div class="preview-hint" id="previewHint">⟵ перетащите разделитель, чтобы изменить размер</div>
+        </div>
+      </div>
+      <div class="splitter h-splitter" data-splitter="dockH"></div>
+      <div id="inspector" class="inspector card">
+        <div class="inspector-tabs" id="inspectorTabs">
+          <button class="insp-tab active" data-insp-tab="analysis">Анализ <span class="tab-count" id="analysisCount">0</span></button>
+          <button class="insp-tab" data-insp-tab="console">Консоль <span class="tab-count" id="consoleCount">0</span></button>
+          <button class="insp-tab" data-insp-tab="debug">Отладка</button>
+          <button class="insp-tab" data-insp-tab="dom">DOM</button>
+          <button class="insp-tab" data-insp-tab="network">Сеть</button>
+          <button class="insp-tab" data-insp-tab="storage">Хранилище</button>
+          <button class="insp-tab" data-insp-tab="perf">Перф</button>
+          <button class="insp-tab" data-insp-tab="assistant">Ассистент</button>
+          <button class="insp-tab" data-insp-tab="log">Журнал</button>
+        </div>
+        <div class="inspector-body" id="inspectorBody">
+          <div class="insp-panel active" data-insp="analysis" id="analysisPanel"></div>
+          <div class="insp-panel" data-insp="console" id="consolePanel"></div>
+          <div class="insp-panel" data-insp="debug" id="debugPanel"></div>
+          <div class="insp-panel" data-insp="dom" id="domPanel"></div>
+          <div class="insp-panel" data-insp="network" id="networkPanel"></div>
+          <div class="insp-panel" data-insp="storage" id="storagePanel"></div>
+          <div class="insp-panel" data-insp="perf" id="perfPanel"></div>
+          <div class="insp-panel" data-insp="assistant" id="assistantPanel"></div>
+          <div class="insp-panel" data-insp="log" id="logPanel"></div>
+        </div>
+      </div>
+    </aside>
+  </main>
+
+  <!-- ══════════════════ status bar ══════════════════ -->
+  <footer id="statusbar" class="statusbar">
+    <span class="status-item" id="statusEngine">◉ Python-движок готов</span>
+    <span class="status-item" id="statusFile">index.html</span>
+    <span class="status-item" id="statusPos">Стр 1, Стл 1</span>
+    <span class="status-item" id="statusLang">HTML</span>
+    <span class="status-spacer"></span>
+    <span class="status-item" id="statusScore">Анализ: —</span>
+    <span class="status-item" id="statusSize">0 КБ</span>
+    <span class="status-item" id="statusAutosave">автосохранение вкл</span>
+    <button class="status-btn" data-cmd="shortcuts">⌨ Горячие клавиши</button>
+  </footer>
+</div>
+
+<div id="toasts" class="toasts" aria-live="polite"></div>
+<div id="modalRoot" class="modal-root"></div>
+<div id="startScreen" class="start-screen"></div>
+<div id="tourLayer" class="tour-layer"></div>
+<div id="contextMenu" class="context-menu"></div>
+<input type="file" id="hiddenFileInput" multiple hidden>
+<input type="file" id="hiddenZipInput" accept=".zip" hidden>
+<input type="file" id="hiddenHtmlInput" accept=".html,.htm" hidden>
+<script src="dist/bundle.js"></script>
+</body>
+</html>
