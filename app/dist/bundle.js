@@ -50229,6 +50229,7 @@ ${p.map((x2, i4) => `  --brand-${i4 + 1}: ${x2};`).join("\n")}
   // app/src/core/shellui.js
   init_core();
   init_icons();
+  init_state();
   var MENUS = {
     file: {
       title: "\u0424\u0430\u0439\u043B",
@@ -50327,10 +50328,12 @@ ${p.map((x2, i4) => `  --brand-${i4 + 1}: ${x2};`).join("\n")}
       box.appendChild(el("div", { class: "dropdown-label", text: sec.label }));
       for (const [id2, label] of sec.items) {
         const c = commands.get(id2);
-        const item = el("button", { class: "dropdown-item", "data-cmd": id2 });
+        const item = el("button", { class: "dropdown-item", "data-menu-item": id2 });
         const ic = c?.icon || "chevronRight";
         item.innerHTML = `<span class="di-ico">${icon(ic, 15)}</span><span class="di-label">${esc(label)}</span>` + (c?.key ? `<kbd>${esc(c.key)}</kbd>` : "");
-        item.addEventListener("click", () => {
+        item.addEventListener("click", (e) => {
+          e.preventDefault();
+          e.stopPropagation();
           closeMenu();
           runCommand(id2);
         });
@@ -50363,11 +50366,18 @@ ${p.map((x2, i4) => `  --brand-${i4 + 1}: ${x2};`).join("\n")}
   function isNativeFrame() {
     return native;
   }
+  var lastWindowAction = 0;
   function windowControl(act) {
     const body = document.body;
+    const now = Date.now();
+    if (act === "maximize" && now - lastWindowAction < 350) return;
+    lastWindowAction = now;
+    if (act === "minimize" && body.classList.contains("app-min")) return;
+    if (act === "close" && body.classList.contains("app-closed")) return;
+    if (act === "restore" && !body.classList.contains("app-min") && !body.classList.contains("app-closed") && !native) return;
     if (act === "minimize") {
       if (native) {
-        window.runlet.windowControl("minimize");
+        window.runlet?.windowControl?.("minimize");
         return;
       }
       body.classList.add("app-min");
@@ -50375,27 +50385,31 @@ ${p.map((x2, i4) => `  --brand-${i4 + 1}: ${x2};`).join("\n")}
       toast("\u041E\u043A\u043D\u043E \u0441\u0432\u0451\u0440\u043D\u0443\u0442\u043E \u2014 \u043D\u0430\u0436\u043C\u0438\u0442\u0435 Runlet \u0432 \u043F\u0430\u043D\u0435\u043B\u0438 \u0437\u0430\u0434\u0430\u0447", "info");
     } else if (act === "maximize") {
       if (native) {
-        window.runlet.windowControl("maximize");
+        window.runlet?.windowControl?.("maximize");
         return;
       }
       body.classList.toggle("app-max");
       body.classList.remove("app-min", "app-closed");
     } else if (act === "close") {
       if (native) {
-        window.runlet.windowControl("close");
+        window.runlet?.windowControl?.("close");
         return;
       }
       body.classList.add("app-closed");
       body.classList.remove("app-min");
     } else if (act === "restore") {
+      if (native) {
+        window.runlet?.windowControl?.("restore");
+        return;
+      }
       body.classList.remove("app-min", "app-closed");
-    }
+    } else return;
     emit("appwindow:changed", act);
   }
   function initAppWindow() {
-    native = !!(window.runlet?.isElectron && state.settings.nativeFrame);
+    native = !!window.runlet?.isElectron;
     const body = document.body;
-    body.classList.toggle("native-frame", native);
+    body.classList.toggle("native-frame", native && !!state.settings.nativeFrame);
     body.classList.toggle("windowed-app", !native && !!state.settings.appWindowed);
     const host2 = $("#winControls");
     if (host2) {
@@ -50445,7 +50459,7 @@ ${p.map((x2, i4) => `  --brand-${i4 + 1}: ${x2};`).join("\n")}
   function setAppWindowed(v) {
     state.settings.appWindowed = !!v;
     document.body.classList.toggle("windowed-app", !native && !!v);
-    emit("settings:changed");
+    applySettings();
     return state.settings.appWindowed;
   }
   function refreshZoomLabel() {
@@ -51166,22 +51180,28 @@ frame();
   function isWindowed() {
     return windowed;
   }
+  var toggling = false;
   function toggleWindowedMode() {
-    windowed = !windowed;
-    $("#app")?.classList.toggle("windowed-mode", windowed);
-    if (windowed) {
-      const live = ctx.liveStatus?.();
-      openSiteWindow(live?.running ? live.url : null, ctx.srcdoc?.());
-      ctx.openThreeStage?.();
-      const cons = $("#consolePanel");
-      if (cons) movePanelWindow(cons, { id: "win-console", title: "\u041A\u043E\u043D\u0441\u043E\u043B\u044C", icon: "terminal", width: 620, height: 360 });
-    } else {
-      for (const id2 of ["site", "win-console"]) closeWindow(id2);
+    if (toggling) return windowed;
+    toggling = true;
+    try {
+      windowed = !windowed;
+      $("#app")?.classList.toggle("windowed-mode", windowed);
+      if (windowed) {
+        const live = ctx.liveStatus?.();
+        openSiteWindow(live?.running ? live.url : null, ctx.srcdoc?.());
+        const cons = $("#consolePanel");
+        if (cons) movePanelWindow(cons, { id: "win-console", title: "\u041A\u043E\u043D\u0441\u043E\u043B\u044C", icon: "terminal", width: 620, height: 360 });
+      } else {
+        for (const id2 of ["site", "win-console"]) closeWindow(id2);
+      }
+      state.settings.windowedMode = windowed;
+      ctx.applySettings?.();
+      emit("windows:changed");
+      return windowed;
+    } finally {
+      toggling = false;
     }
-    state.settings.windowedMode = windowed;
-    ctx.applySettings?.();
-    emit("windows:changed");
-    return windowed;
   }
   function initWindows() {
     ensureLayer();
@@ -51749,7 +51769,11 @@ frame();
             const k = inp.dataset.set;
             const v = inp.type === "checkbox" ? inp.checked : inp.type === "number" ? +inp.value : inp.value;
             state.settings[k] = v;
-            if (k === "appWindowed") setAppWindowed(v);
+            if (k === "appWindowed") {
+              setAppWindowed(v);
+              refreshZoomLabel();
+              return;
+            }
             if (k === "nativeFrame") ctx.setNativeFrame?.(v);
             applySettings();
             refreshZoomLabel();
@@ -53210,6 +53234,14 @@ POST /api/run</pre>`,
       sandboxPermissions: { ...base2.sandboxPermissions, ...saved.sandboxPermissions || {} },
       keybindings: { ...base2.keybindings, ...saved.keybindings || {} }
     };
+    if (window.runlet?.frameStatus) {
+      try {
+        const st = await window.runlet.frameStatus();
+        if (st && typeof st.frame === "boolean") state.settings.nativeFrame = st.frame;
+      } catch (_) {
+      }
+    }
+    state.settings.windowedMode = false;
     initProjects();
     initEditors();
     initPreview();
@@ -53227,8 +53259,6 @@ POST /api/run</pre>`,
     initAppWindow();
     hydrateIcons();
     refreshZoomLabel();
-    if (window.runlet?.setFrame && !state.settings.nativeFrame) window.runlet.setFrame(false);
-    if (state.settings.windowedMode && !state.settings.showLauncher) setTimeout(() => toggleWindowedMode(), 900);
     applyEditorSettings();
     applyLayout(state.layout);
     applyDevice();

@@ -489,7 +489,7 @@ export function settingsModal(tab = 'editor') {
           const k = inp.dataset.set;
           const v = inp.type === 'checkbox' ? inp.checked : (inp.type === 'number' ? +inp.value : inp.value);
           state.settings[k] = v;
-          if (k === 'appWindowed') setAppWindowed(v);
+          if (k === 'appWindowed') { setAppWindowed(v); refreshZoomLabel(); return; } // already persists
           if (k === 'nativeFrame') ctx.setNativeFrame?.(v);
           applySettings(); refreshZoomLabel();
         }));

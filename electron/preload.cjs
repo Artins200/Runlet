@@ -5,7 +5,7 @@ const { contextBridge, ipcRenderer } = require('electron');
 // before it ever reaches ipcRenderer.invoke.
 const CHANNELS = new Set([
   'analyze', 'app:info', 'fs:open', 'fs:save', 'fs:read', 'fs:write',
-  'win:control', 'win:frame', 'shell:open', 'python:check', 'preview:popout',
+  'win:control', 'win:frame', 'win:frameStatus', 'shell:open', 'python:check', 'preview:popout',
   'live:start', 'live:update', 'live:stop', 'live:status', 'live:external',
   'fs:openFolder', 'fs:saveProject'
 ]);
@@ -42,7 +42,7 @@ const api = {
     return ipcRenderer.invoke(channel, ...args);
   },
   windowControl: action =>
-    ['minimize', 'maximize', 'close'].includes(action) ? ipcRenderer.invoke('win:control', action) : Promise.resolve(false),
+    ['minimize', 'maximize', 'restore', 'close'].includes(action) ? ipcRenderer.invoke('win:control', action) : Promise.resolve(false),
   openFile: () => ipcRenderer.invoke('fs:open'),
   saveFile: (name, content) => {
     const c = str(content);
@@ -65,6 +65,7 @@ const api = {
     if (!files || typeof files !== 'object' || Array.isArray(files)) return Promise.resolve({ ok: false });
     return ipcRenderer.invoke('fs:saveProject', files);
   },
+  frameStatus: () => ipcRenderer.invoke('win:frameStatus'),
   setFrame: useFrame => ipcRenderer.invoke('win:frame', !!useFrame),
   liveStart: payload => {
     if (!payload || typeof payload !== 'object' || !payload.project || !payload.project.files) return Promise.resolve({ ok: false, error: 'bad payload' });
