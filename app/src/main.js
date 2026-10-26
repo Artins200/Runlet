@@ -1,7 +1,7 @@
 /* Runlet bootstrap. Works both inside Electron and as a standalone web app. */
 import { state, ctx, on, emit, $, $$, toast, debounce, registerCommand, DEFAULT_SETTINGS,
          runCommand, commands } from './core/core.js';
-import { initStorage, startAutoSave, persistNow, projectJSON, listFiles, read, write, exists } from './core/state.js';
+import { initStorage, startAutoSave, persistNow, projectJSON, listFiles, read, write, exists, sanitizeSettings } from './core/state.js';
 import { initEditors, applyEditorSettings, setPaneFile, goto, getDoc, setDoc, focusPane } from './core/editor.js';
 import { initPreview, run, applyDevice, refreshInspectors, send } from './core/preview.js';
 import { initFiles, renderTree, openFile, renderLibs, renderAssets } from './core/files.js';
@@ -27,7 +27,13 @@ async function boot() {
   });
 
   const restored = await initStorage();
-  state.settings = { ...JSON.parse(JSON.stringify(DEFAULT_SETTINGS)), ...state.settings };
+  const base = JSON.parse(JSON.stringify(DEFAULT_SETTINGS));
+  const saved = sanitizeSettings(state.settings);
+  state.settings = {
+    ...base, ...saved,
+    sandboxPermissions: { ...base.sandboxPermissions, ...(saved.sandboxPermissions || {}) },
+    keybindings: { ...base.keybindings, ...(saved.keybindings || {}) }
+  };
 
   initEditors();
   initPreview();
@@ -108,7 +114,16 @@ function initCollaboration() {
       emit('collab:presence', state.collabPeers);
     } else if (m.type === 'chat') {
       const chat = window.__collabChat;
-      if (chat) chat.innerHTML += `<div><b>${(m.data?.name || 'Участник')}:</b> ${(m.data?.text || '').replace(/[<>&]/g, '')}</div>`;
+      if (chat) {
+        const row = document.createElement('div');
+        const who = document.createElement('b');
+        who.textContent = String(m.data?.name || 'Участник').slice(0, 60) + ': ';
+        row.appendChild(who);
+        row.appendChild(document.createTextNode(String(m.data?.text || '').slice(0, 500)));
+        chat.appendChild(row);
+        while (chat.children.length > 200) chat.removeChild(chat.firstChild);
+        chat.scrollTop = chat.scrollHeight;
+      }
       toast(`${m.data?.name || 'Соавтор'}: ${(m.data?.text || '').slice(0, 60)}`, 'info', 'Чат');
     }
   };
@@ -164,7 +179,13 @@ window.addEventListener('error', e => {
 });
 boot().catch(e => {
   console.error(e);
-  document.body.innerHTML = `<div style="padding:40px;font:16px system-ui;color:#fff;background:#111;height:100vh">
-    <h1>Runlet: ошибка запуска</h1><pre style="white-space:pre-wrap;color:#ff8">${String(e.stack || e)}</pre>
-    <p>Попробуйте перезапустить приложение или сбросить настройки.</p></div>`;
+  const box = document.createElement('div');
+  box.style.cssText = 'padding:40px;font:16px system-ui;color:#fff;background:#111;height:100vh';
+  const h = document.createElement('h1'); h.textContent = 'Runlet: ошибка запуска';
+  const pre = document.createElement('pre');
+  pre.style.cssText = 'white-space:pre-wrap;color:#ff8';
+  pre.textContent = String(e.stack || e).slice(0, 4000);
+  const p = document.createElement('p'); p.textContent = 'Попробуйте перезапустить приложение или сбросить настройки.';
+  box.append(h, pre, p);
+  document.body.replaceChildren(box);
 });

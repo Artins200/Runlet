@@ -8,8 +8,15 @@ function bridgeMain() {
   var fid = cfg.fid || 'rl';
   var files = cfg.files || {};
   var bp = cfg.breakpoints || {};
+  var sentWindow = 0, sentCount = 0;
   var send = function (type, data) {
-    try { parent.postMessage({ __runlet: true, fid: fid, type: type, data: data }, '*'); } catch (e) { }
+    try {
+      // Flood guard: a malicious while(true){console.log()} must not freeze the editor.
+      var now = Date.now();
+      if (now - sentWindow > 1000) { sentWindow = now; sentCount = 0; }
+      if (++sentCount > 400) return;
+      parent.postMessage({ __runlet: true, fid: fid, type: type, data: data }, '*');
+    } catch (e) { }
   };
   var MAX = 30;
   function ser(v, depth) {
@@ -96,6 +103,14 @@ function bridgeMain() {
   window.confirm = function (msg) { send('alert', { text: 'confirm(): ' + String(msg) + ' (вернулось false)', level: 'warn' }); return false; };
   window.prompt = function (msg, def) { send('alert', { text: 'prompt(): ' + String(msg), level: 'warn' }); return def || null; };
   window.print = function () { send('alert', { text: 'print() перехвачен', level: 'info' }); };
+  // Never let previewed code open real windows (phishing / opener attacks).
+  try {
+    window.open = function (url) {
+      send('alert', { text: 'window.open заблокирован песочницей: ' + String(url || '').slice(0, 120), level: 'warn' });
+      return null;
+    };
+  } catch (e) { }
+  try { window.close = function () { send('alert', { text: 'window.close заблокирован', level: 'info' }); }; } catch (e) { }
 
   /* ── isolated storage shim (opaque sandbox origin) ────────────── */
   function Shim() { this._d = {}; }
@@ -363,12 +378,15 @@ function bridgeMain() {
   /* ── commands from the editor ─────────────────────────────────── */
   window.addEventListener('message', function (e) {
     var d = e.data;
-    if (!d || !d.__rlcmd) return;
-    var p = d.data || {};
+    if (!d || d.__rlcmd !== true || d.fid !== fid) return;       // only OUR editor
+    if (typeof d.type !== 'string' || d.type.length > 48) return;
+    if (!d.data || typeof d.data !== 'object') return;
+    var p = d.data;
     switch (d.type) {
       case 'eval': {
         var result, error = '';
-        try { result = (0, eval)(p.expr); } catch (err) { error = String(err); }
+        if (typeof p.expr !== 'string' || p.expr.length > 20000) { error = 'expression too long'; }
+        else { try { result = (0, eval)(p.expr); } catch (err) { error = String(err); } }
         send('eval-result', { id: p.id, value: ser(result), error: error });
         break;
       }
@@ -376,18 +394,20 @@ function bridgeMain() {
         var safeFile = String(p.file).replace(/["\\]/g, '\\$&');
         var style = document.querySelector('style[data-runlet="' + safeFile + '"]');
         if (!style) { var s = document.createElement('style'); s.setAttribute('data-runlet', p.file); document.head.appendChild(s); style = s; }
-        style.textContent = p.css;
+        style.textContent = typeof p.css === 'string' ? p.css.slice(0, 2000000) : '';
         send('alert', { text: 'CSS обновлён без перезагрузки', level: 'ok' });
         break;
       }
       case 'hotjs': {
+        if (typeof p.code !== 'string' || p.code.length > 2000000) { send('error', { text: 'Hot reload: код слишком большой', line: 0, stack: '' }); break; }
         try { (0, eval)(p.code); send('alert', { text: 'JS перезапущен без перезагрузки', level: 'ok' }); }
         catch (err) { send('error', { text: 'Hot reload: ' + err.message, line: 0, stack: err.stack || '' }); }
         break;
       }
-      case 'highlight': highlightEl(p.selector); break;
-      case 'getDOM': send('dom', { tree: domTree(document.documentElement, 0, p.depth || 5) }); break;
+      case 'highlight': highlightEl(typeof p.selector === 'string' ? p.selector.slice(0, 300) : ''); break;
+      case 'getDOM': send('dom', { tree: domTree(document.documentElement, 0, Math.min(6, Math.max(1, +p.depth || 5))) }); break;
       case 'getStyles': {
+        if (typeof p.selector !== 'string' || p.selector.length > 300) break;
         var el = null; try { el = document.querySelector(p.selector); } catch (e2) { }
         send('styles', { selector: p.selector, styles: el ? computedStyles(el) : {}, html: el ? el.outerHTML.slice(0, 600) : '' });
         break;

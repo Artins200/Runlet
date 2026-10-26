@@ -209,6 +209,15 @@ GLOSSARY = [
     ("alt", "текстовая замена картинки: её читают скринридеры и показывают, если картинка не загрузилась."),
 ]
 
+# -- resource limits: untrusted jobs arrive over IPC / localhost HTTP --
+MAX_FILES = 200
+MAX_FILE_CHARS = 2 * 1024 * 1024
+MAX_TOTAL_CHARS = 4 * 1024 * 1024
+MAX_JOB_CHARS = 8 * 1024 * 1024
+MAX_DIAGNOSTICS = 400
+MAX_LINKS = 300
+MAX_FUNCTIONS = 120
+
 TEXT_EXT = (".html", ".htm", ".css", ".js", ".mjs", ".cjs", ".json", ".ts",
             ".jsx", ".tsx", ".scss", ".sass", ".less", ".md", ".svg", ".txt",
             ".xml", ".vue", ".pug", ".map")
@@ -1120,6 +1129,13 @@ def analyse_js(code, file, add, info, offset=0, html_info=None):
     toks, masked = js_tokens(code)
     check_js_balance(toks, code, file, add, offset)
     lines = masked.split("\n")
+    # Whole-file flags computed ONCE instead of rescanning masked per line.
+    has_clear_interval = "clearInterval" in masked
+    has_try = bool(re.search(r"\btry\b", masked))
+    has_catch = ".catch" in masked
+    has_async = bool(re.search(r"\basync\b", masked))
+    has_break = bool(re.search(r"\bbreak\b", masked))
+    has_function = bool(re.search(r"\bfunction\b|=>|\{", masked))
     for k, v in {"functions": [], "events": [], "network": [], "timers": [],
                  "storage": [], "dom_writes": [], "selectors": [],
                  "imports": [], "globals_used": [], "loops": 0, "tries": 0,
@@ -1241,7 +1257,7 @@ def analyse_js(code, file, add, info, offset=0, html_info=None):
         if re.search(r"\bparseInt\s*\([^,)]*\)", ln):
             add("JS035", "hint", file, L, "parseInt без второго аргумента (radix=10).",
                 cat="style", fix="Добавьте , 10.")
-        if re.search(r"\bwhile\s*\(\s*true\s*\)", ln) and not re.search(r"\bbreak\b", masked):
+        if re.search(r"\bwhile\s*\(\s*true\s*\)", ln) and not has_break:
             add("JS036", "warning", file, L,
                 "while(true) без break — страница зависнет.", cat="perf")
         if re.search(r"for\s*\([^;]*;[^;]*<=\s*[\w.]+\.length\s*;", ln):
@@ -1249,23 +1265,23 @@ def analyse_js(code, file, add, info, offset=0, html_info=None):
                 "Выход за границу массива: i <= arr.length даст undefined на последней итерации.",
                 cat="correctness", fix="Используйте i < arr.length.",
                 edit={"kind": "replace", "find": "<=", "replace": "<"})
-        if re.search(r"setInterval\s*\(", ln) and "clearInterval" not in masked:
+        if re.search(r"setInterval\s*\(", ln) and not has_clear_interval:
             add("JS038", "hint", file, L,
                 "setInterval без clearInterval — таймер будет работать вечно.",
                 cat="perf")
-        if re.search(r"JSON\.parse\s*\(", ln) and "try" not in masked:
+        if re.search(r"JSON\.parse\s*\(", ln) and not (has_try or has_catch):
             add("JS039", "warning", file, L,
                 "JSON.parse без try/catch — невалидный JSON уронит скрипт.",
                 cat="correctness", fix="Оберните в try/catch.")
-        if re.search(r"\bfetch\s*\(", ln) and not re.search(r"\.catch|try\s*\{|try\b", masked):
+        if re.search(r"\bfetch\s*\(", ln) and not (has_try or has_catch):
             add("JS040", "warning", file, L,
                 "fetch без обработки ошибки — при обрыве сети будет необработанное исключение.",
                 cat="correctness", fix="Добавьте .catch() или try/catch вокруг await.")
-        if re.search(r"\bawait\b", ln) and not re.search(r"\basync\b", masked):
+        if re.search(r"\bawait\b", ln) and not has_async:
             add("JS041", "error", file, L,
                 "await использован вне async-функции — будет SyntaxError.",
                 cat="correctness", fix="Добавьте async к функции или используйте .then().")
-        if re.search(r"^\s*return\b", ln) and not re.search(r"(function|=>|\{)", "\n".join(lines[:i - 1])[-400:]):
+        if re.search(r"^\s*return\b", ln) and not has_function:
             add("JS042", "error", file, L,
                 "return вне функции — так писать нельзя.", cat="correctness")
         if re.search(r"console\.log\s*\(", ln):
@@ -1493,7 +1509,7 @@ def build_links(files, info, add):
                               re.search(r"\.(php|asp|aspx|cgi|do)$", p))
             if not p.startswith(("http", "data:")) and not looks_like_api:
                 add_link(file, line_of(code, m.start()), p, "fetch")
-    info["links"] = links
+    info["links"] = links[:MAX_LINKS]
 
 
 # ---------------------------------------------------------------------------
@@ -1713,17 +1729,33 @@ def markdown_report(job, report):
 
 def analyse(job):
     t0 = time.time()
-    files = job.get("files") or {}
-    files = {k: v for k, v in files.items()
-             if isinstance(v, str) and k.lower().endswith(TEXT_EXT)}
+    if not isinstance(job, dict):
+        return {"ok": False, "error": "job must be a JSON object"}
+    raw_files = job.get("files") or {}
+    if not isinstance(raw_files, dict):
+        raw_files = {}
+    files, total = {}, 0
+    for name, content in list(raw_files.items())[:MAX_FILES]:
+        if not isinstance(name, str) or not isinstance(content, str):
+            continue
+        if len(name) > 300 or "\0" in name or "\\" in name or ".." in name.split("/"):
+            continue
+        if not name.lower().endswith(TEXT_EXT) or len(content) > MAX_FILE_CHARS:
+            continue
+        total += len(content)
+        if total > MAX_TOTAL_CHARS:
+            break
+        files[name] = content
     add = Collector()
     info = {"functions": [], "inline": [], "css": {}, "js": {}, "html": {},
             "links": [], "_refs": {}, "ids": {}, "classes": set(),
             "tags_set": set(), "headings": [], "css_imports": []}
 
     html_files = [f for f in files if f.lower().endswith((".html", ".htm"))]
-    entry = job.get("entry") or ("index.html" if "index.html" in files else
-                                 (html_files[0] if html_files else None))
+    _entry = job.get("entry")
+    entry = _entry if isinstance(_entry, str) and len(_entry) <= 300 else None
+    entry = entry or ("index.html" if "index.html" in files else
+                      (html_files[0] if html_files else None))
     info["entry"] = entry or "index.html"
     main_html = files.get(entry, "") if entry else ""
     info["html_code"] = main_html
@@ -1764,7 +1796,9 @@ def analyse(job):
 
     diags = sorted(add.items, key=lambda d: (
         {"error": 0, "warning": 1, "info": 2, "hint": 3}.get(d["sev"], 4),
-        d["file"], d["line"]))
+        d["file"], d["line"]))[:MAX_DIAGNOSTICS]
+    info["functions"] = info["functions"][:MAX_FUNCTIONS]
+    info["links"] = info["links"][:MAX_LINKS]
     score, grades = compute_score(diags, info)
     summary = build_narrative(files, info, diags, grades)
     J, C, H = info.get("js", {}), info.get("css", {}), info.get("html", {})
@@ -1880,6 +1914,8 @@ def main():
             if not raw:
                 continue
             try:
+                if len(raw) > MAX_JOB_CHARS:
+                    raise ValueError("job too large")
                 job = json.loads(raw)
                 rep = analyse(job)
             except Exception as e:  # keep the server alive
@@ -1887,8 +1923,10 @@ def main():
             sys.stdout.write(json.dumps(rep, ensure_ascii=False) + "\n")
             sys.stdout.flush()
         return
-    raw = sys.stdin.read()
+    raw = sys.stdin.read(MAX_JOB_CHARS + 1)
     try:
+        if len(raw) > MAX_JOB_CHARS:
+            raise ValueError("job too large")
         job = json.loads(raw or "{}")
         rep = analyse(job)
     except Exception as e:

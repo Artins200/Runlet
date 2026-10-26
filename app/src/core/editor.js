@@ -36,6 +36,7 @@ import { HTML_TAGS, HTML_ATTRS, CSS_PROPS, CSS_VALUES, CSS_FUNCTIONS, JS_COMPLET
 export const editors = {};
 const langComp = {};
 const prefComp = {};
+const readComp = {};
 const internal = { html: false, css: false, js: false };
 const PANES = ['html', 'css', 'js'];
 
@@ -334,6 +335,7 @@ export function initEditors() {
     if (!host) continue;
     langComp[pane] = new Compartment();
     prefComp[pane] = new Compartment();
+    readComp[pane] = new Compartment();
     const path = state.panes[pane] || '';
     const view = new EditorView({
       state: EditorState.create({
@@ -349,6 +351,7 @@ export function initEditors() {
           hover, colorPlugin, cmTheme,
           langComp[pane].of(languageFor(pane, path)),
           prefComp[pane].of(prefExtensions()),
+          readComp[pane].of(readOnlyExtensions()),
           EditorState.allowMultipleSelections.of(true),
           EditorState.tabSize.of(state.settings.tabSize),
           keymap.of([
@@ -360,7 +363,7 @@ export function initEditors() {
             if (u.docChanged && !internal[pane]) {
               const content = u.state.doc.toString();
               if (state.readOnly) { /* read-only share mode: visual only */ }
-              else write(p, content, { fromPane: pane });
+              else write(p, content, { fromPane: pane, quiet: true });
               updateMinimap(pane);
             }
             if (u.docChanged || u.selectionSet || u.focusChanged) updateCursor(pane, u.view);
@@ -391,11 +394,22 @@ export function initEditors() {
     }
   });
   on('settings:changed', applyEditorSettings);
+  on('readOnly:changed', v => setEditorsReadOnly(v));
   on('analysis:report', () => { for (const p of PANES) if (editors[p]) forceLinting(editors[p]); });
   on('pane:goto', ({ pane, line, col }) => goto(pane, line, col));
   on('files:changed', () => { /* status bar */ });
 }
 
+function readOnlyExtensions() {
+  return [EditorState.readOnly.of(!!state.readOnly), EditorView.editable.of(!state.readOnly)];
+}
+export function setEditorsReadOnly(v) {
+  state.readOnly = !!v;
+  for (const pane of PANES) {
+    const view = editors[pane]; if (!view || !readComp[pane]) continue;
+    view.dispatch({ effects: readComp[pane].reconfigure(readOnlyExtensions()) });
+  }
+}
 function prefExtensions() {
   const s = state.settings;
   return [
@@ -419,7 +433,8 @@ export function applyEditorSettings() {
     const view = editors[pane]; if (!view) continue;
     view.dispatch({ effects: [
       prefComp[pane].reconfigure(prefExtensions()),
-      langComp[pane].reconfigure(languageFor(pane, state.panes[pane]))
+      langComp[pane].reconfigure(languageFor(pane, state.panes[pane])),
+      readComp[pane].reconfigure(readOnlyExtensions())
     ] });
     updateMinimap(pane);
     const mm = $(`[data-minimap="${pane}"]`); if (mm) mm.style.display = state.settings.minimap ? '' : 'none';

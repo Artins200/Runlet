@@ -10,15 +10,34 @@ let frame, stage, wrap;
 let currentSrcdoc = '';
 let lastHash = { html: '', css: '', js: '' };
 let fid = 0;
+let currentFid = 'rl0';
 let runCount = 0;
 const requests = new Map();
 let reqId = 0;
 let formState = null;
 let measureStart = null;
 
+let lastSandboxValue = null;
+export function applySandbox() {
+  if (!frame) return;
+  const p = state.settings.sandboxPermissions || {};
+  const tokens = ['allow-scripts'];            // never allow-same-origin
+  if (p.forms) tokens.push('allow-forms');
+  if (p.popups) tokens.push('allow-popups');
+  if (p.modals) tokens.push('allow-modals');
+  if (p.downloads) tokens.push('allow-downloads');
+  if (p.pointerLock) tokens.push('allow-pointer-lock');
+  if (p.orientationLock) tokens.push('allow-orientation-lock');
+  const value = tokens.join(' ');
+  const changed = lastSandboxValue !== null && lastSandboxValue !== value;
+  lastSandboxValue = value;
+  frame.setAttribute('sandbox', value);
+  if (changed && currentSrcdoc) run('full');   // sandbox flags apply on navigation
+}
 export function initPreview() {
   frame = $('#previewFrame'); stage = $('#previewStage'); wrap = $('#previewFrameWrap');
   window.addEventListener('message', onFrameMessage);
+  applySandbox();
   frame.addEventListener('load', () => emit('preview:load'));
 
   const dev = $('#deviceSelect');
@@ -64,7 +83,7 @@ export function initPreview() {
     else scheduleRun('full');
   });
   on('project:loaded', () => { lastHash = { html: '', css: '', js: '' }; });
-  on('settings:changed', applyDevice);
+  on('settings:changed', () => { applyDevice(); applySandbox(); });
   on('deps:changed', () => run('full'));
   on('cursor', d => {
     if (d.pane !== 'html' || !state.settings.codeToPreview) return;
@@ -86,13 +105,13 @@ const scheduleHighlight = debounce(line => {
   const text = lines[line - 1] || '';
   const idm = /id=["']([^"']+)["']/.exec(text);
   const sel = idm ? '#' + idm[1] : (/<([\w-]+)/.exec(text) || [])[1];
-  if (sel) send('highlight', { selector: sel });
+  if (sel && sel.length <= 200) send('highlight', { selector: sel });
 }, 420);
 
 /* ── messaging ──────────────────────────────────────────────────── */
 export function send(type, data = {}) {
-  if (!frame?.contentWindow) return;
-  try { frame.contentWindow.postMessage({ __rlcmd: true, type, data }, '*'); } catch (e) { }
+  if (!frame?.contentWindow || typeof type !== 'string' || type.length > 48) return;
+  try { frame.contentWindow.postMessage({ __rlcmd: true, fid: currentFid, type, data }, '*'); } catch (e) { }
 }
 export function request(type, data = {}, timeout = 1500) {
   return new Promise(resolve => {
@@ -103,9 +122,20 @@ export function request(type, data = {}, timeout = 1500) {
   });
 }
 function onFrameMessage(e) {
-  if (!e.data || !e.data.__runlet) return;
+  const msg = e.data;
+  if (!msg || typeof msg !== 'object' || msg.__runlet !== true) return;
+  // Only the CURRENT preview document may talk to us; a stale srcdoc or a
+  // forged message from another frame is dropped. Sandboxed srcdoc has an
+  // opaque origin, so e.origin is the literal string "null".
   if (frame && e.source !== frame.contentWindow) return;
-  const { type, data } = e.data;
+  if (msg.fid !== currentFid || (e.origin !== 'null' && e.origin !== location.origin)) return;
+  if (typeof msg.type !== 'string' || msg.type.length > 48 || !msg.data || typeof msg.data !== 'object') return;
+  let packed;
+  try { packed = JSON.stringify(msg.data); } catch (_) { return; }
+  if (!packed || packed.length > 512000) return;      // flood / zip-bomb guard
+  let data;
+  try { data = JSON.parse(packed); } catch (_) { return; }  // strips prototypes & functions
+  const type = msg.type;
   switch (type) {
     case 'ready':
       state.perf = { ...state.perf, renderMs: data.ms, elements: data.elements };
@@ -123,7 +153,7 @@ function onFrameMessage(e) {
                         line: data.line, source: data.source, time: Date.now(), seq: state.logs.length });
       emit('console:log', { level: 'error', text: data.text });
       emit('preview:error', data);
-      if (runCount > 1) toast(data.text.slice(0, 120), 'err', 'Ошибка в предпросмотре');
+      if (runCount > 1) toast(String(data.text || '').slice(0, 120), 'err', 'Ошибка в предпросмотре');
       break;
     case 'alert':
       if (state.alertsAsToast) toast(String(data.text).slice(0, 220), data.level || 'info', 'Из предпросмотра');
@@ -136,7 +166,7 @@ function onFrameMessage(e) {
       emit('element:select', data);
       if (state.inspectMode) {
         const html = getDoc('html');
-        const idx = html.indexOf(data.html.slice(0, 40));
+        const idx = html.indexOf(String(data.html || '').slice(0, 40));
         if (idx >= 0) goto('html', html.slice(0, idx).split('\n').length);
         else toast(`Выбран <${data.tag}> — ${data.selector}`, 'info', 'Инспектор');
       }
@@ -170,7 +200,7 @@ function showHighlight(sel, data) {
   box.style.width = (r.w || 0) + 'px';
   box.style.height = (r.h || 0) + 'px';
   box.classList.add('show');
-  box.innerHTML = `<span class="hover-label">${esc((data.tag || '').slice(0, 34))} · ${Math.round(r.w || 0)}×${Math.round(r.h || 0)}</span>`;
+  box.innerHTML = `<span class="hover-label">${esc(String(data.tag || '').slice(0, 34))} · ${Math.round(r.w || 0)}×${Math.round(r.h || 0)}</span>`;
   if (sel === '#hoverHighlight') setTimeout(() => box.classList.remove('show'), 900);
 }
 
@@ -465,9 +495,18 @@ function buildSrcdoc() {
   if (/\.md$/i.test(entry)) html = miniMarkdown(html);
 
   // configuration + bridge
+  currentFid = 'rl' + (++fid);
+  const virtualFiles = {};
+  let virtualBytes = 0;
+  for (const [p, f] of Object.entries(files)) {
+    if (/\.(css|js|html?|scss)$/i.test(p) || typeof f.content !== 'string') continue;
+    virtualBytes += f.content.length;
+    if (virtualBytes > 4 * 1024 * 1024) break;
+    virtualFiles[p] = f.content.slice(0, 2 * 1024 * 1024);
+  }
   const cfg = {
-    fid: 'rl' + (++fid),
-    files: Object.fromEntries(Object.entries(files).filter(([p]) => !/\.(css|js|html?|scss)$/i.test(p)).map(([p, f]) => [p, f.content])),
+    fid: currentFid,
+    files: virtualFiles,
     breakpoints: state.breakpoints,
     scheme: $('#optScheme')?.value || 'auto',
     motion: $('#optMotion')?.value || 'no-preference',
@@ -490,8 +529,15 @@ function buildSrcdoc() {
   if (!/^\s*<!doctype/i.test(html)) html = '<!DOCTYPE html>\n' + html;
   return html;
 }
-function escapeScript(code) { return code.replace(/<\/script/gi, '<\\/script'); }
-function jsonForScript(o) { return JSON.stringify(o).replace(/</g, '\\u003c').replace(/<!--/g, '<\\!--'); }
+function escapeScript(code) {
+  return String(code).replace(/<\/script/gi, '<\\/script').replace(/<\/style/gi, '<\\/style');
+}
+function jsonForScript(o) {
+  // < keeps the HTML parser from ever seeing "</script>" in the source,
+  // while the JS string itself still decodes to the original characters.
+  return JSON.stringify(o).replace(/</g, '\\u003c').replace(/>/g, '\\u003e')
+    .replace(/&/g, '\\u0026').replace(/\u2028/g, '\\u2028').replace(/\u2029/g, '\\u2029');
+}
 
 /* ── run / hot swap ─────────────────────────────────────────────── */
 export function run(reason = 'full') {
@@ -516,7 +562,9 @@ export function run(reason = 'full') {
     emit('preview:hotjs');
     return;
   }
-  currentSrcdoc = buildSrcdoc();
+  const next = buildSrcdoc();
+  if (next.length > 8 * 1024 * 1024) { toast('Предпросмотр слишком большой (>8 МБ) — запуск пропущен', 'err'); return; }
+  currentSrcdoc = next;
   lastHash = { html: hash(read(state.entry)), css: hash(listFiles().filter(p => /\.css$/i.test(p)).map(read).join('')), js: hash(getDoc('js')) };
   frame.srcdoc = currentSrcdoc;
   emit('preview:run', { reason, size: currentSrcdoc.length });
@@ -582,9 +630,20 @@ export function toggleInspect() {
 }
 export function previewFullscreen() { $('#previewCard')?.classList.toggle('preview-max'); setTimeout(applyDevice, 80); }
 export function popout() {
+  const html = srcdoc();
+  if (window.runlet?.popout) {
+    // Electron: main process opens an isolated data: window with NO opener,
+    // instead of letting the renderer create a privileged child window.
+    Promise.resolve(window.runlet.popout(html)).then(ok => {
+      if (ok) toast('Предпросмотр открыт в новом окне', 'ok');
+      else toast('Не удалось открыть окно предпросмотра', 'err');
+    }).catch(() => toast('Не удалось открыть окно предпросмотра', 'err'));
+    return;
+  }
   const w = window.open('', 'runlet-preview', 'width=1000,height=760');
   if (!w) { toast('Браузер заблокировал новое окно', 'err'); return; }
-  w.document.open(); w.document.write(srcdoc()); w.document.close();
+  w.opener = null;
+  w.document.open(); w.document.write(html); w.document.close();
   toast('Предпросмотр открыт в новом окне', 'ok');
 }
 export function reload() { send('hotcss', { css: '', file: '' }); run('full'); }

@@ -13,9 +13,12 @@
 ## 🚀 Быстрый старт
 
 ```bash
-npm install           # поставит Electron, CodeMirror 6, esbuild, fflate, jsdom
+npm install           # Electron 45, CodeMirror 6, esbuild, fflate, jsdom
 npm start             # собрать рендерер + запустить десктопное приложение
 ```
+
+Electron стоит в `optionalDependencies`: если бинарник не скачался за прокси,
+выполните `npm install electron@45 --no-save` (или задайте `ELECTRON_MIRROR`).
 
 Нужен **Python 3.8+** (только стандартная библиотека, ничего не надо доустанавливать) —
 это «мозг» анализа. Если Python недоступен, редактор автоматически переключится
@@ -34,10 +37,11 @@ npm run dev                       # то же + пересборка
 npx electron-builder             # config уже лежит в package.json (build)
 ```
 
-Тесты (19 проверок: синтаксис, Python-движок, esbuild, jsdom-запуск UI, 93 команды, iframe-мост):
+Проверка безопасности и тесты (20 групп + 39 security-проверок):
 
 ```bash
-npm test
+npm audit       # 0 уязвимостей
+npm test        # синтаксис, Python-движок, esbuild, jsdom UI, 93 команды, iframe-мост, HTTP-хардненинг
 ```
 
 ---
@@ -217,28 +221,129 @@ Runlet/
 
 ## 🔐 Изоляция предпросмотра
 
-* iframe с `sandbox` **без `allow-same-origin`** → у кода opaque origin: нет доступа к
-  `localStorage`/cookies родителя; вместо этого мост даёт изолированный in-memory shim.
+* iframe с `sandbox` **без `allow-same-origin`** и с минимальными правами
+  (`allow-scripts allow-forms`). `allow-popups`, `allow-modals`, `allow-downloads`,
+  `pointer-lock` по умолчанию **выключены** — включаются только вручную в
+  **Настройки → Предпросмотр → Разрешения sandbox**. `window.open` перехватывается мостом.
+* У кода opaque origin: нет доступа к `localStorage`/cookies родителя; вместо этого мост
+  даёт изолированный in-memory shim.
 * `window.fetch`, XHR, `console.*`, `alert/confirm`, `window.onerror`,
   `unhandledrejection` перехватываются мостом и попадают в панели редактора.
+* Обмен сообщениями принимается только от **текущего** документа: проверяются
+  `e.source`, `e.origin`, одноразовый `fid`, тип и размер payload (защита от подделки
+  сообщений и флуда). Есть лимит 400 сообщений в секунду.
 * Опции: отключить JS, заблокировать внешние ресурсы через CSP, `alert → тост`,
   лимит времени выполнения (предупреждение о долгих задачах).
 * ES-модули, `@import`, `url()`, `fetch()` локальных файлов разрешаются внутри виртуальной ФС.
 
 ---
 
+## 🛡 Аудит безопасности: что было найдено и исправлено
+
+Помимо двух зависимостей из `npm audit`, был проведён аудит собственного кода
+( Electron main/preload, dev-сервер, IPC, рендерер, iframe-мост, шаринг, Python-движок).
+Все находки закрыты; регрессионные проверки вынесены в `scripts/security.mjs`.
+
+### Зависимости (2 high → 0)
+
+| Находка | Исправление |
+| --- | --- |
+| `electron@38.8.6` — 34 GHSA (use-after-free в offscreen paint/shared texture, обход context isolation через `Function.prototype.bind`, `window.open` без наследования sandbox, подмена code-sign checks, чтение локальных файлов через кастомные протоколы и т.д.) | Обновлено до **electron@45.0.0**. `npm audit` → **0 уязвимостей** |
+| `extract-zip@2.0.1` — symlink path traversal / произвольная запись файлов | Electron 45 использует `@electron-internal/extract-zip@1.0.6`; уязвимый пакет больше не в дереве зависимостей |
+
+### Electron main / preload
+
+| Уровень | Проблема | Исправление |
+| --- | --- | --- |
+| Критический | `ipcMain.handle('fs:read')` принимал **любой абсолютный путь** — XSS в рендерере давал чтение `/etc/passwd`, SSH-ключей, токенов | Путь резолвится и проверяется на нахождение внутри `ROOT`, запрещены `..`, `.git`, `node_modules`, `\0`; только текстовые расширения, лимит 4 МБ |
+| Высокий | `fs:write` писал по `path.join(ROOT, file)` — `../` позволял выйти из каталога | Пишет только в `.runlet/workspace/` и только по basename |
+| Высокий | `setWindowOpenHandler` **разрешал** любые не-https URL → новое окно с правами рендерера и доступом к `window.opener` | Все попапы запрещены; предпросмотр открывается отдельным IPC `preview:popout` с изолированным `data:`-окном **без opener** |
+| Высокий | `shell.openExternal` пускал `http:`, `file:`, кастомные схемы, URL с credentials, локальные адреса | Строгий allowlist HTTPS + `mailto:`, без userinfo/raw-IP/private-host, лимит длины |
+| Средний | Не было запрета навигации, webview, permissions | `will-navigate`/`will-redirect` закреплены за `file://…/app/index.html`; `will-attach-webview` → `preventDefault`; `setPermissionRequestHandler` → отказ всем |
+| Средний | `sandbox: false` в `webPreferences` | Включён `sandbox: true`, отключены `nodeIntegration*`, `webSecurity: true`, `allowRunningInsecureContent: false`, `enableWebSQL: false` |
+| Средний | REST API на `127.0.0.1:7788` с `Access-Control-Allow-Origin: *` и без авторизации — любая вкладка браузера могла читать/перезаписывать проект и дёргать `/api/run` | Убран wildcard CORS; добавлен **random 256-битный токен** (`timingSafeEqual`), проверка `Host` против DNS-rebinding, проверка `Origin`, требование `Content-Type: application/json`, лимит тела и rate-limit. Токен лежит в `userData/api-token` (0600); CLI читает его автоматически |
+| Низкий | В allowlist preload были несуществующие каналы `fs:list`, `project:export` | Удалены; все аргументы IPC валидируются по типу/размеру; объект API заморожен |
+
+### Dev-сервер (веб-версия)
+
+* Удалён `Access-Control-Allow-Origin: *` и разрешающий `OPTIONS`; добавлены
+  `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer`,
+  `Cross-Origin-Resource-Policy: same-origin`, CSP и `Cache-Control: no-store`.
+* `/api/analyze`, `/api/project`, `/api/files`, `/api/run` требуют токен, который
+  сервер внедряет в `index.html` (`meta[name=runlet-api-token]`) — чужая страница
+  не может его прочитать из-за SOP. Есть проверка `Origin === Host`, лимит тела 4 МБ,
+  rate-limit 90 запросов/мин и валидация структуры job.
+* Статика отдаётся по **allowlist** (`app/dist`, `public`, `app/index.html`):
+  `analysis/engine.py`, `package.json`, `.runlet/*`, `.git/*`, исходники больше не доступны.
+* Service Worker кэширует HTML **без токена** и всегда делает network-first для shell.
+
+### Рендерер / XSS / выполнение кода
+
+* **Плагины по URL** выполнялись через `new Function(...)` прямо в рендерере — плагин
+  получал доступ к `window`, `document`, `fetch` и `window.runlet.invoke('fs:read')`.
+  Теперь код выполняется в отдельном **sandboxed iframe** (`sandbox="allow-scripts"`,
+  CSP `connect-src 'none'`, opaque origin) и общается с редактором только через
+  проверенный `postMessage`-API с allowlist методов и декларативных команд.
+* **Калькулятор** использовал `Function('return (' + expr + ')')()` → заменён на
+  `safeCalc()`: разбор через `acorn` и вычисление только числовых AST-узлов
+  (нет доступа к глобалам, `fetch`, `window`).
+* Закрыты XSS-синки: пользовательские строки в `style="color:…"`, генераторах
+  SEO/Schema.org, `alt=`, `embed`-коде, именах новых файлов, чате коллаборации
+  и документации — экранирование + валидация цветов/чисел/путей.
+* `jsonForScript` экранирует `<`, `>`, `&`, U+2028/U+2029 (защита от выхода из
+  `<script>`); `escapeScript` — `</script>`/`</style>`; в `srcdoc` добавлен лимит 8 МБ.
+* Импорт настроек/проекта и ссылки-шаринга: allowlist ключей, защита от
+  `__proto__`/`constructor`/`prototype`, нормализация типов, санитайз акцентного цвета.
+* **Path traversal / zip-slip:** все имена виртуальных файлов проходят через
+  `safePathKey()` — запрещены `..`, абсолютные пути, `\`, `:` , ` `, служебные ключи.
+  Проверка применяется и к записям из ZIP, загруженным файлам и ссылкам `#p=`.
+
+### Шаринг (ссылки `#p=`)
+
+* `decodeShare` мог разжать zip-бомбу на сотни МБ: добавлены лимит кода ссылки,
+  лимит JSON 4 МБ и **предвыделенный буфер** для `inflateSync` (без аллокации).
+* Пароль раньше просто лежал в открытом JSON и ни на что не влиял: теперь ссылки с
+  паролем реально шифруются **PBKDF2-SHA256 (150 000 итераций) + AES-GCM**,
+  при открытии запрашивается пароль. `readOnly` теперь блокирует редактирование
+  через `EditorState.readOnly` / `EditorView.editable`, а не только игнорирует запись.
+* Импорт по URL разрешает только публичные HTTPS-адреса (без SSRF в локальную сеть),
+  с таймаутом, лимитом размера и `credentials: 'omit'`.
+
+### Python-движок
+
+* Входной job валидируется: ≤200 файлов, ≤2 МБ на файл, ≤4 МБ суммарно, ≤8 МБ на
+  строку в `--server`; отклоняются нестроковые значения, `\0`, `..`, `\` в именах.
+* Ограничено число диагностик/ссылок/функций в отчёте; устранены O(n²) повторные
+  сканы исходника на каждой строке (флаги `try`/`async`/`break` считаются один раз).
+* В движке нет `eval`, `exec`, `subprocess`, `os.system` и записи на диск.
+
+### Ограничения (честно)
+
+* CSP для `srcdoc` вынужденно содержит `'unsafe-inline'`/`'unsafe-eval'` — это нужно,
+  чтобы выполнять код пользователя в предпросмотре; изоляция обеспечивается
+  **sandbox без `allow-same-origin`**, а не CSP.
+* Парольная ссылка защищает содержимое ссылки, но дешифруется на стороне получателя —
+  это клиентское шифрование, а не серверная авторизация.
+* `npm audit` проверяет только известные CVE; регрессионные тесты в
+  `scripts/security.mjs` проверяют описанные выше сценарии атак.
+
+---
+
 ## 🧪 Тесты
 
-`npm test` проверяет 19 вещей, включая:
+`npm test` проверяет 20 групп (включая 39 security-проверок), в том числе:
 
 * компиляцию Python-движка и его selftest-отчёт (нахождение `JS060` — обращение к
   несуществующему селектору);
-* esbuild-сборку и синтаксис всех 26 JS-файлов;
+* esbuild-сборку, синтаксис всех JS-файлов и `npm audit` (0 уязвимостей);
 * то, что все 500 идей на месте, а все кнопки `data-cmd` имеют зарегистрированные команды;
 * запуск всего UI в jsdom (3 редактора, дерево файлов, палитра, Python-отчёт);
 * выполнение 93 команд и диалогов подряд без исключений;
 * валидность всех `<script>` внутри собранного `srcdoc` (инструментация не ломает JS);
-* выполнение моста предпросмотра: `console.log`, REPL `eval`, DOM, storage, tracer.
+* выполнение моста предпросмотра: `console.log`, REPL `eval`, DOM, storage, tracer;
+* отказ API без токена (403), с неверным токеном (403), с чужим `Origin` (403),
+  успешный вызов Python-движка с токеном, 404 на попытки path traversal,
+  фильтрацию опасных ключей в Python-движке, `safeCalc` и round-trip ссылок шаринга.
 
 ---
 

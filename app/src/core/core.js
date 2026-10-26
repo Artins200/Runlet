@@ -11,6 +11,10 @@ export const DEFAULT_SETTINGS = {
   presets: 'balanced', locale: 'ru', firstRun: true,
   pythonEngine: true, hotCss: true, hotJs: true, codeToPreview: true,
   timeLimit: 4000, confirmDelete: true,
+  // Least-privilege sandbox for the preview iframe. Enabling these widens the
+  // attack surface for untrusted/shared projects — keep them off by default.
+  sandboxPermissions: { popups: false, modals: false, downloads: false,
+                        pointerLock: false, orientationLock: false, forms: true },
   keybindings: {
     'run': 'Ctrl+Enter', 'format': 'Ctrl+Shift+F', 'save': 'Ctrl+S',
     'download': 'Ctrl+Shift+S', 'palette': 'Ctrl+Shift+P', 'analyze': 'Ctrl+Shift+A',
@@ -314,8 +318,25 @@ export function applyLocale() {
 }
 
 /* ── theme / appearance ────────────────────────────────────────────── */
+export function safeDataSrc(v) {
+  // Only inert media data: URIs (never data:text/html, javascript:, file:).
+  if (typeof v !== 'string' || v.length > 8 * 1024 * 1024) return '';
+  return /^(data:(image|audio|video|font)\/[a-z0-9.+_-]+[;,]|blob:|https:\/\/)/i.test(v) ? v : '';
+}
+export function sanitizeColor(v, fallback = '#7c6cf6') {
+  // Only simple hex colours are ever allowed into CSS/style attributes.
+  return typeof v === 'string' && /^#(?:[0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$/i.test(v) ? v : fallback;
+}
 export function applyTheme() {
   const s = state.settings;
+  // Settings may come from an imported JSON file — never trust their types.
+  s.accent = sanitizeColor(s.accent);
+  s.fontSize = Math.max(9, Math.min(28, Number(s.fontSize) || 13));
+  s.lineHeight = Math.max(1, Math.min(2.5, Number(s.lineHeight) || 1.6));
+  s.tabSize = Math.max(1, Math.min(8, Math.round(Number(s.tabSize) || 2)));
+  s.theme = ['auto', 'dark', 'light', 'contrast'].includes(s.theme) ? s.theme : 'auto';
+  s.density = ['comfy', 'compact'].includes(s.density) ? s.density : 'comfy';
+  s.fontFamily = ['mono', 'system', 'courier', 'sans'].includes(s.fontFamily) ? s.fontFamily : 'mono';
   let theme = s.theme;
   if (theme === 'auto') theme = matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
   document.documentElement.dataset.theme = theme;
@@ -329,7 +350,7 @@ export function applyTheme() {
     system: 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace',
     courier: '"Courier New", Courier, monospace',
     sans: 'var(--sans)'
-  }[s.fontFamily] || 'monospace';
+  }[s.fontFamily];
   document.documentElement.style.setProperty('--mono', mono);
   const c = $('#accentInput'); if (c) c.value = s.accent;
   emit('theme', theme);

@@ -1,5 +1,5 @@
 /* Inspector panels: analysis, console, debugger, DOM, network, storage, perf, log. */
-import { state, ctx, $, $$, el, esc, on, emit, toast, download, copy, debounce, fmtBytes } from './core.js';
+import { state, ctx, $, $$, el, esc, on, emit, toast, download, copy, debounce, fmtBytes, sanitizeColor } from './core.js';
 import { read, listFiles } from './state.js';
 import { reportMarkdown, reportJSON, gotoDiagnostic, applyFix, fixAllSafe, runAnalysis, scheduleAnalysis } from './analyzer.js';
 import { refreshInspectors, request, send, evalInPreview, setBreakpoint, emulateA11y, screenReader } from './preview.js';
@@ -121,7 +121,10 @@ function chipsHtml(r) {
   for (const n of (b.network || []).slice(0, 4)) chips.push(`<span class="chip">🌐 <b>${esc(n.method || 'fetch')}</b> ${esc(String(n.url).slice(0, 40))}</span>`);
   for (const t of (b.timers || []).slice(0, 3)) chips.push(`<span class="chip">⏱ ${esc(t.kind || 'timer')}</span>`);
   for (const s of (b.storage || []).slice(0, 4)) chips.push(`<span class="chip">💾 <b>${esc(s.store)}</b> ${esc(s.key)}</span>`);
-  for (const c of (b.colors || []).slice(0, 6)) chips.push(`<span class="chip">🎨 <b style="color:${esc(c.value)}">■</b> ${esc(c.value)}</span>`);
+  for (const c of (b.colors || []).slice(0, 6)) {
+    const col = sanitizeColor(c.value, 'transparent');
+    chips.push(`<span class="chip">🎨 <b style="color:${col}">■</b> ${esc(String(c.value).slice(0, 40))}</span>`);
+  }
   if (!chips.length) return '';
   return `<div class="section"><h3>Поведение кода</h3><div class="chips">${chips.join('')}</div></div>`;
 }

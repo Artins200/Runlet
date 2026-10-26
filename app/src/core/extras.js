@@ -3,7 +3,8 @@ import { state, ctx, $, el, esc, on, emit, toast, copy, download, debounce } fro
 import { LESSONS, QUIZZES, RECIPES, PLUGIN_CATALOG, FEATURES, IMPLEMENTED, PARTIAL_SET, coverage } from './data.js';
 import { getDoc, setDoc, insertText } from './editor.js';
 import { runAnalysis } from './analyzer.js';
-import { paletteFrom, unitConvert, specificity, randomColor } from './tools.js';
+import { write } from './state.js';
+import { paletteFrom, unitConvert, specificity, randomColor, safeCalc } from './tools.js';
 
 /* ══════════════════ learning ══════════════════ */
 export function initLearn() {
@@ -202,30 +203,153 @@ export function renderPlugins() {
   }
   host.querySelector('#plugUrl').onclick = () => ctx.modal({
     title: 'Установить плагин по ссылке',
-    body: `<div class="field"><label>URL JS-файла</label><input id="plugSrc" placeholder="https://example.com/plugin.js"></div>
-      <p class="muted" style="font-size:11px">Код выполняется в песочнице: доступен только Runlet.pluginAPI.</p>`,
+    body: `<div class="field"><label>URL JS-файла (только HTTPS)</label><input id="plugSrc" placeholder="https://example.com/plugin.js"></div>
+      <div class="beginner">⚠ Сторонний код выполняется в отдельном sandboxed iframe без доступа к DOM редактора, файлам ОС и сети. Разрешены только явно описанные команды.</div>`,
     okText: 'Установить',
     onOk: async root => {
       const url = root.querySelector('#plugSrc').value.trim(); if (!url) return false;
+      let u;
+      try { u = new URL(url); } catch (_) { toast('Некорректный URL', 'err'); return false; }
+      if (u.protocol !== 'https:' || u.username || u.password || url.length > 2000) {
+        toast('Разрешены только HTTPS-ссылки без логина/пароля', 'err'); return false;
+      }
       try {
-        const code = await (await fetch(url)).text();
-        installPluginCode(code, url);
+        const res = await fetch(u.href, { credentials: 'omit', referrerPolicy: 'no-referrer' });
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const code = await res.text();
+        if (code.length > 200000) throw new Error('файл плагина слишком большой (>200 КБ)');
+        installPluginCode(code, u.hostname);
       } catch (e) { toast('Не удалось загрузить плагин: ' + e.message, 'err'); }
     }
   });
 }
+/* Commands a remote plugin is allowed to expose as a menu entry. */
+const PLUGIN_SAFE_COMMANDS = new Set([
+  'run', 'analyze', 'format', 'save', 'theme', 'density', 'palette', 'snippets',
+  'cssLab', 'jsTools', 'htmlTools', 'colorTool', 'contrastTool', 'tour', 'learn',
+  'features', 'plugins', 'librarySearch', 'consoleClear', 'refreshInspectors',
+  'breakpoint', 'rotateDevice', 'toggleGrid', 'previewFullscreen', 'bundleSize',
+  'perfTips', 'lighthouse', 'a11yReport', 'screenReader'
+]);
+const PLUGIN_SAFE_METHODS = new Set([
+  'toast', 'log', 'emit', 'insertText', 'setDoc', 'getDoc', 'analyze',
+  'runCommand', 'readFile', 'writeFile'
+]);
+
+/** Remote plugin code runs in a separate sandboxed iframe (opaque origin,
+ *  CSP connect-src 'none'). It can only call a curated, validated message API. */
 export function installPluginCode(code, name = 'custom') {
-  try {
-    const sandbox = new Function('api', 'console', 'window', 'document', 'fetch', `"use strict";\n${code}\nreturn (typeof register === 'function') ? register(api) : (typeof module !== 'undefined' && module.exports) || null;`);
-    const result = sandbox(pluginAPI, { log: (...a) => toast(a.join(' '), 'info') }, undefined, undefined, undefined);
-    if (result && typeof result === 'object') {
-      if (result.commands) for (const [id, def] of Object.entries(result.commands)) ctx.registerCommand?.(id, def);
-      if (result.name) state.plugins.push(result.name);
+  if (typeof code !== 'string' || !code.trim() || code.length > 200000 || code.includes('\0')) {
+    toast('Некорректный код плагина', 'err'); return false;
+  }
+  const nonce = Math.random().toString(36).slice(2) + Date.now().toString(36);
+  const iframe = document.createElement('iframe');
+  iframe.setAttribute('sandbox', 'allow-scripts');   // NO allow-same-origin
+  iframe.setAttribute('aria-hidden', 'true');
+  iframe.style.cssText = 'position:fixed;left:-9999px;width:1px;height:1px;border:0;opacity:0';
+
+  const cfg = {
+    nonce,
+    code,
+    files: Object.keys(state.files).slice(0, 100).map(p => String(p).slice(0, 200)),
+    projectName: String(state.projectName).slice(0, 100),
+    methods: [...PLUGIN_SAFE_METHODS],
+    safeCommands: [...PLUGIN_SAFE_COMMANDS]
+  };
+  const shim = `(function(){
+    var C = window.__PLUGIN_CFG__;
+    var post = function(m){ try { parent.postMessage(Object.assign({__plugin:1, nonce:C.nonce}, m), '*'); } catch(e){} };
+    var api = {};
+    C.methods.forEach(function(m){ api[m] = function(){
+      var args = [].slice.call(arguments).slice(0, 4).map(function(a){
+        if (typeof a === 'string') return a.slice(0, 200000);
+        if (typeof a === 'number' || typeof a === 'boolean' || a === null) return a;
+        return String(a).slice(0, 1000);
+      });
+      post({ method: m, args: args });
+    }; });
+    api.state = Object.freeze({ files: Object.freeze(C.files.slice()), projectName: C.projectName,
+                                safeCommands: Object.freeze(C.safeCommands.slice()) });
+    api.version = '1.0';
+    try {
+      var fn = new Function('api', 'console', '"use strict";\n' + C.code +
+        '\nreturn (typeof register === "function") ? register(api) : null;');
+      var manifest = fn(api, { log: function(){}, warn: function(){}, error: function(){}, info: function(){} });
+      var clean = null;
+      try { clean = JSON.parse(JSON.stringify(manifest || {})); } catch(e) { clean = null; }
+      post({ ready: true, manifest: clean });
+    } catch (e) { post({ error: String((e && e.message) || e).slice(0, 300) }); }
+  })();`;
+  const cfgJson = JSON.stringify(cfg).replace(/</g, '\\u003c').replace(/\u2028/g, '\\u2028').replace(/\u2029/g, '\\u2029');
+  iframe.srcdoc = '<!doctype html><html><head><meta charset="utf-8">' +
+    `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline' 'unsafe-eval'; connect-src 'none'; img-src 'none'; style-src 'none'; form-action 'none'; base-uri 'none'; object-src 'none'">` +
+    '</head><body><script>window.__PLUGIN_CFG__=' + cfgJson + ';<\/script><script>' + shim + '<\/script></body></html>';
+
+  let done = false;
+  const cleanup = () => {
+    if (done) return; done = true;
+    window.removeEventListener('message', handler);
+    clearTimeout(killTimer);
+    setTimeout(() => iframe.remove(), 50);
+  };
+  const killTimer = setTimeout(cleanup, 30000);
+
+  function handler(e) {
+    const d = e.data;
+    if (!d || d.__plugin !== 1 || d.nonce !== nonce) return;
+    if (e.source !== iframe.contentWindow) return;
+    if (e.origin !== 'null' && e.origin !== location.origin) return;
+    if (d.error) { toast('Ошибка плагина: ' + String(d.error).slice(0, 200), 'err'); cleanup(); return; }
+    if (d.ready) {
+      const m = d.manifest && typeof d.manifest === 'object' ? d.manifest : {};
+      const pname = typeof m.name === 'string' ? m.name.replace(/[^\w\s.-]/g, '').slice(0, 60) : '';
+      const cmds = m.commands && typeof m.commands === 'object' && !Array.isArray(m.commands) ? m.commands : {};
+      let registered = 0;
+      for (const [id, def] of Object.entries(cmds).slice(0, 20)) {
+        if (!/^[\w-]{1,60}$/.test(id) || !def || typeof def !== 'object') continue;
+        const target = String(def.command || '').slice(0, 80);
+        if (!PLUGIN_SAFE_COMMANDS.has(target)) continue;
+        const title = String(def.title || id).replace(/[<>&"']/g, '').slice(0, 80);
+        ctx.registerCommand?.('plugin:' + id, {
+          title, group: 'Плагины', icon: '🔌', run: () => ctx.runCommand?.(target)
+        });
+        registered++;
+      }
+      if (pname) state.plugins.push(pname);
+      toast(`Плагин «${pname || name}» установлен (${registered} команд)`, 'ok');
+      renderPlugins(); cleanup(); return;
     }
-    toast('Плагин установлен: ' + name, 'ok');
-    renderPlugins();
-    return true;
-  } catch (e) { toast('Ошибка плагина: ' + e.message, 'err'); return false; }
+    if (typeof d.method === 'string' && PLUGIN_SAFE_METHODS.has(d.method)) {
+      executePluginMethod(d.method, Array.isArray(d.args) ? d.args : []);
+    }
+  }
+  window.addEventListener('message', handler);
+  document.body.appendChild(iframe);
+  return true;
+}
+function executePluginMethod(method, args) {
+  const str = (v, n = 200000) => typeof v === 'string' ? v.slice(0, n) : String(v ?? '').slice(0, n);
+  try {
+    switch (method) {
+      case 'toast': case 'log': toast(str(args[0], 300), 'info', 'Плагин'); break;
+      case 'emit': if (/^[\w:.-]{1,60}$/.test(str(args[0], 60))) emit(str(args[0], 60), args[1]); break;
+      case 'insertText': insertText(str(args[0]), str(args[1], 10) || state.activePane); break;
+      case 'setDoc': setDoc(str(args[0]), str(args[1], 10) || state.activePane); break;
+      case 'getDoc': break;                // async read not exposed to remote plugins
+      case 'analyze': runAnalysis({ silent: true }); break;
+      case 'readFile': break;              // no synchronous file read across the boundary
+      case 'writeFile': {
+        const path = str(args[0], 300);
+        if (/^[\w./-]{1,300}$/.test(path) && !path.includes('..')) write(path, str(args[1]));
+        break;
+      }
+      case 'runCommand': {
+        const id = str(args[0], 80);
+        if (PLUGIN_SAFE_COMMANDS.has(id)) ctx.runCommand?.(id);
+        break;
+      }
+    }
+  } catch (e) { toast('Плагин: ' + e.message, 'err'); }
 }
 export function openPlugin(id) {
   switch (id) {
@@ -247,7 +371,7 @@ function pluginTerminal() {
     okText: 'Закрыть',
     onMount: root => {
       const out = root.querySelector('#termOut'), inp = root.querySelector('#termIn');
-      const print = s => { out.innerHTML += `<div>${esc(s)}</div>`; out.scrollTop = out.scrollHeight; };
+      const print = s => { const row = document.createElement('div'); row.textContent = String(s).slice(0, 4000); out.appendChild(row); while (out.children.length > 300) out.removeChild(out.firstChild); out.scrollTop = out.scrollHeight; };
       const run = () => {
         const line = inp.value.trim(); if (!line) return;
         print('$ ' + line); inp.value = '';
@@ -276,7 +400,7 @@ function pluginCalc() {
     okText: 'Закрыть',
     onMount: root => {
       const inp = root.querySelector('#calcIn'), out = root.querySelector('#calcOut');
-      const update = () => { try { out.textContent = '= ' + Function('"use strict";return (' + inp.value + ')')(); } catch (e) { out.textContent = 'Ошибка: ' + e.message; } };
+      const update = () => { try { out.textContent = '= ' + safeCalc(inp.value); } catch (e) { out.textContent = 'Ошибка: ' + e.message; } };
       inp.addEventListener('input', update); update();
       root.querySelectorAll('[data-e]').forEach(b => b.onclick = () => {
         const n = parseFloat(inp.value) || 16;
