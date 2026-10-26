@@ -9,14 +9,6 @@
 [![Made with JavaScript](https://img.shields.io/badge/Made%20with-JavaScript-f7df1e.svg)](https://developer.mozilla.org/en-US/docs/Web/JavaScript)
 [![Status](https://img.shields.io/badge/status-alpha-orange.svg)]()
 
----
-
-## 📸 Screenshot
-
-![Liveforge screenshot](./docs/screenshot.png)
-> _Replace with an actual screenshot of the editor._
-
----
 
 ## ✨ Why Liveforge?
 
