@@ -1,8 +1,8 @@
-# Liveforge
+# Runlet
 
 > Write code. Run it instantly. See the result.
 
-**Liveforge** is a browser-based HTML/CSS/JS editor and playground with live preview, console, virtual file system, CDN libraries, snippets, and AI assistance. Write code, see the result immediately, debug it, and share your project — no installation, no build step, no setup.
+**Runlet** is a browser-based HTML/CSS/JS editor and playground with live preview, console, virtual file system, CDN libraries, snippets, and AI assistance. Write code, see the result immediately, debug it, and share your project — no installation, no build step, no setup.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
@@ -10,9 +10,9 @@
 [![Status](https://img.shields.io/badge/status-alpha-orange.svg)]()
 
 
-## ✨ Why Liveforge?
+## ✨ Why Runlet?
 
-Setting up a local dev environment for a quick experiment is overkill. Liveforge removes the friction between "I want to try some code" and "I see the result in my browser."
+Setting up a local dev environment for a quick experiment is overkill. Runlet removes the friction between "I want to try some code" and "I see the result in my browser."
 
 - **Zero setup.** Open the page and start coding.
 - **Instant feedback.** Live preview updates as you type.
