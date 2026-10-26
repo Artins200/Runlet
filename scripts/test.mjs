@@ -112,6 +112,14 @@ try {
   ok('Renderer boot (jsdom)', smoke.status === 0, smokeOut.split('\n').filter(l => /checks passed|Errors captured/.test(l)).join(', '));
   ok('Python engine через браузер', /runlet-python/.test(smokeOut), smokeOut.match(/analysis report received[^\n]*/)?.[0] || '');
 
+  // 7b. Window stability (no self-minimize / self-restore / window recreation)
+  const wstab = run(process.execPath, ['scripts/window-stability.mjs']);
+  const wsOut = (wstab.stdout || '') + (wstab.stderr || '');
+  const wsPass = wsOut.split('\n').filter(l => l.includes('✅')).length;
+  const wsFail = wsOut.split('\n').filter(l => l.includes('❌')).length;
+  ok('Стабильность окна (нет самопроизвольных действий)', wstab.status === 0, `${wsPass} проверок` + (wsFail ? `, ${wsFail} упало` : ''));
+  if (wstab.status !== 0) console.log(wsOut.split('\n').filter(l => l.includes('❌')).join('\n').slice(0, 1600));
+
   // 8. srcdoc scripts syntax
   const src = run(process.execPath, ['scripts/checksrcdoc.mjs']);
   const srcOut = (src.stdout || '') + (src.stderr || '');

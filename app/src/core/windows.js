@@ -186,13 +186,16 @@ export function openSiteWindow(url, html) {
 
 let windowed = false;
 export function isWindowed() { return windowed; }
+let toggling = false;
 export function toggleWindowedMode() {
+  if (toggling) return windowed;
+  toggling = true;
+  try {
   windowed = !windowed;
   $('#app')?.classList.toggle('windowed-mode', windowed);
   if (windowed) {
     const live = ctx.liveStatus?.();
     openSiteWindow(live?.running ? live.url : null, ctx.srcdoc?.());
-    ctx.openThreeStage?.();
     const cons = $('#consolePanel');
     if (cons) movePanelWindow(cons, { id: 'win-console', title: 'Консоль', icon: 'terminal', width: 620, height: 360 });
   } else {
@@ -202,6 +205,7 @@ export function toggleWindowedMode() {
   ctx.applySettings?.();
   emit('windows:changed');
   return windowed;
+  } finally { toggling = false; }
 }
 export function initWindows() {
   ensureLayer();

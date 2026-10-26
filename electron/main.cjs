@@ -24,6 +24,31 @@ const MAX_IPC_TEXT = 4 * 1024 * 1024;       // 4 MB per IPC text payload
 const MAX_API_BODY = 6 * 1024 * 1024;       // 6 MB per REST body
 const ENGINE_TIMEOUT = 15000;
 let nativeFrame = true;   // normal OS window: minimize / maximize / close
+let frameRecreating = false;
+
+/* The MAIN process is the single source of truth for the window frame.
+   The renderer must never call setFrame() at startup: recreating a
+   BrowserWindow reloads the page, and a persisted preference could then
+   trigger the same call again forever (the "window minimizes and reopens"
+   loop). Read the preference once before the first window is created. */
+function framePrefFile() {
+  try { return path.join(app.getPath('userData'), 'window-prefs.json'); }
+  catch (_) { return path.join(ROOT, '.runlet', 'window-prefs.json'); }
+}
+function readFramePref() {
+  try {
+    const raw = fs.readFileSync(framePrefFile(), 'utf8');
+    const v = JSON.parse(raw);
+    return typeof v.nativeFrame === 'boolean' ? v.nativeFrame : true;
+  } catch (_) { return true; }
+}
+function writeFramePref(v) {
+  try {
+    const f = framePrefFile();
+    fs.mkdirSync(path.dirname(f), { recursive: true });
+    fs.writeFileSync(f, JSON.stringify({ nativeFrame: !!v }), { mode: 0o600 });
+  } catch (_) { /* ignore */ }
+}
 
 let win = null;
 let engine = null;
@@ -342,9 +367,10 @@ function registerIPC() {
   }));
   ipcMain.handle('python:check', () => ({ available: !!startEngine() }));
   ipcMain.handle('win:control', (_, action) => {
-    if (!win || !['minimize', 'maximize', 'close'].includes(action)) return false;
+    if (!win || !['minimize', 'maximize', 'restore', 'close'].includes(action)) return false;
     if (action === 'minimize') win.minimize();
     else if (action === 'maximize') win.isMaximized() ? win.unmaximize() : win.maximize();
+    else if (action === 'restore') win.restore();
     else win.close();
     return true;
   });
@@ -466,12 +492,26 @@ function registerIPC() {
     if (!liveServer) return false;
     shell.openExternal(`http://127.0.0.1:${livePort}/`); return true;
   });
+  // Explicit user toggle only (Settings -> Windows). No-op when unchanged,
+  // and guarded against re-entrant recreation.
+  ipcMain.handle('win:frameStatus', () => ({ frame: nativeFrame }));
   ipcMain.handle('win:frame', (_, useFrame) => {
-    nativeFrame = !!useFrame;
+    const want = !!useFrame;
+    if (want === nativeFrame || frameRecreating) return { ok: true, changed: false, frame: nativeFrame };
+    frameRecreating = true;
+    nativeFrame = want;
+    writeFramePref(want);
     const old = win, bounds = old?.getBounds();
-    createWindow(bounds);
-    try { old?.close(); } catch (_) { }
-    return true;
+    try {
+      createWindow(bounds);
+      win?.webContents.once('did-finish-load', () => { frameRecreating = false; });
+      setTimeout(() => { frameRecreating = false; }, 4000);
+      try { old?.close(); } catch (_) { }
+    } catch (e) {
+      frameRecreating = false;
+      return { ok: false, error: e.message, frame: nativeFrame };
+    }
+    return { ok: true, changed: true, frame: nativeFrame };
   });
 }
 
@@ -587,6 +627,7 @@ function startAPI() {
 /* ── lifecycle ─────────────────────────────────────────────────── */
 app.whenReady().then(() => {
   nativeTheme.themeSource = 'system';
+  nativeFrame = readFramePref();       // create the FIRST window correctly
   registerIPC();
   buildMenu();
   createWindow();

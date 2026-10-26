@@ -56,6 +56,17 @@ async function boot() {
     sandboxPermissions: { ...base.sandboxPermissions, ...(saved.sandboxPermissions || {}) },
     keybindings: { ...base.keybindings, ...(saved.keybindings || {}) }
   };
+  // The main process owns the OS window frame. Ask it once and adopt the value
+  // silently — NEVER call setFrame() here: that would recreate the window,
+  // reload this page and loop forever. Floating windows are never restored
+  // automatically either; the user toggles them explicitly.
+  if (window.runlet?.frameStatus) {
+    try {
+      const st = await window.runlet.frameStatus();
+      if (st && typeof st.frame === 'boolean') state.settings.nativeFrame = st.frame;
+    } catch (_) { /* keep default */ }
+  }
+  state.settings.windowedMode = false;
 
   initProjects();
   initEditors();
@@ -71,8 +82,6 @@ async function boot() {
   initUI();
   initMenus(); initZoom(); initAppWindow();
   hydrateIcons(); refreshZoomLabel();
-  if (window.runlet?.setFrame && !state.settings.nativeFrame) window.runlet.setFrame(false);
-  if (state.settings.windowedMode && !state.settings.showLauncher) setTimeout(() => toggleWindowedMode(), 900);
 
   applyEditorSettings();
   applyLayout(state.layout);

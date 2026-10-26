@@ -4,6 +4,7 @@
 import { state, ctx, $, $$, el, esc, emit, on, toast, runCommand, commands,
          setFontZoom, toggleWrap } from './core.js';
 import { icon } from './icons.js';
+import { applySettings } from './state.js';
 
 /* ── grouped menus ─────────────────────────────────────────────────── */
 const MENUS = {
@@ -68,10 +69,16 @@ export function openMenu(kind, anchor) {
     box.appendChild(el('div', { class: 'dropdown-label', text: sec.label }));
     for (const [id, label] of sec.items) {
       const c = commands.get(id);
-      const item = el('button', { class: 'dropdown-item', 'data-cmd': id });
+      // No data-cmd here: initUI() already delegates clicks on [data-cmd]
+      // globally. Adding it would run every menu command twice (toggles would
+      // flip straight back).
+      const item = el('button', { class: 'dropdown-item', 'data-menu-item': id });
       const ic = c?.icon || 'chevronRight';
       item.innerHTML = `<span class="di-ico">${icon(ic, 15)}</span><span class="di-label">${esc(label)}</span>` + (c?.key ? `<kbd>${esc(c.key)}</kbd>` : '');
-      item.addEventListener('click', () => { closeMenu(); runCommand(id); });
+      item.addEventListener('click', e => {
+        e.preventDefault(); e.stopPropagation();
+        closeMenu(); runCommand(id);
+      });
       box.appendChild(item);
     }
   }
@@ -96,28 +103,40 @@ export function initMenus() {
 /* ── windowed application shell ───────────────────────────────────── */
 let native = false;
 export function isNativeFrame() { return native; }
+let lastWindowAction = 0;
 export function windowControl(act) {
   const body = document.body;
+  const now = Date.now();
+  // A single click must never toggle twice (double listeners / double clicks).
+  if (act === 'maximize' && now - lastWindowAction < 350) return;
+  lastWindowAction = now;
+  if (act === 'minimize' && body.classList.contains('app-min')) return;
+  if (act === 'close' && body.classList.contains('app-closed')) return;
+  if (act === 'restore' && !body.classList.contains('app-min') && !body.classList.contains('app-closed') && !native) return;
+
   if (act === 'minimize') {
-    if (native) { window.runlet.windowControl('minimize'); return; }
+    if (native) { window.runlet?.windowControl?.('minimize'); return; }
     body.classList.add('app-min'); body.classList.remove('app-closed');
     toast('Окно свёрнуто — нажмите Runlet в панели задач', 'info');
   } else if (act === 'maximize') {
-    if (native) { window.runlet.windowControl('maximize'); return; }
+    if (native) { window.runlet?.windowControl?.('maximize'); return; }
     body.classList.toggle('app-max');
     body.classList.remove('app-min', 'app-closed');
   } else if (act === 'close') {
-    if (native) { window.runlet.windowControl('close'); return; }
+    if (native) { window.runlet?.windowControl?.('close'); return; }
     body.classList.add('app-closed'); body.classList.remove('app-min');
   } else if (act === 'restore') {
+    if (native) { window.runlet?.windowControl?.('restore'); return; }
     body.classList.remove('app-min', 'app-closed');
-  }
+  } else return;
   emit('appwindow:changed', act);
 }
 export function initAppWindow() {
-  native = !!(window.runlet?.isElectron && state.settings.nativeFrame);
+  // In Electron the OS owns the window whether the native frame is drawn or
+  // not. Only the browser preview needs the in-app window simulation.
+  native = !!window.runlet?.isElectron;
   const body = document.body;
-  body.classList.toggle('native-frame', native);
+  body.classList.toggle('native-frame', native && !!state.settings.nativeFrame);
   body.classList.toggle('windowed-app', !native && !!state.settings.appWindowed);
   const host = $('#winControls');
   if (host) {
@@ -161,7 +180,7 @@ export function initAppWindow() {
 export function setAppWindowed(v) {
   state.settings.appWindowed = !!v;
   document.body.classList.toggle('windowed-app', !native && !!v);
-  emit('settings:changed');
+  applySettings();                 // persists + emits once, no manual re-emit
   return state.settings.appWindowed;
 }
 
