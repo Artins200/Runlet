@@ -1,7 +1,7 @@
 /* Every UI action lives here: buttons, hotkeys and the command palette. */
 import {
   state, ctx, registerCommand, runCommand, commands, $, $$, toast, copy, download, emit, on,
-  applyTheme, debounce, DEFAULT_SETTINGS, esc
+  applyTheme, debounce, DEFAULT_SETTINGS, esc, setFontZoom, toggleWrap, contrastRatio
 } from './core.js';
 import { undo, redo } from '@codemirror/commands';
 import {
@@ -28,7 +28,7 @@ import {
   replaceAllInProject, doSearch, findReferences, downloadFile, exportZip, importZip,
   importSingleHtml, exportSingleHtml, exportStaticSite, importFromUrl, uploadFiles,
   renderLibs, renderAssets, cleanupAssets, showAssetPreview, snapshotDialog,
-  versionsDialog, shareDialog
+  versionsDialog, shareDialog, quickCreate, openOSFolder, saveToDisk
 } from './files.js';
 import {
   modal, closeModal, commandPalette, settingsModal, shortcutsModal, showStartScreen,
@@ -39,7 +39,8 @@ import {
 } from './ui.js';
 import { startLiveServer, stopLiveServer, toggleLiveServer, openSiteWindow, openSiteExternal, liveServerDialog, liveStatus } from './liveserver.js';
 import { toggleWindowedMode, detachEditor, openSiteWindow as openSiteWin, closeAllWindows, windowCount, isWindowed, movePanelWindow } from './windows.js';
-import { addObject, exportToProject, openThreeDWindow, getScene, setScene } from './threeD.js';
+import { addObject, exportToProject, openThreeDWindow, getScene, setScene, openThreeStage, threeDStats, threeDRender } from './threeD.js';
+import { windowControl, setAppWindowed, refreshZoomLabel } from './shellui.js';
 import { makeProject, openProject, exportProject, exportAllProjects, importProjectFile, listProjects } from './projects.js';
 import { icon, deEmoji } from './icons.js';
 import { initLearn, renderLearn, openLesson, initPlugins, renderPlugins, initFeatures, openPlugin } from './extras.js';
@@ -74,7 +75,7 @@ export function initCommands() {
   cmd('tour', 'Быстрый тур', 'Основное', 'help', () => startTour());
   cmd('startScreen', 'Стартовый экран', 'Основное', 'home', () => showStartScreen());
   cmd('learn', 'Открыть обучение', 'Основное', 'book', () => { selectRailTab('learn'); renderLearn(); });
-  cmd('features', 'Карта 500 идей', 'Основное', 'list', () => { selectRailTab('features'); initFeatures(); });
+  cmd('features', 'Карта идей', 'Основное', 'list', () => { toast('Вкладка «Идеи» удалена из интерфейса', 'info'); }, { hidden: true });
   cmd('applySettings', 'Применить настройки', 'Основное', 'refresh', () => { applySettings(); applyEditorSettings(); }, { hidden: true });
 
   /* ── layouts ────────────────────────────────────────────────── */
@@ -294,11 +295,57 @@ POST /api/run</pre>`, okText: 'Ок' }));
   cmd('closeWindows', 'Закрыть все окна', 'Окна', 'close', () => closeAllWindows());
   cmd('previewWindow', 'Предпросмотр в окне', 'Окна', 'window', () => ctx.openPreviewWindow?.());
   cmd('detachEditor', 'Редактор в окне', 'Окна', 'window', p => detachEditor(typeof p === 'string' ? p : state.activePane));
-  cmd('openThreeD', '3D-редактор', '3D', 'cube', () => { selectRailTab('three'); emit('three:show'); });
+  cmd('openThreeD', '3D-редактор', '3D', 'cube', () => { selectRailTab('three'); openThreeStage(); });
+  cmd('openThreeWindow', '3D в окне', '3D', 'window', () => openThreeStage());
   cmd('openThreeWindow', '3D в окне', '3D', 'window', () => ctx.openThreeWindow?.());
   cmd('threeAdd', 'Добавить объект', '3D', 'plus', () => { selectRailTab('three'); addObject('cube'); });
   cmd('threeExport', 'Экспорт 3D в проект', '3D', 'download', () => exportToProject());
   cmd('helpWelcome', 'Как работать', 'Основное', 'info', () => showWelcome());
+
+  /* ── readable editor, window shell, real files ───────────────── */
+  cmd('quickNewHtml', 'Новый HTML-файл', 'Файлы', 'code', () => quickCreate('html'));
+  cmd('quickNewCss', 'Новый CSS-файл', 'Файлы', 'palette', () => quickCreate('css'));
+  cmd('quickNewJs', 'Новый JS-файл', 'Файлы', 'braces', () => quickCreate('js'));
+  cmd('openOSFolder', 'Открыть папку с диска', 'Файлы', 'folder', () => openOSFolder());
+  cmd('saveToDisk', 'Сохранить проект на диск', 'Файлы', 'save', () => saveToDisk());
+  cmd('fontZoomIn', 'Увеличить шрифт кода', 'Редактор', 'plus', () => { setFontZoom(1); refreshZoomLabel(); });
+  cmd('fontZoomOut', 'Уменьшить шрифт кода', 'Редактор', 'minus', () => { setFontZoom(-1); refreshZoomLabel(); });
+  cmd('fontZoomReset', 'Сбросить масштаб', 'Редактор', 'refresh', () => { setFontZoom(0, 16); refreshZoomLabel(); });
+  cmd('toggleWrap', 'Перенос длинных строк', 'Редактор', 'wrap', () => { toggleWrap(); refreshZoomLabel(); });
+  cmd('toggleAnimations', 'Анимации интерфейса', 'Вид', 'spark', () => {
+    state.settings.animations = state.settings.animations === false;
+    applySettings(); refreshZoomLabel();
+    toast(state.settings.animations ? 'Анимации включены' : 'Анимации выключены', 'info');
+  });
+  cmd('appMinimize', 'Свернуть окно программы', 'Окна', 'minus', () => windowControl('minimize'));
+  cmd('appMaximize', 'Развернуть окно программы', 'Окна', 'maximize', () => windowControl('maximize'));
+  cmd('appRestore', 'Вернуть окно программы', 'Окна', 'window', () => windowControl('restore'));
+  cmd('toggleAppWindow', 'Оконный режим приложения', 'Окна', 'window', () => {
+    const v = setAppWindowed(!state.settings.appWindowed);
+    toast(v ? 'Оконный режим: можно свернуть и двигать' : 'На весь экран', 'info');
+  });
+  cmd('contrastCheck', 'Проверка контрастности интерфейса', 'Доступность', 'eye', () => {
+    const cs = getComputedStyle(document.documentElement);
+    const g = n => cs.getPropertyValue(n).trim();
+    const pairs = [
+      ['Основной текст', g('--text'), g('--card')],
+      ['Второстепенный текст', g('--muted'), g('--card')],
+      ['Номера строк / подписи', g('--dim'), g('--code-bg')],
+      ['Ошибки', g('--err'), g('--card')],
+      ['Предупреждения', g('--warn'), g('--card')],
+      ['Успех', g('--ok'), g('--card')]
+    ];
+    const rows = pairs.map(([name, fg, bg]) => {
+      const r = contrastRatio(fg, bg);
+      const ok = r >= 4.5;
+      return `<div class="list-row"><div class="grow"><b>${esc(name)}</b>
+        <small>${esc(fg)} на ${esc(bg)}</small></div>
+        <b style="color:${ok ? 'var(--ok)' : 'var(--err)'}">${r.toFixed(2)}:1 ${ok ? 'OK' : 'мало'}</b></div>`;
+    }).join('');
+    ctx.modal({ title: 'Контрастность интерфейса (WCAG)', wide: false, okText: 'Закрыть',
+      body: `<div class="beginner" style="margin:0 0 10px">Норма для обычного текста — не ниже 4.5:1, для крупного и иконок — 3:1.</div>
+        <div class="list-rows">${rows}</div>` });
+  });
 
   /* ── misc helpers (hidden from palette) ─────────────────────── */
   cmd('openFile', 'Открыть файл', 'Файлы', 'file', p => { if (typeof p === 'string') openFile(p); }, { hidden: true });

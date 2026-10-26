@@ -6,7 +6,8 @@ const { contextBridge, ipcRenderer } = require('electron');
 const CHANNELS = new Set([
   'analyze', 'app:info', 'fs:open', 'fs:save', 'fs:read', 'fs:write',
   'win:control', 'win:frame', 'shell:open', 'python:check', 'preview:popout',
-  'live:start', 'live:update', 'live:stop', 'live:status', 'live:external'
+  'live:start', 'live:update', 'live:stop', 'live:status', 'live:external',
+  'fs:openFolder', 'fs:saveProject'
 ]);
 
 const str = (v, max = 4 * 1024 * 1024) =>
@@ -59,6 +60,11 @@ const api = {
     ipcRenderer.on('menu:command', (_, id) => { if (typeof id === 'string' && id.length < 80) cb(id); });
   },
   pythonCheck: () => ipcRenderer.invoke('python:check'),
+  openFolder: () => ipcRenderer.invoke('fs:openFolder'),
+  saveProject: files => {
+    if (!files || typeof files !== 'object' || Array.isArray(files)) return Promise.resolve({ ok: false });
+    return ipcRenderer.invoke('fs:saveProject', files);
+  },
   setFrame: useFrame => ipcRenderer.invoke('win:frame', !!useFrame),
   liveStart: payload => {
     if (!payload || typeof payload !== 'object' || !payload.project || !payload.project.files) return Promise.resolve({ ok: false, error: 'bad payload' });

@@ -1,6 +1,6 @@
 /* Runlet bootstrap. Works both inside Electron and as a standalone web app. */
 import { state, ctx, on, emit, $, $$, toast, debounce, registerCommand, DEFAULT_SETTINGS,
-         runCommand, commands } from './core/core.js';
+         runCommand, commands, contrastRatio, setFontZoom, toggleWrap } from './core/core.js';
 import { initStorage, startAutoSave, persistNow, projectJSON, listFiles, read, write, exists, sanitizeSettings, applySettings } from './core/state.js';
 import { initEditors, applyEditorSettings, setPaneFile, goto, getDoc, setDoc, focusPane } from './core/editor.js';
 import { initPreview, run, applyDevice, refreshInspectors, send } from './core/preview.js';
@@ -18,6 +18,8 @@ import { initLiveServer, liveStatus, toggleLiveServer } from './core/liveserver.
 import { srcdoc } from './core/preview.js';
 import { runAnalysis, scheduleAnalysis } from './core/analyzer.js';
 import { coverage } from './core/data.js';
+import { initAppWindow, initMenus, initZoom, refreshZoomLabel, windowControl, isNativeFrame, setAppWindowed } from './core/shellui.js';
+import { openThreeStage, threeDStats, threeDRender } from './core/threeD.js';
 
 const started = performance.now();
 
@@ -39,9 +41,10 @@ async function boot() {
     openSiteWindowRaw: (url, html) => openSiteWindow(url, html),
     openPreviewWindow: () => openWindow({ id: 'preview', title: 'Предпросмотр', icon: 'monitor',
       width: 900, height: 640, html: srcdoc() }),
-    openThreeWindow: openThreeDWindow,
+    openThreeWindow: openThreeStage, openThreeStage,
     movePanelWindow, detachEditor, windowCount,
     setNativeFrame: v => window.runlet?.setFrame?.(v),
+    windowControl, isNativeFrame, threeDStats, threeDRender, setAppWindowed,
     toggleLiveServer
   });
 
@@ -61,14 +64,14 @@ async function boot() {
   initPanels();
   initLearn();
   initPlugins();
-  initFeatures();
   initThreeD();
   initWindows();
   initLiveServer();
   initCommands();
   initUI();
-  hydrateIcons();
-  if (window.runlet?.setFrame && state.settings.nativeFrame) window.runlet.setFrame(true);
+  initMenus(); initZoom(); initAppWindow();
+  hydrateIcons(); refreshZoomLabel();
+  if (window.runlet?.setFrame && !state.settings.nativeFrame) window.runlet.setFrame(false);
   if (state.settings.windowedMode && !state.settings.showLauncher) setTimeout(() => toggleWindowedMode(), 900);
 
   applyEditorSettings();
@@ -194,6 +197,8 @@ function publicAPI() {
     toggleWindowedMode, liveStatus, toggleLiveServer,
     srcdoc: () => srcdoc(),
     scene3d: () => import('./core/threeD.js').then(m => m.getScene()),
+    threeD: () => threeDStats(), openThreeD: () => openThreeStage(),
+    contrastRatio, setFontZoom, toggleWrap, windowControl,
     console: {
       clear: () => { state.logs = []; renderConsole(); },
       logs: () => state.logs

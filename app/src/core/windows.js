@@ -192,12 +192,11 @@ export function toggleWindowedMode() {
   if (windowed) {
     const live = ctx.liveStatus?.();
     openSiteWindow(live?.running ? live.url : null, ctx.srcdoc?.());
-    const three = $('#threePanel');
-    if (three) movePanelWindow(three, { id: 'win-three', title: '3D-редактор', icon: 'cube', width: 760, height: 520 });
+    ctx.openThreeStage?.();
     const cons = $('#consolePanel');
     if (cons) movePanelWindow(cons, { id: 'win-console', title: 'Консоль', icon: 'terminal', width: 620, height: 360 });
   } else {
-    for (const id of ['site', 'win-three', 'win-console']) closeWindow(id);
+    for (const id of ['site', 'win-console']) closeWindow(id);
   }
   state.settings.windowedMode = windowed;
   ctx.applySettings?.();

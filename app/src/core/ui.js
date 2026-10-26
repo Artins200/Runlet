@@ -16,6 +16,7 @@ import {
 } from './editor.js';
 import { SNIPPETS, CDN_LIBS, LESSONS, coverage } from './data.js';
 import { icon, deEmoji } from './icons.js';
+import { setAppWindowed, refreshZoomLabel, windowControl } from './shellui.js';
 import { TEMPLATES, listProjects, makeProject, openProject, renderProjectRows, exportProject, exportAllProjects, importProjectFile } from './projects.js';
 import { toggleWindowedMode, isWindowed, closeAllWindows, openWindow, movePanelWindow } from './windows.js';
 import {
@@ -89,8 +90,8 @@ export function renderToolbar() {
       host.appendChild(b);
     }
   };
-  build(state.settings.toolbarButtons, primary, false);
-  build(state.settings.toolbarSecondary, secondary, true);
+  build((state.settings.toolbarButtons || []).slice(0, 4), primary, false);
+  build((state.settings.toolbarSecondary || []).slice(0, 2), secondary, true);
   hydrateIcons(primary); hydrateIcons(secondary);
   const badge = $('#analyzeBadge');
   if (badge && state.report) badge.textContent = (state.report.metrics?.diagnostics?.error || 0) + '';
@@ -381,17 +382,22 @@ export function settingsModal(tab = 'editor') {
       <button class="mini-btn" data-slotdown="${group}" data-i="${i}">${icon('arrowDown', 12)}</button>
       <button class="mini-btn" data-slotdel="${group}" data-i="${i}">${icon('trash', 12)}</button></div>`).join('');
   const pages = {
-    editor: `<div class="field-row">
-        ${field('Размер шрифта', 'fontSize', 'number', 'min="9" max="28"')}
-        ${field('Межстрочный интервал', 'lineHeight', 'number', 'step="0.1" min="1" max="2.5"')}
+    editor: `<div class="beginner" style="margin:0 0 10px">Код читается крупно: 16px и свободный интервал 1.55.
+      Масштаб меняется кнопками на панели или Ctrl + колесо мыши.</div>
+      <div class="field-row">
+        ${field('Размер шрифта кода, px', 'fontSize', 'number', 'min="14" max="24" step="1"')}
+        ${field('Межстрочный интервал', 'lineHeight', 'number', 'step="0.05" min="1.4" max="1.9"')}
         ${field('Ширина табуляции', 'tabSize', 'number', 'min="1" max="8"')}
         <div class="field"><label>Шрифт редактора</label><select data-set="fontFamily">
           ${['mono', 'system', 'courier', 'sans'].map(v => `<option value="${v}" ${s.fontFamily === v ? 'selected' : ''}>${v}</option>`).join('')}</select></div>
       </div>
       <h4 style="margin:10px 0 5px;font-size:11px">Отображение</h4>
-      <div class="rowflex">${bool('Пробелы и табы', 'showWhitespace')}${bool('Невидимые символы', 'showInvisibles')}
-        ${bool('Перенос строк', 'wrap')}${bool('Мини-карта', 'minimap')}${bool('Хлебные крошки', 'breadcrumbs')}
-        ${bool('Плавная прокрутка', 'smoothScroll')}${bool('Убирать пробелы в конце', 'trimTrailingWhitespace')}</div>
+      <div class="rowflex">${bool('Перенос длинных строк', 'wrap')}${bool('Мини-карта', 'minimap')}
+        ${bool('Пробелы и табы', 'showWhitespace')}${bool('Хлебные крошки', 'breadcrumbs')}
+        ${bool('Плавная прокрутка', 'smoothScroll')}</div>
+      <div class="rowflex mt8"><button class="mini-btn" id="setContrast">Проверить контрастность интерфейса</button>
+        <button class="mini-btn" id="setFontReset">Вернуть 16px</button>
+        <span class="muted" style="font-size:11px">WCAG: текст ≥ 4.5:1, иконки ≥ 3:1</span></div>
       <h4 style="margin:12px 0 5px;font-size:11px">Пресеты</h4>
       <div class="tabs-line">${Object.entries(PRESETS).map(([k, v]) => `<button data-preset="${k}" class="${s.presets === k ? 'active' : ''}">${v.label}</button>`).join('')}</div>`,
     preview: `<div class="field-row">
@@ -422,7 +428,13 @@ export function settingsModal(tab = 'editor') {
         <button class="mini-btn" id="tbAddSecondaryBtn">Добавить</button>
         <button class="mini-btn" id="tbReset">Сбросить набор</button></div>`,
     windows: `<div class="list-rows">
-        <div class="list-row"><div class="grow"><b>Оконный режим</b><small>Сайт, 3D и консоль в плавающих окнах</small></div>
+        <div class="list-row"><div class="grow"><b>Оконный режим приложения</b><small>Обычное окно: свернуть, развернуть, закрыть — не полноэкранный режим</small></div>
+          <label class="chk"><input type="checkbox" data-set="appWindowed" ${s.appWindowed !== false ? 'checked' : ''}> включён</label></div>
+        <div class="list-row"><div class="grow"><b>Системная рамка окна</b><small>Electron: стандартные кнопки окна ОС</small></div>
+          <label class="chk"><input type="checkbox" data-set="nativeFrame" ${s.nativeFrame ? 'checked' : ''}> включена</label></div>
+        <div class="list-row"><div class="grow"><b>Анимации интерфейса</b><small>Плавные переходы, появление панелей</small></div>
+          <label class="chk"><input type="checkbox" data-set="animations" ${s.animations !== false ? 'checked' : ''}> включены</label></div>
+        <div class="list-row"><div class="grow"><b>Оконный режим панелей</b><small>Сайт, 3D и консоль в плавающих окнах</small></div>
           <button class="mini-btn ${isWindowed() ? 'active' : ''}" id="wndToggle">${isWindowed() ? 'Выключить' : 'Включить'}</button></div>
         <div class="list-row"><div class="grow"><b>Системная рамка окна</b><small>Только Electron; приложение перезапустит окно</small></div>
           <button class="mini-btn ${s.nativeFrame ? 'active' : ''}" id="wndFrame">${s.nativeFrame ? 'Вкл' : 'Выкл'}</button></div>
@@ -476,8 +488,16 @@ export function settingsModal(tab = 'editor') {
         body.querySelectorAll('[data-set]').forEach(inp => inp.addEventListener('change', () => {
           const k = inp.dataset.set;
           const v = inp.type === 'checkbox' ? inp.checked : (inp.type === 'number' ? +inp.value : inp.value);
-          state.settings[k] = v; applySettings();
+          state.settings[k] = v;
+          if (k === 'appWindowed') setAppWindowed(v);
+          if (k === 'nativeFrame') ctx.setNativeFrame?.(v);
+          applySettings(); refreshZoomLabel();
         }));
+        body.querySelector('#setContrast')?.addEventListener('click', () => ctx.runCommand?.('contrastCheck'));
+        body.querySelector('#setFontReset')?.addEventListener('click', () => {
+          state.settings.fontSize = 16; state.settings.lineHeight = 1.55;
+          applySettings(); refreshZoomLabel(); closeModal(); settingsModal('editor');
+        });
         body.querySelectorAll('[data-sandbox]').forEach(inp => inp.addEventListener('change', () => {
           state.settings.sandboxPermissions = { ...(state.settings.sandboxPermissions || {}), [inp.dataset.sandbox]: inp.checked };
           applySettings();
@@ -610,13 +630,7 @@ export function shortcutsModal() {
 
 /* ── window controls (Electron) ─────────────────────────────────── */
 function initWindowControls() {
-  if (!window.runlet?.isElectron) return;
-  const host = $('#winControls');
-  for (const [label, act] of [['—', 'minimize'], ['□', 'maximize'], ['×', 'close']]) {
-    host.appendChild(el('button', { class: act === 'close' ? 'wc-close' : '', text: label,
-      onclick: () => window.runlet.windowControl(act) }));
-  }
-  $('#titlebar')?.classList.add('electron');
+  if (window.runlet?.isElectron) $('#titlebar')?.classList.add('electron');
 }
 
 /* ── greeting / project launcher ─────────────────────────────────── */
@@ -656,7 +670,7 @@ export function showStartScreen() {
       <div class="launch-logo"><div class="brand-mark">${icon('code', 22)}</div><div><b>Runlet</b><br><span>studio 2.0</span></div></div>
       <h1 class="launch-title">Редактор сайтов,<br>в котором всё понятно.</h1>
       <p class="launch-lead">Проекты, живой предпросмотр, локальный сервер, 3D и анализ кода — в одном окне без лишнего шума.</p>
-      <div class="launch-steps">${steps.map(([i, t, d]) => `<div class="launch-step"><div class="launch-step-i">${icon(i, 16)}</div>
+      <div class="launch-steps">${steps.map(([i, t, d], k) => `<div class="launch-step anim-in" style="--i:${k}"><div class="launch-step-i">${icon(i, 16)}</div>
         <div><b>${t}</b><span>${d}</span></div></div>`).join('')}</div>
       <div class="launch-foot"><button class="btn btn-ghost" id="launchWelcome">Как работать</button>
         <button class="btn btn-ghost" id="launchTour">Тур</button></div>
@@ -669,7 +683,7 @@ export function showStartScreen() {
         <select id="prjTemplate">${TEMPLATES.map(t => `<option value="${t.id}" ${t.id === chosen ? 'selected' : ''}>${t.name}</option>`).join('')}</select>
         <button class="btn btn-accent" id="prjCreate">${icon('plus', 15)} Создать</button>
       </div>
-      <div class="template-grid" id="prjTemplates">${TEMPLATES.map(t => `<div class="template-card ${t.id === chosen ? 'active' : ''}" data-tpl="${t.id}">${icon(t.icon, 17)}<b>${t.name}</b><small>${t.desc}</small></div>`).join('')}</div>
+      <div class="template-grid" id="prjTemplates">${TEMPLATES.map((t, k) => `<div class="template-card anim-in" style="--i:${k}" data-tpl="${t.id}">${icon(t.icon, 17)}<b>${t.name}</b><small>${t.desc}</small></div>`).join('')}</div>
       <div class="launch-head"><div><h2 style="font-size:13px">Мои проекты</h2></div>
         <div class="rowflex"><button class="mini-btn" id="prjExportAll">${icon('download', 13)} Экспорт всех</button>
           <button class="mini-btn" id="prjExport">${icon('archive', 13)} Экспорт</button></div></div>
@@ -748,8 +762,8 @@ function drawTour() {
   layer.innerHTML = `<div class="tour-spot" style="left:${r.left - 6}px;top:${r.top - 6}px;width:${r.width + 12}px;height:${r.height + 12}px"></div>
     <div class="tour-box" style="left:${Math.min(innerWidth - 320, Math.max(12, r.left))}px;top:${Math.min(innerHeight - 180, r.bottom + 16)}px">
       <h4>${esc(step.title)}</h4><p>${esc(step.text)}</p>
-      <div class="tour-nav"><button class="mini-btn" id="tourPrev">←</button>
-        <button class="mini-btn" id="tourNext">${tourIndex === tourSteps.length - 1 ? 'Готово' : 'Далее →'}</button>
+      <div class="tour-nav"><button class="mini-btn" id="tourPrev">${icon('arrowLeft', 13)}</button>
+        <button class="mini-btn" id="tourNext">${tourIndex === tourSteps.length - 1 ? 'Готово' : `Далее ${icon('arrowRight', 13)}`}</button>
         <button class="mini-btn" id="tourSkip">Пропустить</button>
         <span class="tour-step">${tourIndex + 1}/${tourSteps.length}</span></div></div>`;
   layer.querySelector('#tourPrev').onclick = () => { tourIndex = Math.max(0, tourIndex - 1); drawTour(); };

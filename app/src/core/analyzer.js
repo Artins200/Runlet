@@ -1,6 +1,7 @@
 /* Analysis client: talks to the Python engine (Electron IPC or /api/analyze),
    falls back to an in-browser JS analyser, applies quick fixes. */
 import { state, ctx, emit, on, toast, busy, debounce, esc } from './core.js';
+import { icon } from './icons.js';
 import { allTextFiles, read, write, exists } from './state.js';
 import { CSS_PROPS, CSS_VALUES } from './data.js';
 import { editors, setDoc, getDoc, goto } from './editor.js';
@@ -71,8 +72,8 @@ export async function runAnalysis({ silent = false, force = false } = {}) {
     badge.style.opacity = report.engine?.startsWith('runlet-python') ? '1' : '.75';
   }
   const st = document.querySelector('#statusEngine');
-  if (st) st.textContent = (report.engine?.startsWith('runlet-python') ? '◉ Python-движок' : '◉ JS-анализ') +
-    ` · ${report.elapsed_ms ?? 0} мс`;
+  if (st) st.innerHTML = `<span class="ico">${icon(report.engine?.startsWith('runlet-python') ? 'code' : 'info', 12)}</span> ` +
+    (report.engine?.startsWith('runlet-python') ? 'Python-движок' : 'JS-анализ') + ` · ${report.elapsed_ms ?? 0} мс`;
   const badgeN = document.querySelector('#analyzeBadge');
   if (badgeN) badgeN.textContent = (report.metrics?.diagnostics?.error || 0) + '';
   const sc = document.querySelector('#statusScore');

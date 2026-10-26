@@ -22,6 +22,7 @@ let cam = { yaw: 0.7, pitch: 0.45, dist: 7.5 };
 let showGrid = true, wire = false;
 let dirty = true, drag = null;
 let panelRefs = {};
+let stage = null, stageCanvas = null, stageG = null, visible = false, drawnPolys = 0, lastFrame = 0;
 
 /* ── geometry ─────────────────────────────────────────────────────── */
 function geometry(type) {
@@ -112,9 +113,12 @@ function shade(hex, k) {
 
 /* ── rendering ────────────────────────────────────────────────────── */
 function render() {
-  if (!canvas || !g) return;
+  if (!stageCanvas || !stageG) return;
+  canvas = stageCanvas; g = stageG;
   const dpr = Math.min(2, window.devicePixelRatio || 1);
-  const w = canvas.clientWidth || 400, h = canvas.clientHeight || 300;
+  const [w0, h0] = sizeCanvas();
+  const w = w0 || canvas.clientWidth || 900, h = h0 || canvas.clientHeight || 520;
+  if (!g) return;
   if (canvas.width !== Math.round(w * dpr) || canvas.height !== Math.round(h * dpr)) {
     canvas.width = Math.round(w * dpr); canvas.height = Math.round(h * dpr);
   }
@@ -149,7 +153,7 @@ function render() {
     }
   }
   polys.sort((a, b) => b.z - a.z);
-  const L = [0.35, 0.72, 0.6];
+  drawnPolys = polys.length;
   for (const p of polys) {
     const pr = p.face.map(v => project(v, w, h));
     if (pr.some(v => v[2] <= 0.15)) continue;
@@ -180,8 +184,6 @@ function drawLine3(a, b, w, h) {
   if (p[2] <= 0.15 || q[2] <= 0.15) return;
   g.beginPath(); g.moveTo(p[0], p[1]); g.lineTo(q[0], q[1]); g.stroke();
 }
-function invalidate() { dirty = true; }
-function loop() { if (dirty) render(); requestAnimationFrame(loop); }
 
 /* ── scene operations ─────────────────────────────────────────────── */
 function makeObject(type, offset = 0) {
@@ -215,82 +217,167 @@ export function setScene(scene) {
 }
 function current() { return objects.find(o => o.id === selected); }
 
-/* ── UI ───────────────────────────────────────────────────────────── */
-export function initThreeD() {
-  host = $('#threePanel'); if (!host) return;
-  host.innerHTML = `<div class="td-wrap">
-    <div class="td-toolbar" id="tdToolbar"></div>
-    <div class="td-main">
-      <div class="td-view"><canvas class="td-canvas" id="tdCanvas"></canvas>
-        <div class="td-badge" id="tdBadge">объектов: 0</div>
-        <div class="td-hint">Тяните мышью — вращение · колесо — зум · клик — выбор</div></div>
-      <div class="td-side">
-        <h4>Объекты</h4><div class="td-list" id="tdList"></div>
-        <div class="td-props" id="tdProps"></div>
+/* ── UI: a dedicated large stage (a 200px rail panel cannot host a 3D
+   viewport, and a hidden panel never reports a canvas size). ───────────── */
+function sizeCanvas() {
+  if (!stageCanvas || !stage) return [0, 0];
+  const view = stageCanvas.parentElement;
+  const r = view?.getBoundingClientRect();
+  const w = Math.max(320, Math.round(r?.width || 0) || 0);
+  const h = Math.max(240, Math.round(r?.height || 0) || 0);
+  if (w < 320) return [0, 0];
+  canvas = stageCanvas; g = stageG;
+  return [w, h];
+}
+export function threeDRender() { dirty = true; render(); return threeDStats(); }
+export function threeDStats() {
+  return { objects: objects.length, selected, drawn: drawnPolys, visible,
+           width: stageCanvas?.width || 0, height: stageCanvas?.height || 0 };
+}
+export function openThreeStage() {
+  if (!stage) buildStage();
+  if (!stage) return null;
+  stage.classList.add('show');
+  visible = true;
+  const [w, h] = sizeCanvas();
+  dirty = true;
+  // Several frames: layout may settle asynchronously (fonts, flex, animation).
+  render();
+  requestAnimationFrame(() => { sizeCanvas(); dirty = true; render(); });
+  setTimeout(() => { sizeCanvas(); dirty = true; render(); }, 120);
+  setTimeout(() => { sizeCanvas(); dirty = true; render(); }, 420);
+  emit('three:opened', { w, h });
+  return stage;
+}
+export function closeThreeStage() {
+  if (!stage) return;
+  stage.classList.remove('show'); visible = false;
+}
+export function toggleThreeStage() { return visible ? (closeThreeStage(), false) : (openThreeStage(), true); }
+
+function toolbarButtons(target, withLabels = true) {
+  target.innerHTML = '';
+  for (const t of TYPES) {
+    const b = el('button', { class: 'mini-btn td-add', title: 'Добавить: ' + t.name,
+                             'data-add': t.id });
+    b.innerHTML = icon(t.icon, 14) + (withLabels ? `<span>${t.name}</span>` : '');
+    b.onclick = () => { addObject(t.id); openThreeStage(); };
+    target.appendChild(b);
+  }
+}
+function buildStage() {
+  stage = $('#threeStage'); if (!stage) return;
+  stage.innerHTML = `<div class="three-stage-head">
+      <div class="three-stage-title">${icon('cube', 17)}<b>3D-редактор</b>
+        <span class="pill" id="tdBadge">объектов: 0</span></div>
+      <div class="three-stage-actions">
+        <button class="mini-btn" id="tdClear">Очистить</button>
+        <button class="mini-btn" id="tdCamera">Сброс камеры</button>
+        <button class="mini-btn" id="tdGrid">Сетка</button>
+        <button class="mini-btn" id="tdWire">Каркас</button>
+        <button class="mini-btn" id="tdExport">В проект</button>
+        <button class="mini-btn" id="tdClose" title="Закрыть">${icon('close', 14)}</button>
       </div>
     </div>
-    <div class="td-actions">
-      <button class="mini-btn" id="tdGrid">Сетка</button>
-      <button class="mini-btn" id="tdWire">Каркас</button>
-      <button class="mini-btn" id="tdCamera">Сброс камеры</button>
-      <button class="mini-btn" id="tdExport">В проект</button>
-      <button class="mini-btn" id="tdWindow">В окне</button>
-    </div>
-  </div>`;
-  canvas = $('#tdCanvas'); g = canvas.getContext('2d');
-  panelRefs = { toolbar: $('#tdToolbar'), list: $('#tdList'), props: $('#tdProps'), badge: $('#tdBadge') };
+    <div class="td-wrap">
+      <div class="td-toolbar" id="tdToolbar"></div>
+      <div class="td-main">
+        <div class="td-view"><canvas class="td-canvas" id="tdCanvas" width="900" height="520"></canvas>
+          <div class="td-badge" id="tdHint">объектов: 0</div>
+          <div class="td-hint">Тяните мышью — вращение · колесо — зум · клик — выбор</div>
+          <div class="td-error hidden" id="tdError"></div>
+        </div>
+        <div class="td-side">
+          <h4>Объекты</h4><div class="td-list" id="tdList"></div>
+          <div class="td-props" id="tdProps"></div>
+        </div>
+      </div>
+    </div>`;
+  stageCanvas = $('#tdCanvas');
+  stageG = stageCanvas?.getContext('2d') || null;
+  canvas = stageCanvas; g = stageG;
+  panelRefs = { toolbar: $('#tdToolbar'), list: $('#tdList'), props: $('#tdProps'),
+                badge: $('#tdBadge'), hint: $('#tdHint'), error: $('#tdError') };
+  toolbarButtons(panelRefs.toolbar);
+  if (!stageG) panelRefs.error.textContent = 'Canvas недоступен в этом окружении.';
+  else panelRefs.error.classList.add('hidden');
 
-  for (const t of TYPES) {
-    const b = el('button', { class: 'mini-btn', title: 'Добавить: ' + t.name, onclick: () => addObject(t.id) });
-    b.innerHTML = icon(t.icon, 13) + `<span>${t.name}</span>`;
-    panelRefs.toolbar.appendChild(b);
-  }
   $('#tdGrid').onclick = () => { showGrid = !showGrid; $('#tdGrid').classList.toggle('active', showGrid); invalidate(); };
   $('#tdWire').onclick = () => { wire = !wire; $('#tdWire').classList.toggle('active', wire); invalidate(); };
   $('#tdCamera').onclick = () => { cam = { yaw: 0.7, pitch: 0.45, dist: 7.5 }; invalidate(); };
+  $('#tdClear').onclick = () => { clearScene(); openThreeStage(); };
   $('#tdExport').onclick = exportToProject;
-  $('#tdWindow').onclick = () => ctx.openThreeWindow?.();
+  $('#tdClose').onclick = closeThreeStage;
   $('#tdGrid').classList.toggle('active', showGrid);
 
-  canvas.addEventListener('pointerdown', e => {
-    const r = canvas.getBoundingClientRect();
-    drag = { x: e.clientX, y: e.clientY, yaw: cam.yaw, pitch: cam.pitch, moved: false };
-    canvas.setPointerCapture(e.pointerId);
+  stageCanvas?.addEventListener('pointerdown', e => {
+    const r = stageCanvas.getBoundingClientRect();
+    drag = { x: e.clientX, y: e.clientY, yaw: cam.yaw, pitch: cam.pitch };
+    stageCanvas.setPointerCapture(e.pointerId);
     pick(e.clientX - r.left, e.clientY - r.top);
   });
-  canvas.addEventListener('pointermove', e => {
+  stageCanvas?.addEventListener('pointermove', e => {
     if (!drag) return;
-    const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
-    if (Math.abs(dx) + Math.abs(dy) > 3) drag.moved = true;
-    cam.yaw = drag.yaw + dx * 0.008;
-    cam.pitch = Math.max(-1.4, Math.min(1.4, drag.pitch + dy * 0.008));
+    cam.yaw = drag.yaw + (e.clientX - drag.x) * 0.008;
+    cam.pitch = Math.max(-1.4, Math.min(1.4, drag.pitch + (e.clientY - drag.y) * 0.008));
     invalidate();
   });
-  canvas.addEventListener('pointerup', () => { drag = null; });
-  canvas.addEventListener('wheel', e => {
+  stageCanvas?.addEventListener('pointerup', () => { drag = null; });
+  stageCanvas?.addEventListener('wheel', e => {
     e.preventDefault();
     cam.dist = Math.max(3, Math.min(24, cam.dist + e.deltaY * 0.012));
     invalidate();
   }, { passive: false });
-
-  const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(() => invalidate()) : null;
-  ro?.observe(canvas.parentElement);
-  window.addEventListener('resize', invalidate);
-
+  stage?.addEventListener('keydown', e => {
+    if (e.key === 'ArrowLeft') { cam.yaw -= 0.15; invalidate(); }
+    if (e.key === 'ArrowRight') { cam.yaw += 0.15; invalidate(); }
+    if (e.key === 'ArrowUp') { cam.pitch = Math.max(-1.4, cam.pitch - 0.12); invalidate(); }
+    if (e.key === 'ArrowDown') { cam.pitch = Math.min(1.4, cam.pitch + 0.12); invalidate(); }
+    if (e.key === 'Escape') closeThreeStage();
+  });
+  stage.tabIndex = -1;
+  const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(() => { sizeCanvas(); dirty = true; }) : null;
+  ro?.observe(stageCanvas?.parentElement || stage);
+  window.addEventListener('resize', () => { sizeCanvas(); dirty = true; });
+  renderList(); renderProps();
+}
+export function initThreeD() {
+  host = $('#threePanel');
+  if (host) {
+    host.innerHTML = `<div class="three-rail">
+      <div class="three-rail-head"><div class="three-rail-ico">${icon('cube', 22)}</div>
+        <div><b>3D-редактор</b><p>Ставьте примитивы, меняйте размер и поворот, экспортируйте сцену в проект.</p></div></div>
+      <button class="btn btn-accent" id="tdOpen">${icon('maximize', 15)} Открыть редактор</button>
+      <div class="three-rail-label">Добавить объект</div>
+      <div class="three-rail-grid" id="tdRailAdd"></div>
+      <div class="three-rail-summary" id="tdRailSummary"></div>
+      <div class="three-rail-actions"><button class="mini-btn" id="tdRailExport">${icon('download', 13)} В проект</button></div>
+    </div>`;
+    toolbarButtons($('#tdRailAdd'), true);
+    $('#tdOpen').onclick = () => openThreeStage();
+    $('#tdRailExport').onclick = exportToProject;
+  }
+  buildStage();
   if (!objects.length) {
     addObject('cube');
-    const s = objects[0]; s.pos = [-1.6, 0, 0];
-    addObject('sphere'); objects[1].pos = [1.6, 0, 0]; objects[1].color = '#d97757';
+    objects[0].pos = [-1.6, 0, 0];
+    addObject('sphere');
+    objects[1].pos = [1.6, 0, 0]; objects[1].color = '#d97757';
     selected = objects[0].id; invalidate();
   }
-  renderList(); renderProps(); loop();
+  on('three:show', () => openThreeStage());
+  on('rail:tab', name => { if (name === 'three') openThreeStage(); });
+  renderList(); renderProps();
+  sizeCanvas();
+  loop();
   emit('three:ready');
 }
 function pick(x, y) {
-  const o = current();
+  if (!canvas) return;
   let best = null, bestArea = Infinity;
+  const [w, h] = [canvas.clientWidth || 400, canvas.clientHeight || 300];
   for (const obj of objects) {
-    const pts = geo(obj.type).V.map(p => project(worldPoint(obj, p), canvas.clientWidth, canvas.clientHeight));
+    const pts = geo(obj.type).V.map(p => project(worldPoint(obj, p), w, h));
     const xs = pts.map(p => p[0]), ys = pts.map(p => p[1]);
     const x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys);
     if (x >= x0 && x <= x1 && y >= y0 && y <= y1) {
@@ -303,8 +390,12 @@ function pick(x, y) {
 function renderList() {
   if (!panelRefs.list) return;
   panelRefs.list.innerHTML = '';
-  panelRefs.badge.textContent = 'объектов: ' + objects.length;
-  if (!objects.length) { panelRefs.list.innerHTML = '<div class="td-empty">Сцена пуста. Добавьте примитив сверху.</div>'; return; }
+  const label = 'объектов: ' + objects.length;
+  if (panelRefs.badge) panelRefs.badge.textContent = label;
+  if (panelRefs.hint) panelRefs.hint.textContent = label;
+  const rail = $('#tdRailSummary');
+  if (rail) rail.innerHTML = `${icon('layers', 14)} <b>${objects.length}</b> объектов · ${icon('cursor', 14)} выбран: ${esc(objects.find(o => o.id === selected)?.name || '—')}`;
+  if (!objects.length) { panelRefs.list.innerHTML = '<div class="td-empty">Сцена пуста. Добавьте примитив.</div>'; return; }
   for (const o of objects) {
     const row = el('div', { class: 'td-item' + (o.id === selected ? ' active' : '') });
     row.innerHTML = `<span class="td-swatch" style="background:${esc(o.color)}"></span><span class="grow">${esc(o.name)}</span>
@@ -323,16 +414,16 @@ function renderProps() {
   if (!panelRefs.props) return;
   const o = current();
   if (!o) { panelRefs.props.innerHTML = '<div class="td-empty">Выберите объект</div>'; return; }
-  const inp = (label, key, i, step = 0.1) => `<div><label>${label}</label>
-    <input type="number" step="${step}" data-prop="${key}" data-i="${i}" value="${Number(o[key][i]).toFixed(2)}"></div>`;
+  const inp = (key, i, step = 0.1) => `<input type="number" step="${step}" data-prop="${key}" data-i="${i}" value="${Number(o[key][i]).toFixed(2)}">`;
+  const rot = (i) => `<input type="number" step="5" data-prop="rot" data-i="${i}" value="${Math.round(o.rot[i] * 180 / Math.PI)}">`;
   panelRefs.props.innerHTML = `
     <label>Имя</label><input id="tdName" value="${esc(o.name)}" maxlength="60">
-    <label>Цвет</label><input type="color" id="tdColor" value="${esc(o.color)}" style="width:100%;height:28px;border:1px solid var(--border);border-radius:6px;background:var(--code-bg)">
-    <label>Позиция X / Y / Z</label><div class="td-triple">${inp('X', 'pos', 0)}${inp('Y', 'pos', 1)}${inp('Z', 'pos', 2)}</div>
-    <label>Поворот X / Y / Z (градусы)</label><div class="td-triple">
-      ${['X', 'Y', 'Z'].map((l, i) => `<div><input type="number" step="5" data-prop="rot" data-i="${i}" value="${Math.round(o.rot[i] * 180 / Math.PI)}"></div>`).join('')}</div>
-    <label>Масштаб</label><div class="td-triple">${inp('X', 'scale', 1)}${inp('Y', 'scale', 1)}${inp('Z', 'scale', 1)}</div>
-    <div class="rowflex mt8"><button class="mini-btn" id="tdDup">Дублировать</button><button class="mini-btn" id="tdReset">Сбросить</button></div>`;
+    <label>Цвет</label><input type="color" id="tdColor" value="${esc(o.color)}" class="td-color">
+    <label>Позиция X / Y / Z</label><div class="td-triple">${inp('pos', 0)}${inp('pos', 1)}${inp('pos', 2)}</div>
+    <label>Поворот X / Y / Z (°)</label><div class="td-triple">${rot(0)}${rot(1)}${rot(2)}</div>
+    <label>Масштаб X / Y / Z</label><div class="td-triple">${inp('scale', 0)}${inp('scale', 1)}${inp('scale', 2)}</div>
+    <div class="rowflex mt8"><button class="mini-btn" id="tdDup">${icon('copy', 12)} Дублировать</button>
+      <button class="mini-btn" id="tdReset">${icon('refresh', 12)} Сбросить</button></div>`;
   $('#tdName').oninput = e => { o.name = e.target.value.slice(0, 60); renderList(); };
   $('#tdColor').oninput = e => { o.color = e.target.value; renderList(); invalidate(); };
   panelRefs.props.querySelectorAll('[data-prop]').forEach(inp => {
@@ -345,12 +436,19 @@ function renderProps() {
     };
   });
   $('#tdDup').onclick = () => {
-    const c = JSON.parse(JSON.stringify(o)); c.id = makeObject(o.type).id; c.name = o.name + ' копия';
-    c.pos[0] += 1.2; objects.push(c); selected = c.id; renderList(); renderProps(); invalidate();
+    const c = JSON.parse(JSON.stringify(o)); c.id = makeObject(o.type).id;
+    c.name = o.name + ' копия'; c.pos[0] += 1.2;
+    objects.push(c); selected = c.id; renderList(); renderProps(); invalidate();
   };
-  $('#tdReset').onclick = () => { o.pos = [0, 0, 0]; o.rot = [0, 0, 0]; o.scale = [1, 1, 1]; renderProps(); invalidate(); };
+  $('#tdReset').onclick = () => { o.pos = [0,0,0]; o.rot = [0,0,0]; o.scale = [1,1,1]; renderProps(); invalidate(); };
 }
-
+function invalidate() { dirty = true; }
+function loop() {
+  const now = performance.now();
+  if (visible && g && now - lastFrame > 28) { lastFrame = now; dirty = true; }
+  if (dirty) render();
+  requestAnimationFrame(loop);
+}
 /* ── export ───────────────────────────────────────────────────────── */
 function standaloneHtml(scene) {
   const data = JSON.stringify(scene).replace(/</g, '\\u003c');
@@ -398,9 +496,5 @@ export function exportToProject() {
   toast('Сцена сохранена: scene.json и 3d.html', 'ok');
   ctx.openFile?.('3d.html');
 }
-export function openThreeDWindow() {
-  if (!host) return null;
-  ctx.selectRailTab?.('three');
-  return ctx.movePanelWindow?.(host, { id: 'win-three', title: '3D-редактор', icon: 'cube', width: 800, height: 540 });
-}
-export function threeDSummary() { return { objects: objects.length, selected }; }
+export function openThreeDWindow() { return openThreeStage(); }
+export function threeDSummary() { return threeDStats(); }

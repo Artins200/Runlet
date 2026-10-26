@@ -23,7 +23,7 @@ const IS_DEV = process.env.RUNLET_DEV === '1';
 const MAX_IPC_TEXT = 4 * 1024 * 1024;       // 4 MB per IPC text payload
 const MAX_API_BODY = 6 * 1024 * 1024;       // 6 MB per REST body
 const ENGINE_TIMEOUT = 15000;
-let nativeFrame = false;
+let nativeFrame = true;   // normal OS window: minimize / maximize / close
 
 let win = null;
 let engine = null;
@@ -395,6 +395,63 @@ function registerIPC() {
     return !!safe;
   });
   ipcMain.handle('preview:popout', (_, html) => openPreviewPopout(html));
+  ipcMain.handle('fs:openFolder', async () => {
+    const r = await dialog.showOpenDialog(win, { properties: ['openDirectory'], title: 'Открыть папку проекта' });
+    if (r.canceled || !r.filePaths[0]) return null;
+    const root = r.filePaths[0];
+    const files = {};
+    const TEXT = /\.(html?|css|scss|less|js|mjs|cjs|ts|jsx|tsx|json|md|txt|svg|xml|yml|yaml|map)$/i;
+    const BIN = /\.(png|jpe?g|gif|webp|ico|woff2?|ttf|otf|mp3|wav|mp4|webm)$/i;
+    const walk = (dir, base, depth) => {
+      if (depth > 6 || Object.keys(files).length >= 200) return;
+      let entries = [];
+      try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch (_) { return; }
+      for (const ent of entries) {
+        if (ent.name.startsWith('.') || ent.name === 'node_modules' || ent.name === 'dist') continue;
+        const full = path.join(dir, ent.name);
+        const rel = base ? base + '/' + ent.name : ent.name;
+        if (ent.isDirectory()) { walk(full, rel, depth + 1); continue; }
+        if (!ent.isFile()) continue;
+        try {
+          const st = fs.statSync(full);
+          if (st.size > 2 * 1024 * 1024) continue;
+          if (BIN.test(ent.name)) {
+            const ext = path.extname(ent.name).slice(1).toLowerCase();
+            const mime = { jpg: 'image/jpeg', svg: 'image/svg+xml', ttf: 'font/ttf', otf: 'font/otf' }[ext] || ('image/' + (ext === 'jpg' ? 'jpeg' : ext));
+            files[rel] = 'data:' + mime + ';base64,' + fs.readFileSync(full).toString('base64');
+          } else if (TEXT.test(ent.name)) {
+            files[rel] = fs.readFileSync(full, 'utf8');
+          }
+        } catch (_) { /* skip unreadable */ }
+      }
+    };
+    walk(root, '', 0);
+    return { name: path.basename(root), files };
+  });
+  ipcMain.handle('fs:saveProject', async (_, map) => {
+    if (!map || typeof map !== 'object' || Array.isArray(map)) return { ok: false, error: 'bad files' };
+    const r = await dialog.showOpenDialog(win, { properties: ['openDirectory', 'createDirectory'], title: 'Куда сохранить проект' });
+    if (r.canceled || !r.filePaths[0]) return { ok: false, error: 'cancelled' };
+    const root = r.filePaths[0];
+    let count = 0;
+    for (const [name, content] of Object.entries(map).slice(0, 200)) {
+      const key = liveSafeName(name);
+      if (!key || typeof content !== 'string') continue;
+      const target = path.resolve(root, key);
+      if (!target.startsWith(root + path.sep)) continue;   // containment
+      try {
+        fs.mkdirSync(path.dirname(target), { recursive: true });
+        if (/^data:/i.test(content)) {
+          const comma = content.indexOf(',');
+          const meta = content.slice(5, comma), payload = content.slice(comma + 1);
+          if (/;base64/i.test(meta)) fs.writeFileSync(target, Buffer.from(payload, 'base64'));
+          else fs.writeFileSync(target, decodeURIComponent(payload));
+        } else fs.writeFileSync(target, content, 'utf8');
+        count++;
+      } catch (_) { /* skip */ }
+    }
+    return { ok: true, count };
+  });
   ipcMain.handle('live:start', async (_, payload) => {
     if (!isPlainObject(payload)) return { ok: false, error: 'bad payload' };
     return startLive(payload.port, payload.project);

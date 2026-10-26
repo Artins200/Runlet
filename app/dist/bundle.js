@@ -41,6 +41,116 @@
     mod
   ));
 
+  // app/src/core/icons.js
+  function icon(name2, size = 16, cls = "ico") {
+    const body = P[name2] || P.info;
+    return `<svg class="${cls}" viewBox="0 0 24 24" width="${size}" height="${size}" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${body}</svg>`;
+  }
+  function deEmoji(text) {
+    return String(text ?? "").replace(/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}\u{2B00}-\u{2BFF}]/gu, "").replace(/\s{2,}/g, " ").trim();
+  }
+  var P, ICON_NAMES;
+  var init_icons = __esm({
+    "app/src/core/icons.js"() {
+      P = {
+        play: '<path d="M8 5.5 18 12 8 18.5Z" fill="currentColor" stroke="none"/>',
+        stop: '<rect x="6" y="6" width="12" height="12" rx="2" fill="currentColor" stroke="none"/>',
+        refresh: '<path d="M20 11a8 8 0 1 0-2.3 6.3M20 5v6h-6"/>',
+        format: '<path d="M4 6h16M4 10h10M4 14h16M4 18h7"/>',
+        save: '<path d="M5 3h11l3 3v15H5zM8 3v6h8V3M8 21v-7h8v7"/>',
+        download: '<path d="M12 3v12m0 0 4-4m-4 4-4-4M4 19h16"/>',
+        upload: '<path d="M12 16V4m0 0-4 4m4-4 4 4M4 19h16"/>',
+        search: '<circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/>',
+        settings: '<circle cx="12" cy="12" r="3.2"/><path d="M12 2v3m0 14v3M2 12h3m14 0h3M5 5l2 2m10 10 2 2M19 5l-2 2M7 17l-2 2"/>',
+        sliders: '<path d="M4 7h9m4 0h3M4 17h3m4 0h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/>',
+        columns: '<rect x="3" y="4" width="5" height="16" rx="1.3"/><rect x="9.5" y="4" width="5" height="16" rx="1.3"/><rect x="16" y="4" width="5" height="16" rx="1.3"/>',
+        rows: '<rect x="3" y="4" width="18" height="4.3" rx="1.3"/><rect x="3" y="9.8" width="18" height="4.3" rx="1.3"/><rect x="3" y="15.6" width="18" height="4.3" rx="1.3"/>',
+        tabs: '<path d="M3 8a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/>',
+        theme: '<path d="M12 3a9 9 0 1 0 9 9 7 7 0 0 1-9-9Z"/>',
+        density: '<path d="M4 7h16M4 12h16M4 17h16"/>',
+        chart: '<path d="M4 19V5m0 14h16M7 15l4-5 3 3 5-7"/>',
+        folder: '<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/>',
+        file: '<path d="M6 3h8l4 4v14H6zM14 3v5h4"/>',
+        files: '<path d="M8 3h7l4 4v10M5 7v14h11l3-3V7Z"/>',
+        plus: '<path d="M12 5v14M5 12h14"/>',
+        minus: '<path d="M5 12h14"/>',
+        close: '<path d="m6 6 12 12M18 6 6 18"/>',
+        check: '<path d="m4 12 5 5L20 6"/>',
+        chevronDown: '<path d="m6 9 6 6 6-6"/>',
+        chevronRight: '<path d="m9 6 6 6-6 6"/>',
+        chevronUp: '<path d="m6 15 6-6 6 6"/>',
+        arrowUp: '<path d="M12 19V5m0 0-5 5m5-5 5 5"/>',
+        arrowDown: '<path d="M12 5v14m0 0-5-5m5 5 5-5"/>',
+        arrowLeft: '<path d="M19 12H5m0 0 5-5m-5 5 5 5"/>',
+        arrowRight: '<path d="M5 12h14m0 0-5-5m5 5-5 5"/>',
+        maximize: '<path d="M4 9V4h5M20 15v5h-5M4 4l6 6M20 20l-6-6"/>',
+        minimize: '<path d="M4 9h6M20 15h-6M4 9l6 6M20 15l-6-6"/>',
+        external: '<path d="M13 4h7v7M20 4 9 15M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/>',
+        grid: '<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18M15 3v18"/>',
+        ruler: '<path d="M3 8h18v8H3zM7 8v4M11 8v3M15 8v4M19 8v3"/>',
+        droplet: '<path d="M12 3s6 6.5 6 10.5A6 6 0 0 1 6 13.5C6 9.5 12 3 12 3Z"/>',
+        target: '<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/><path d="M12 2v3m0 14v3M2 12h3m14 0h3"/>',
+        rotate: '<path d="M20 11a8 8 0 1 0-2.3 6.3M20 5v6h-6"/>',
+        monitor: '<rect x="2.5" y="4" width="19" height="13" rx="2"/><path d="M9 21h6M12 17v4"/>',
+        tablet: '<rect x="5" y="2.5" width="14" height="19" rx="2"/><path d="M11 18.5h2"/>',
+        phone: '<rect x="7" y="2.5" width="10" height="19" rx="2"/><path d="M11 18.5h2"/>',
+        resize: '<path d="M4 14 14 4M8 18 18 8"/>',
+        code: '<path d="m8 6-6 6 6 6m8-12 6 6-6 6m-2-14-4 16"/>',
+        cube: '<path d="m12 2 9 5v10l-9 5-9-5V7Z"/><path d="m3 7 9 5 9-5M12 12v10"/>',
+        box: '<path d="M3 7.5 12 3l9 4.5v9L12 21l-9-4.5Z"/><path d="M3 7.5 12 12l9-4.5M12 12v9"/>',
+        layers: '<path d="m12 3 9 5-9 5-9-5Z"/><path d="m3 12 9 5 9-5M3 16l9 5 9-5"/>',
+        book: '<path d="M4 4.5A2.5 2.5 0 0 1 6.5 2H20v17H6.5A2.5 2.5 0 0 0 4 21.5Z"/><path d="M4 18.5A2.5 2.5 0 0 1 6.5 16H20"/>',
+        puzzle: '<path d="M9 3h6v3a2 2 0 1 0 4 0V3h2v6h-3a2 2 0 1 0 0 4h3v6h-6v-3a2 2 0 1 0-4 0v3H3v-6h3a2 2 0 1 0 0-4H3V3Z"/>',
+        list: '<path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>',
+        terminal: '<rect x="2.5" y="4" width="19" height="16" rx="2"/><path d="m6 9 3 3-3 3M12 15h6"/>',
+        bug: '<rect x="6" y="7" width="12" height="12" rx="4"/><path d="M9 7V5a3 3 0 0 1 6 0v2M3 11h3m12 0h3M3 16h3m12 0h3M6 20l-2 2m14-2 2 2"/>',
+        network: '<circle cx="12" cy="4" r="2"/><circle cx="5" cy="19" r="2"/><circle cx="19" cy="19" r="2"/><path d="M12 6v6m0 0-6 6m6-6 6 6"/>',
+        database: '<ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/>',
+        gauge: '<path d="M4 18a8 8 0 1 1 16 0"/><path d="m12 14 4-4"/><circle cx="12" cy="18" r="1.4" fill="currentColor" stroke="none"/>',
+        journal: '<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 7h8M8 11h8M8 15h5"/>',
+        copy: '<rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/>',
+        edit: '<path d="M4 20h4l11-11-4-4L4 16Z"/><path d="m14 6 4 4"/>',
+        trash: '<path d="M4 7h16M9 7V4h6v3M6 7l1 14h10l1-14M10 11v6m4-6v6"/>',
+        globe: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18"/>',
+        server: '<rect x="3" y="3" width="18" height="8" rx="2"/><rect x="3" y="13" width="18" height="8" rx="2"/><path d="M7 7h.01M7 17h.01"/>',
+        window: '<rect x="2.5" y="4" width="19" height="16" rx="2"/><path d="M2.5 9h19M6 6.5h.01M9 6.5h.01M12 6.5h.01"/>',
+        keyboard: '<rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M6 13h.01M10 13h.01M14 13h.01M18 13h.01M8 16h8"/>',
+        info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5h.01"/>',
+        help: '<circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 1 1 3.5 2.3c-.9.4-1 1.1-1 1.7M12 17h.01"/>',
+        home: '<path d="M4 11 12 4l8 7v9H4Z"/><path d="M9 20v-6h6v6"/>',
+        clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+        eye: '<path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6-10-6-10-6Z"/><circle cx="12" cy="12" r="2.6"/>',
+        eyeOff: '<path d="M4 4 20 20M9.9 5.2A11 11 0 0 1 12 5c6.5 0 10 7 10 7a16 16 0 0 1-3 3.6M6.2 7.6C3.5 9.2 2 12 2 12s3.5 7 10 7a10 10 0 0 0 3.3-.5"/>',
+        filter: '<path d="M3 5h18l-7 8v6l-4 2v-8Z"/>',
+        link: '<path d="M10 13a5 5 0 0 0 7 0l2-2a5 5 0 0 0-7-7l-1 1M14 11a5 5 0 0 0-7 0l-2 2a5 5 0 0 0 7 7l1-1"/>',
+        image: '<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="8.5" cy="9.5" r="1.5"/><path d="m4 17 5-5 3 3 4-4 4 4"/>',
+        palette: '<path d="M12 3a9 9 0 0 0 0 18c1.4 0 2-1 2-2s-.8-2 .3-2.7A2 2 0 0 0 15 12a8 8 0 0 1-3-9Z"/><circle cx="7.5" cy="11" r="1" fill="currentColor" stroke="none"/><circle cx="10" cy="7" r="1" fill="currentColor" stroke="none"/><circle cx="15" cy="8" r="1" fill="currentColor" stroke="none"/>',
+        scissors: '<circle cx="6" cy="6" r="2.5"/><circle cx="6" cy="18" r="2.5"/><path d="M8 8 20 18M8 16 20 6"/>',
+        brackets: '<path d="M8 4H5a2 2 0 0 0-2 2v4a2 2 0 0 1-2 2 2 2 0 0 1 2 2v4a2 2 0 0 0 2 2h3M16 4h3a2 2 0 0 1 2 2v4a2 2 0 0 0 2 2 2 2 0 0 0-2 2v4a2 2 0 0 1-2 2h-3"/>',
+        indent: '<path d="M4 6h16M4 12h10M4 18h16M17 10l3 2-3 2"/>',
+        wrap: '<path d="M4 6h16M4 12h13a3 3 0 0 1 0 6h-3m0 0 2-2m-2 2 2 2M4 18h5"/>',
+        pin: '<path d="M9 3h6l-1 6 4 3v2H6v-2l4-3Z"/><path d="M12 14v7"/>',
+        more: '<circle cx="5" cy="12" r="1.4" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.4" fill="currentColor" stroke="none"/><circle cx="19" cy="12" r="1.4" fill="currentColor" stroke="none"/>',
+        cursor: '<path d="M5 3v16l4-4 3 5 2-1-3-5h6Z"/>',
+        move: '<path d="M12 3v18M3 12h18M9 6l3-3 3 3M9 18l3 3 3-3M6 9l-3 3 3 3M18 9l3 3-3 3"/>',
+        sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5M17.5 17.5 19 19M19 5l-1.5 1.5M6.5 17.5 5 19"/>',
+        moon: '<path d="M20 14A8 8 0 0 1 10 4a8 8 0 1 0 10 10Z"/>',
+        contrast: '<circle cx="12" cy="12" r="9"/><path d="M12 3v18a9 9 0 0 0 0-18Z" fill="currentColor" stroke="none"/>',
+        spark: '<path d="M12 3v4m0 10v4M3 12h4m10 0h4M6 6l2.5 2.5M15.5 15.5 18 18M18 6l-2.5 2.5M8.5 15.5 6 18"/>',
+        package: '<path d="m12 3 9 4.5v9L12 21l-9-4.5v-9Z"/><path d="M3 7.5 12 12l9-4.5M12 12v9"/>',
+        archive: '<rect x="3" y="4" width="18" height="5" rx="1"/><path d="M5 9v11h14V9M10 13h4"/>',
+        history: '<path d="M3 12a9 9 0 1 0 3-6.7M3 4v5h5"/><path d="M12 8v5l3 2"/>',
+        shield: '<path d="M12 3 4 6v6c0 5 3.5 8 8 9 4.5-1 8-4 8-9V6Z"/><path d="m9 12 2 2 4-4"/>',
+        wand: '<path d="m4 20 10-10M13 6l5 5M6 3l1 2 2 1-2 1-1 2-1-2-2-1 2-1ZM19 14l.7 1.3L21 16l-1.3.7L19 18l-.7-1.3L17 16l1.3-.7Z"/>',
+        text: '<path d="M4 6V4h16v2M12 4v16M9 20h6"/>',
+        braces: '<path d="M9 3H7a2 2 0 0 0-2 2v4a2 2 0 0 1-2 2 2 2 0 0 1 2 2v6a2 2 0 0 0 2 2h2M15 3h2a2 2 0 0 1 2 2v4a2 2 0 0 0 2 2 2 2 0 0 0-2 2v6a2 2 0 0 1-2 2h-2"/>',
+        users: '<circle cx="9" cy="8" r="3"/><path d="M3 20v-2a6 6 0 0 1 12 0v2M16 5a3 3 0 0 1 0 6m2 9v-2a5 5 0 0 0-2-4"/>',
+        key: '<circle cx="8" cy="15" r="4"/><path d="m11 12 9-9 2 2-2 2 1 1-2 2-1-1-2 2 2 2-2 2-2-2-2 2"/>'
+      };
+      ICON_NAMES = Object.keys(P);
+    }
+  });
+
   // app/src/core/core.js
   function registerCommand(id2, def) {
     commands.set(id2, { id: id2, ...def });
@@ -148,13 +258,16 @@
     }
   }
   function toast(msg, type = "info", title = "") {
-    const icons = { ok: "", err: "", warn: "", info: "\u2139" };
+    const icons = { ok: "check", err: "close", warn: "info", info: "info" };
     const box = $("#toasts");
     if (!box) return;
+    const ic = document.createElement("span");
+    ic.className = "t-icon";
+    ic.innerHTML = icon(icons[type] || "info", 15);
     const node = el(
       "div",
       { class: "toast " + type },
-      el("span", { class: "t-icon", text: icons[type] || "\u2022" }),
+      ic,
       el("div", {}, title ? el("b", { text: title }) : null, el("span", { text: msg }))
     );
     box.appendChild(node);
@@ -220,9 +333,9 @@
   }
   function applyTheme() {
     const s = state.settings;
-    s.accent = sanitizeColor(s.accent);
-    s.fontSize = Math.max(9, Math.min(28, Number(s.fontSize) || 13));
-    s.lineHeight = Math.max(1, Math.min(2.5, Number(s.lineHeight) || 1.6));
+    s.accent = sanitizeColor(s.accent, "#4f8ff7");
+    s.fontSize = Math.max(12, Math.min(28, Number(s.fontSize) || 16));
+    s.lineHeight = Math.max(1.3, Math.min(2, Number(s.lineHeight) || 1.55));
     s.tabSize = Math.max(1, Math.min(8, Math.round(Number(s.tabSize) || 2)));
     s.theme = ["auto", "dark", "light", "contrast"].includes(s.theme) ? s.theme : "auto";
     s.density = ["comfy", "compact"].includes(s.density) ? s.density : "comfy";
@@ -231,10 +344,12 @@
     if (theme2 === "auto") theme2 = matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
     document.documentElement.dataset.theme = theme2;
     document.documentElement.dataset.density = s.density;
+    document.documentElement.dataset.anim = s.animations === false ? "off" : "on";
     document.documentElement.style.setProperty("--accent", s.accent);
     document.documentElement.style.setProperty("--accent2", shiftHue(s.accent, 42));
     document.documentElement.style.setProperty("--cm-fs", s.fontSize + "px");
     document.documentElement.style.setProperty("--cm-lh", String(s.lineHeight));
+    document.documentElement.style.setProperty("--fs-ui", (s.fontSize > 18 ? 15 : 14) + "px");
     const mono = {
       mono: '"JetBrains Mono", "Fira Code", "SF Mono", Consolas, monospace',
       system: "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
@@ -300,20 +415,53 @@
     const want = k.key === "Esc" ? "Escape" : k.key;
     return !!(e.ctrlKey || e.metaKey) === k.ctrl && e.altKey === k.alt && e.shiftKey === k.shift && (key === want || key.toLowerCase() === String(want).toLowerCase());
   }
+  function setFontZoom(delta, absolute = null) {
+    const s = state.settings;
+    const next = absolute == null ? s.fontSize + delta : absolute;
+    s.fontSize = Math.max(12, Math.min(28, Math.round(next * 10) / 10));
+    applyTheme();
+    emit("settings:changed");
+    const lab = $("#fontSizeLabel");
+    if (lab) lab.textContent = Math.round(s.fontSize) + "px";
+    return s.fontSize;
+  }
+  function toggleWrap(force = null) {
+    state.settings.wrap = force == null ? !state.settings.wrap : !!force;
+    applyTheme();
+    emit("settings:changed");
+    const b = $("#wrapToggle");
+    if (b) b.classList.toggle("active", state.settings.wrap);
+    return state.settings.wrap;
+  }
+  function hexLum(hex) {
+    const h = String(hex || "").replace("#", "");
+    if (!/^[0-9a-f]{6}$/i.test(h)) return 0;
+    const ch = [0, 2, 4].map((i4) => {
+      const v = parseInt(h.slice(i4, i4 + 2), 16) / 255;
+      return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
+    });
+    return 0.2126 * ch[0] + 0.7152 * ch[1] + 0.0722 * ch[2];
+  }
+  function contrastRatio(a, b) {
+    const l1 = hexLum(a), l2 = hexLum(b);
+    const hi = Math.max(l1, l2), lo = Math.min(l1, l2);
+    return Math.round((hi + 0.05) / (lo + 0.05) * 100) / 100;
+  }
   var DEFAULT_SETTINGS, DEFAULT_FILES, state, ctx, listeners, commands, $, $$;
   var init_core = __esm({
     "app/src/core/core.js"() {
+      init_icons();
       DEFAULT_SETTINGS = {
         theme: "auto",
         accent: "#4f8ff7",
         density: "comfy",
-        fontSize: 13,
+        fontSize: 16,
         fontFamily: "mono",
-        lineHeight: 1.6,
+        lineHeight: 1.55,
         tabSize: 2,
         showWhitespace: false,
         showInvisibles: true,
-        wrap: false,
+        wrap: true,
         cursorStyle: "smooth",
         smoothScroll: true,
         stickyHeaders: true,
@@ -339,12 +487,16 @@
         confirmDelete: true,
         showLauncher: true,
         windowedMode: false,
-        nativeFrame: false,
+        nativeFrame: true,
         livePort: 5500,
+        appWindowed: true,
+        animations: true,
+        fontSizeMin: 12,
+        fontSizeMax: 28,
         // Customisable quick-action toolbar. Commands come from the registry;
         // users can replace any entry from a preset list in Settings -> Buttons.
-        toolbarButtons: ["run", "liveServer", "openSite", "format", "save", "download", "exportProject", "importProject"],
-        toolbarSecondary: ["analyze", "windowedMode", "openThreeD", "tour", "helpWelcome"],
+        toolbarButtons: ["run", "save"],
+        toolbarSecondary: ["analyze"],
         // Least-privilege sandbox for the preview iframe. Enabling these widens the
         // attack surface for untrusted/shared projects — keep them off by default.
         sandboxPermissions: {
@@ -6369,127 +6521,22 @@ reset.addEventListener('click', () => {
     }
   });
 
-  // app/src/core/icons.js
-  function icon(name2, size = 16, cls = "ico") {
-    const body = P[name2] || P.info;
-    return `<svg class="${cls}" viewBox="0 0 24 24" width="${size}" height="${size}" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${body}</svg>`;
-  }
-  function deEmoji(text) {
-    return String(text ?? "").replace(/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}\u{2B00}-\u{2BFF}]/gu, "").replace(/\s{2,}/g, " ").trim();
-  }
-  var P, ICON_NAMES;
-  var init_icons = __esm({
-    "app/src/core/icons.js"() {
-      P = {
-        play: '<path d="M8 5.5 18 12 8 18.5Z" fill="currentColor" stroke="none"/>',
-        stop: '<rect x="6" y="6" width="12" height="12" rx="2" fill="currentColor" stroke="none"/>',
-        refresh: '<path d="M20 11a8 8 0 1 0-2.3 6.3M20 5v6h-6"/>',
-        format: '<path d="M4 6h16M4 10h10M4 14h16M4 18h7"/>',
-        save: '<path d="M5 3h11l3 3v15H5zM8 3v6h8V3M8 21v-7h8v7"/>',
-        download: '<path d="M12 3v12m0 0 4-4m-4 4-4-4M4 19h16"/>',
-        upload: '<path d="M12 16V4m0 0-4 4m4-4 4 4M4 19h16"/>',
-        search: '<circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/>',
-        settings: '<circle cx="12" cy="12" r="3.2"/><path d="M12 2v3m0 14v3M2 12h3m14 0h3M5 5l2 2m10 10 2 2M19 5l-2 2M7 17l-2 2"/>',
-        sliders: '<path d="M4 7h9m4 0h3M4 17h3m4 0h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/>',
-        columns: '<rect x="3" y="4" width="5" height="16" rx="1.3"/><rect x="9.5" y="4" width="5" height="16" rx="1.3"/><rect x="16" y="4" width="5" height="16" rx="1.3"/>',
-        rows: '<rect x="3" y="4" width="18" height="4.3" rx="1.3"/><rect x="3" y="9.8" width="18" height="4.3" rx="1.3"/><rect x="3" y="15.6" width="18" height="4.3" rx="1.3"/>',
-        tabs: '<path d="M3 8a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/>',
-        theme: '<path d="M12 3a9 9 0 1 0 9 9 7 7 0 0 1-9-9Z"/>',
-        density: '<path d="M4 7h16M4 12h16M4 17h16"/>',
-        chart: '<path d="M4 19V5m0 14h16M7 15l4-5 3 3 5-7"/>',
-        folder: '<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/>',
-        file: '<path d="M6 3h8l4 4v14H6zM14 3v5h4"/>',
-        files: '<path d="M8 3h7l4 4v10M5 7v14h11l3-3V7Z"/>',
-        plus: '<path d="M12 5v14M5 12h14"/>',
-        minus: '<path d="M5 12h14"/>',
-        close: '<path d="m6 6 12 12M18 6 6 18"/>',
-        check: '<path d="m4 12 5 5L20 6"/>',
-        chevronDown: '<path d="m6 9 6 6 6-6"/>',
-        chevronRight: '<path d="m9 6 6 6-6 6"/>',
-        chevronUp: '<path d="m6 15 6-6 6 6"/>',
-        arrowUp: '<path d="M12 19V5m0 0-5 5m5-5 5 5"/>',
-        arrowDown: '<path d="M12 5v14m0 0-5-5m5 5 5-5"/>',
-        arrowLeft: '<path d="M19 12H5m0 0 5-5m-5 5 5 5"/>',
-        arrowRight: '<path d="M5 12h14m0 0-5-5m5 5-5 5"/>',
-        maximize: '<path d="M4 9V4h5M20 15v5h-5M4 4l6 6M20 20l-6-6"/>',
-        minimize: '<path d="M4 9h6M20 15h-6M4 9l6 6M20 15l-6-6"/>',
-        external: '<path d="M13 4h7v7M20 4 9 15M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/>',
-        grid: '<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18M15 3v18"/>',
-        ruler: '<path d="M3 8h18v8H3zM7 8v4M11 8v3M15 8v4M19 8v3"/>',
-        droplet: '<path d="M12 3s6 6.5 6 10.5A6 6 0 0 1 6 13.5C6 9.5 12 3 12 3Z"/>',
-        target: '<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/><path d="M12 2v3m0 14v3M2 12h3m14 0h3"/>',
-        rotate: '<path d="M20 11a8 8 0 1 0-2.3 6.3M20 5v6h-6"/>',
-        monitor: '<rect x="2.5" y="4" width="19" height="13" rx="2"/><path d="M9 21h6M12 17v4"/>',
-        tablet: '<rect x="5" y="2.5" width="14" height="19" rx="2"/><path d="M11 18.5h2"/>',
-        phone: '<rect x="7" y="2.5" width="10" height="19" rx="2"/><path d="M11 18.5h2"/>',
-        resize: '<path d="M4 14 14 4M8 18 18 8"/>',
-        code: '<path d="m8 6-6 6 6 6m8-12 6 6-6 6m-2-14-4 16"/>',
-        cube: '<path d="m12 2 9 5v10l-9 5-9-5V7Z"/><path d="m3 7 9 5 9-5M12 12v10"/>',
-        box: '<path d="M3 7.5 12 3l9 4.5v9L12 21l-9-4.5Z"/><path d="M3 7.5 12 12l9-4.5M12 12v9"/>',
-        layers: '<path d="m12 3 9 5-9 5-9-5Z"/><path d="m3 12 9 5 9-5M3 16l9 5 9-5"/>',
-        book: '<path d="M4 4.5A2.5 2.5 0 0 1 6.5 2H20v17H6.5A2.5 2.5 0 0 0 4 21.5Z"/><path d="M4 18.5A2.5 2.5 0 0 1 6.5 16H20"/>',
-        puzzle: '<path d="M9 3h6v3a2 2 0 1 0 4 0V3h2v6h-3a2 2 0 1 0 0 4h3v6h-6v-3a2 2 0 1 0-4 0v3H3v-6h3a2 2 0 1 0 0-4H3V3Z"/>',
-        list: '<path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>',
-        terminal: '<rect x="2.5" y="4" width="19" height="16" rx="2"/><path d="m6 9 3 3-3 3M12 15h6"/>',
-        bug: '<rect x="6" y="7" width="12" height="12" rx="4"/><path d="M9 7V5a3 3 0 0 1 6 0v2M3 11h3m12 0h3M3 16h3m12 0h3M6 20l-2 2m14-2 2 2"/>',
-        network: '<circle cx="12" cy="4" r="2"/><circle cx="5" cy="19" r="2"/><circle cx="19" cy="19" r="2"/><path d="M12 6v6m0 0-6 6m6-6 6 6"/>',
-        database: '<ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/>',
-        gauge: '<path d="M4 18a8 8 0 1 1 16 0"/><path d="m12 14 4-4"/><circle cx="12" cy="18" r="1.4" fill="currentColor" stroke="none"/>',
-        journal: '<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 7h8M8 11h8M8 15h5"/>',
-        copy: '<rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/>',
-        edit: '<path d="M4 20h4l11-11-4-4L4 16Z"/><path d="m14 6 4 4"/>',
-        trash: '<path d="M4 7h16M9 7V4h6v3M6 7l1 14h10l1-14M10 11v6m4-6v6"/>',
-        globe: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18"/>',
-        server: '<rect x="3" y="3" width="18" height="8" rx="2"/><rect x="3" y="13" width="18" height="8" rx="2"/><path d="M7 7h.01M7 17h.01"/>',
-        window: '<rect x="2.5" y="4" width="19" height="16" rx="2"/><path d="M2.5 9h19M6 6.5h.01M9 6.5h.01M12 6.5h.01"/>',
-        keyboard: '<rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M6 13h.01M10 13h.01M14 13h.01M18 13h.01M8 16h8"/>',
-        info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5h.01"/>',
-        help: '<circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 1 1 3.5 2.3c-.9.4-1 1.1-1 1.7M12 17h.01"/>',
-        home: '<path d="M4 11 12 4l8 7v9H4Z"/><path d="M9 20v-6h6v6"/>',
-        clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
-        eye: '<path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6-10-6-10-6Z"/><circle cx="12" cy="12" r="2.6"/>',
-        eyeOff: '<path d="M4 4 20 20M9.9 5.2A11 11 0 0 1 12 5c6.5 0 10 7 10 7a16 16 0 0 1-3 3.6M6.2 7.6C3.5 9.2 2 12 2 12s3.5 7 10 7a10 10 0 0 0 3.3-.5"/>',
-        filter: '<path d="M3 5h18l-7 8v6l-4 2v-8Z"/>',
-        link: '<path d="M10 13a5 5 0 0 0 7 0l2-2a5 5 0 0 0-7-7l-1 1M14 11a5 5 0 0 0-7 0l-2 2a5 5 0 0 0 7 7l1-1"/>',
-        image: '<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="8.5" cy="9.5" r="1.5"/><path d="m4 17 5-5 3 3 4-4 4 4"/>',
-        palette: '<path d="M12 3a9 9 0 0 0 0 18c1.4 0 2-1 2-2s-.8-2 .3-2.7A2 2 0 0 0 15 12a8 8 0 0 1-3-9Z"/><circle cx="7.5" cy="11" r="1" fill="currentColor" stroke="none"/><circle cx="10" cy="7" r="1" fill="currentColor" stroke="none"/><circle cx="15" cy="8" r="1" fill="currentColor" stroke="none"/>',
-        scissors: '<circle cx="6" cy="6" r="2.5"/><circle cx="6" cy="18" r="2.5"/><path d="M8 8 20 18M8 16 20 6"/>',
-        brackets: '<path d="M8 4H5a2 2 0 0 0-2 2v4a2 2 0 0 1-2 2 2 2 0 0 1 2 2v4a2 2 0 0 0 2 2h3M16 4h3a2 2 0 0 1 2 2v4a2 2 0 0 0 2 2 2 2 0 0 0-2 2v4a2 2 0 0 1-2 2h-3"/>',
-        indent: '<path d="M4 6h16M4 12h10M4 18h16M17 10l3 2-3 2"/>',
-        wrap: '<path d="M4 6h16M4 12h13a3 3 0 0 1 0 6h-3m0 0 2-2m-2 2 2 2M4 18h5"/>',
-        pin: '<path d="M9 3h6l-1 6 4 3v2H6v-2l4-3Z"/><path d="M12 14v7"/>',
-        more: '<circle cx="5" cy="12" r="1.4" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.4" fill="currentColor" stroke="none"/><circle cx="19" cy="12" r="1.4" fill="currentColor" stroke="none"/>',
-        cursor: '<path d="M5 3v16l4-4 3 5 2-1-3-5h6Z"/>',
-        move: '<path d="M12 3v18M3 12h18M9 6l3-3 3 3M9 18l3 3 3-3M6 9l-3 3 3 3M18 9l3 3-3 3"/>',
-        sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5M17.5 17.5 19 19M19 5l-1.5 1.5M6.5 17.5 5 19"/>',
-        moon: '<path d="M20 14A8 8 0 0 1 10 4a8 8 0 1 0 10 10Z"/>',
-        contrast: '<circle cx="12" cy="12" r="9"/><path d="M12 3v18a9 9 0 0 0 0-18Z" fill="currentColor" stroke="none"/>',
-        spark: '<path d="M12 3v4m0 10v4M3 12h4m10 0h4M6 6l2.5 2.5M15.5 15.5 18 18M18 6l-2.5 2.5M8.5 15.5 6 18"/>',
-        package: '<path d="m12 3 9 4.5v9L12 21l-9-4.5v-9Z"/><path d="M3 7.5 12 12l9-4.5M12 12v9"/>',
-        archive: '<rect x="3" y="4" width="18" height="5" rx="1"/><path d="M5 9v11h14V9M10 13h4"/>',
-        history: '<path d="M3 12a9 9 0 1 0 3-6.7M3 4v5h5"/><path d="M12 8v5l3 2"/>',
-        shield: '<path d="M12 3 4 6v6c0 5 3.5 8 8 9 4.5-1 8-4 8-9V6Z"/><path d="m9 12 2 2 4-4"/>',
-        wand: '<path d="m4 20 10-10M13 6l5 5M6 3l1 2 2 1-2 1-1 2-1-2-2-1 2-1ZM19 14l.7 1.3L21 16l-1.3.7L19 18l-.7-1.3L17 16l1.3-.7Z"/>',
-        text: '<path d="M4 6V4h16v2M12 4v16M9 20h6"/>',
-        braces: '<path d="M9 3H7a2 2 0 0 0-2 2v4a2 2 0 0 1-2 2 2 2 0 0 1 2 2v6a2 2 0 0 0 2 2h2M15 3h2a2 2 0 0 1 2 2v4a2 2 0 0 0 2 2 2 2 0 0 0-2 2v6a2 2 0 0 1-2 2h-2"/>',
-        users: '<circle cx="9" cy="8" r="3"/><path d="M3 20v-2a6 6 0 0 1 12 0v2M16 5a3 3 0 0 1 0 6m2 9v-2a5 5 0 0 0-2-4"/>',
-        key: '<circle cx="8" cy="15" r="4"/><path d="m11 12 9-9 2 2-2 2 1 1-2 2-1-1-2 2 2 2-2 2-2-2-2 2"/>'
-      };
-      ICON_NAMES = Object.keys(P);
-    }
-  });
-
   // app/src/core/threeD.js
   var threeD_exports = {};
   __export(threeD_exports, {
     addObject: () => addObject,
     clearScene: () => clearScene,
+    closeThreeStage: () => closeThreeStage,
     exportToProject: () => exportToProject,
     getScene: () => getScene,
     initThreeD: () => initThreeD,
     openThreeDWindow: () => openThreeDWindow,
+    openThreeStage: () => openThreeStage,
     setScene: () => setScene,
-    threeDSummary: () => threeDSummary
+    threeDRender: () => threeDRender,
+    threeDStats: () => threeDStats,
+    threeDSummary: () => threeDSummary,
+    toggleThreeStage: () => toggleThreeStage
   });
   function geometry(type) {
     const V = [], F = [];
@@ -6582,9 +6629,13 @@ reset.addEventListener('click', () => {
     return `rgb(${Math.round(Math.min(255, r * k))},${Math.round(Math.min(255, g2 * k))},${Math.round(Math.min(255, b * k))})`;
   }
   function render() {
-    if (!canvas || !g) return;
+    if (!stageCanvas || !stageG) return;
+    canvas = stageCanvas;
+    g = stageG;
     const dpr = Math.min(2, window.devicePixelRatio || 1);
-    const w = canvas.clientWidth || 400, h = canvas.clientHeight || 300;
+    const [w0, h0] = sizeCanvas();
+    const w = w0 || canvas.clientWidth || 900, h = h0 || canvas.clientHeight || 520;
+    if (!g) return;
     if (canvas.width !== Math.round(w * dpr) || canvas.height !== Math.round(h * dpr)) {
       canvas.width = Math.round(w * dpr);
       canvas.height = Math.round(h * dpr);
@@ -6620,7 +6671,7 @@ reset.addEventListener('click', () => {
       }
     }
     polys.sort((a, b) => b.z - a.z);
-    const L = [0.35, 0.72, 0.6];
+    drawnPolys = polys.length;
     for (const p of polys) {
       const pr = p.face.map((v) => project(v, w, h));
       if (pr.some((v) => v[2] <= 0.15)) continue;
@@ -6657,13 +6708,6 @@ reset.addEventListener('click', () => {
     g.moveTo(p[0], p[1]);
     g.lineTo(q[0], q[1]);
     g.stroke();
-  }
-  function invalidate() {
-    dirty = true;
-  }
-  function loop() {
-    if (dirty) render();
-    requestAnimationFrame(loop);
   }
   function makeObject(type, offset2 = 0) {
     return {
@@ -6717,36 +6761,126 @@ reset.addEventListener('click', () => {
   function current2() {
     return objects.find((o) => o.id === selected);
   }
-  function initThreeD() {
-    host = $("#threePanel");
-    if (!host) return;
-    host.innerHTML = `<div class="td-wrap">
-    <div class="td-toolbar" id="tdToolbar"></div>
-    <div class="td-main">
-      <div class="td-view"><canvas class="td-canvas" id="tdCanvas"></canvas>
-        <div class="td-badge" id="tdBadge">\u043E\u0431\u044A\u0435\u043A\u0442\u043E\u0432: 0</div>
-        <div class="td-hint">\u0422\u044F\u043D\u0438\u0442\u0435 \u043C\u044B\u0448\u044C\u044E \u2014 \u0432\u0440\u0430\u0449\u0435\u043D\u0438\u0435 \xB7 \u043A\u043E\u043B\u0435\u0441\u043E \u2014 \u0437\u0443\u043C \xB7 \u043A\u043B\u0438\u043A \u2014 \u0432\u044B\u0431\u043E\u0440</div></div>
-      <div class="td-side">
-        <h4>\u041E\u0431\u044A\u0435\u043A\u0442\u044B</h4><div class="td-list" id="tdList"></div>
-        <div class="td-props" id="tdProps"></div>
+  function sizeCanvas() {
+    if (!stageCanvas || !stage2) return [0, 0];
+    const view = stageCanvas.parentElement;
+    const r = view?.getBoundingClientRect();
+    const w = Math.max(320, Math.round(r?.width || 0) || 0);
+    const h = Math.max(240, Math.round(r?.height || 0) || 0);
+    if (w < 320) return [0, 0];
+    canvas = stageCanvas;
+    g = stageG;
+    return [w, h];
+  }
+  function threeDRender() {
+    dirty = true;
+    render();
+    return threeDStats();
+  }
+  function threeDStats() {
+    return {
+      objects: objects.length,
+      selected,
+      drawn: drawnPolys,
+      visible,
+      width: stageCanvas?.width || 0,
+      height: stageCanvas?.height || 0
+    };
+  }
+  function openThreeStage() {
+    if (!stage2) buildStage();
+    if (!stage2) return null;
+    stage2.classList.add("show");
+    visible = true;
+    const [w, h] = sizeCanvas();
+    dirty = true;
+    render();
+    requestAnimationFrame(() => {
+      sizeCanvas();
+      dirty = true;
+      render();
+    });
+    setTimeout(() => {
+      sizeCanvas();
+      dirty = true;
+      render();
+    }, 120);
+    setTimeout(() => {
+      sizeCanvas();
+      dirty = true;
+      render();
+    }, 420);
+    emit("three:opened", { w, h });
+    return stage2;
+  }
+  function closeThreeStage() {
+    if (!stage2) return;
+    stage2.classList.remove("show");
+    visible = false;
+  }
+  function toggleThreeStage() {
+    return visible ? (closeThreeStage(), false) : (openThreeStage(), true);
+  }
+  function toolbarButtons(target, withLabels = true) {
+    target.innerHTML = "";
+    for (const t2 of TYPES) {
+      const b = el("button", {
+        class: "mini-btn td-add",
+        title: "\u0414\u043E\u0431\u0430\u0432\u0438\u0442\u044C: " + t2.name,
+        "data-add": t2.id
+      });
+      b.innerHTML = icon(t2.icon, 14) + (withLabels ? `<span>${t2.name}</span>` : "");
+      b.onclick = () => {
+        addObject(t2.id);
+        openThreeStage();
+      };
+      target.appendChild(b);
+    }
+  }
+  function buildStage() {
+    stage2 = $("#threeStage");
+    if (!stage2) return;
+    stage2.innerHTML = `<div class="three-stage-head">
+      <div class="three-stage-title">${icon("cube", 17)}<b>3D-\u0440\u0435\u0434\u0430\u043A\u0442\u043E\u0440</b>
+        <span class="pill" id="tdBadge">\u043E\u0431\u044A\u0435\u043A\u0442\u043E\u0432: 0</span></div>
+      <div class="three-stage-actions">
+        <button class="mini-btn" id="tdClear">\u041E\u0447\u0438\u0441\u0442\u0438\u0442\u044C</button>
+        <button class="mini-btn" id="tdCamera">\u0421\u0431\u0440\u043E\u0441 \u043A\u0430\u043C\u0435\u0440\u044B</button>
+        <button class="mini-btn" id="tdGrid">\u0421\u0435\u0442\u043A\u0430</button>
+        <button class="mini-btn" id="tdWire">\u041A\u0430\u0440\u043A\u0430\u0441</button>
+        <button class="mini-btn" id="tdExport">\u0412 \u043F\u0440\u043E\u0435\u043A\u0442</button>
+        <button class="mini-btn" id="tdClose" title="\u0417\u0430\u043A\u0440\u044B\u0442\u044C">${icon("close", 14)}</button>
       </div>
     </div>
-    <div class="td-actions">
-      <button class="mini-btn" id="tdGrid">\u0421\u0435\u0442\u043A\u0430</button>
-      <button class="mini-btn" id="tdWire">\u041A\u0430\u0440\u043A\u0430\u0441</button>
-      <button class="mini-btn" id="tdCamera">\u0421\u0431\u0440\u043E\u0441 \u043A\u0430\u043C\u0435\u0440\u044B</button>
-      <button class="mini-btn" id="tdExport">\u0412 \u043F\u0440\u043E\u0435\u043A\u0442</button>
-      <button class="mini-btn" id="tdWindow">\u0412 \u043E\u043A\u043D\u0435</button>
-    </div>
-  </div>`;
-    canvas = $("#tdCanvas");
-    g = canvas.getContext("2d");
-    panelRefs = { toolbar: $("#tdToolbar"), list: $("#tdList"), props: $("#tdProps"), badge: $("#tdBadge") };
-    for (const t2 of TYPES) {
-      const b = el("button", { class: "mini-btn", title: "\u0414\u043E\u0431\u0430\u0432\u0438\u0442\u044C: " + t2.name, onclick: () => addObject(t2.id) });
-      b.innerHTML = icon(t2.icon, 13) + `<span>${t2.name}</span>`;
-      panelRefs.toolbar.appendChild(b);
-    }
+    <div class="td-wrap">
+      <div class="td-toolbar" id="tdToolbar"></div>
+      <div class="td-main">
+        <div class="td-view"><canvas class="td-canvas" id="tdCanvas" width="900" height="520"></canvas>
+          <div class="td-badge" id="tdHint">\u043E\u0431\u044A\u0435\u043A\u0442\u043E\u0432: 0</div>
+          <div class="td-hint">\u0422\u044F\u043D\u0438\u0442\u0435 \u043C\u044B\u0448\u044C\u044E \u2014 \u0432\u0440\u0430\u0449\u0435\u043D\u0438\u0435 \xB7 \u043A\u043E\u043B\u0435\u0441\u043E \u2014 \u0437\u0443\u043C \xB7 \u043A\u043B\u0438\u043A \u2014 \u0432\u044B\u0431\u043E\u0440</div>
+          <div class="td-error hidden" id="tdError"></div>
+        </div>
+        <div class="td-side">
+          <h4>\u041E\u0431\u044A\u0435\u043A\u0442\u044B</h4><div class="td-list" id="tdList"></div>
+          <div class="td-props" id="tdProps"></div>
+        </div>
+      </div>
+    </div>`;
+    stageCanvas = $("#tdCanvas");
+    stageG = stageCanvas?.getContext("2d") || null;
+    canvas = stageCanvas;
+    g = stageG;
+    panelRefs = {
+      toolbar: $("#tdToolbar"),
+      list: $("#tdList"),
+      props: $("#tdProps"),
+      badge: $("#tdBadge"),
+      hint: $("#tdHint"),
+      error: $("#tdError")
+    };
+    toolbarButtons(panelRefs.toolbar);
+    if (!stageG) panelRefs.error.textContent = "Canvas \u043D\u0435\u0434\u043E\u0441\u0442\u0443\u043F\u0435\u043D \u0432 \u044D\u0442\u043E\u043C \u043E\u043A\u0440\u0443\u0436\u0435\u043D\u0438\u0438.";
+    else panelRefs.error.classList.add("hidden");
     $("#tdGrid").onclick = () => {
       showGrid = !showGrid;
       $("#tdGrid").classList.toggle("active", showGrid);
@@ -6761,54 +6895,107 @@ reset.addEventListener('click', () => {
       cam = { yaw: 0.7, pitch: 0.45, dist: 7.5 };
       invalidate();
     };
+    $("#tdClear").onclick = () => {
+      clearScene();
+      openThreeStage();
+    };
     $("#tdExport").onclick = exportToProject;
-    $("#tdWindow").onclick = () => ctx.openThreeWindow?.();
+    $("#tdClose").onclick = closeThreeStage;
     $("#tdGrid").classList.toggle("active", showGrid);
-    canvas.addEventListener("pointerdown", (e) => {
-      const r = canvas.getBoundingClientRect();
-      drag = { x: e.clientX, y: e.clientY, yaw: cam.yaw, pitch: cam.pitch, moved: false };
-      canvas.setPointerCapture(e.pointerId);
+    stageCanvas?.addEventListener("pointerdown", (e) => {
+      const r = stageCanvas.getBoundingClientRect();
+      drag = { x: e.clientX, y: e.clientY, yaw: cam.yaw, pitch: cam.pitch };
+      stageCanvas.setPointerCapture(e.pointerId);
       pick(e.clientX - r.left, e.clientY - r.top);
     });
-    canvas.addEventListener("pointermove", (e) => {
+    stageCanvas?.addEventListener("pointermove", (e) => {
       if (!drag) return;
-      const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
-      if (Math.abs(dx) + Math.abs(dy) > 3) drag.moved = true;
-      cam.yaw = drag.yaw + dx * 8e-3;
-      cam.pitch = Math.max(-1.4, Math.min(1.4, drag.pitch + dy * 8e-3));
+      cam.yaw = drag.yaw + (e.clientX - drag.x) * 8e-3;
+      cam.pitch = Math.max(-1.4, Math.min(1.4, drag.pitch + (e.clientY - drag.y) * 8e-3));
       invalidate();
     });
-    canvas.addEventListener("pointerup", () => {
+    stageCanvas?.addEventListener("pointerup", () => {
       drag = null;
     });
-    canvas.addEventListener("wheel", (e) => {
+    stageCanvas?.addEventListener("wheel", (e) => {
       e.preventDefault();
       cam.dist = Math.max(3, Math.min(24, cam.dist + e.deltaY * 0.012));
       invalidate();
     }, { passive: false });
-    const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(() => invalidate()) : null;
-    ro?.observe(canvas.parentElement);
-    window.addEventListener("resize", invalidate);
+    stage2?.addEventListener("keydown", (e) => {
+      if (e.key === "ArrowLeft") {
+        cam.yaw -= 0.15;
+        invalidate();
+      }
+      if (e.key === "ArrowRight") {
+        cam.yaw += 0.15;
+        invalidate();
+      }
+      if (e.key === "ArrowUp") {
+        cam.pitch = Math.max(-1.4, cam.pitch - 0.12);
+        invalidate();
+      }
+      if (e.key === "ArrowDown") {
+        cam.pitch = Math.min(1.4, cam.pitch + 0.12);
+        invalidate();
+      }
+      if (e.key === "Escape") closeThreeStage();
+    });
+    stage2.tabIndex = -1;
+    const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(() => {
+      sizeCanvas();
+      dirty = true;
+    }) : null;
+    ro?.observe(stageCanvas?.parentElement || stage2);
+    window.addEventListener("resize", () => {
+      sizeCanvas();
+      dirty = true;
+    });
+    renderList();
+    renderProps();
+  }
+  function initThreeD() {
+    host = $("#threePanel");
+    if (host) {
+      host.innerHTML = `<div class="three-rail">
+      <div class="three-rail-head"><div class="three-rail-ico">${icon("cube", 22)}</div>
+        <div><b>3D-\u0440\u0435\u0434\u0430\u043A\u0442\u043E\u0440</b><p>\u0421\u0442\u0430\u0432\u044C\u0442\u0435 \u043F\u0440\u0438\u043C\u0438\u0442\u0438\u0432\u044B, \u043C\u0435\u043D\u044F\u0439\u0442\u0435 \u0440\u0430\u0437\u043C\u0435\u0440 \u0438 \u043F\u043E\u0432\u043E\u0440\u043E\u0442, \u044D\u043A\u0441\u043F\u043E\u0440\u0442\u0438\u0440\u0443\u0439\u0442\u0435 \u0441\u0446\u0435\u043D\u0443 \u0432 \u043F\u0440\u043E\u0435\u043A\u0442.</p></div></div>
+      <button class="btn btn-accent" id="tdOpen">${icon("maximize", 15)} \u041E\u0442\u043A\u0440\u044B\u0442\u044C \u0440\u0435\u0434\u0430\u043A\u0442\u043E\u0440</button>
+      <div class="three-rail-label">\u0414\u043E\u0431\u0430\u0432\u0438\u0442\u044C \u043E\u0431\u044A\u0435\u043A\u0442</div>
+      <div class="three-rail-grid" id="tdRailAdd"></div>
+      <div class="three-rail-summary" id="tdRailSummary"></div>
+      <div class="three-rail-actions"><button class="mini-btn" id="tdRailExport">${icon("download", 13)} \u0412 \u043F\u0440\u043E\u0435\u043A\u0442</button></div>
+    </div>`;
+      toolbarButtons($("#tdRailAdd"), true);
+      $("#tdOpen").onclick = () => openThreeStage();
+      $("#tdRailExport").onclick = exportToProject;
+    }
+    buildStage();
     if (!objects.length) {
       addObject("cube");
-      const s = objects[0];
-      s.pos = [-1.6, 0, 0];
+      objects[0].pos = [-1.6, 0, 0];
       addObject("sphere");
       objects[1].pos = [1.6, 0, 0];
       objects[1].color = "#d97757";
       selected = objects[0].id;
       invalidate();
     }
+    on("three:show", () => openThreeStage());
+    on("rail:tab", (name2) => {
+      if (name2 === "three") openThreeStage();
+    });
     renderList();
     renderProps();
+    sizeCanvas();
     loop();
     emit("three:ready");
   }
   function pick(x2, y) {
-    const o = current2();
+    if (!canvas) return;
     let best = null, bestArea = Infinity;
+    const [w, h] = [canvas.clientWidth || 400, canvas.clientHeight || 300];
     for (const obj of objects) {
-      const pts = geo(obj.type).V.map((p) => project(worldPoint(obj, p), canvas.clientWidth, canvas.clientHeight));
+      const pts = geo(obj.type).V.map((p) => project(worldPoint(obj, p), w, h));
       const xs = pts.map((p) => p[0]), ys = pts.map((p) => p[1]);
       const x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys);
       if (x2 >= x0 && x2 <= x1 && y >= y0 && y <= y1) {
@@ -6829,9 +7016,13 @@ reset.addEventListener('click', () => {
   function renderList() {
     if (!panelRefs.list) return;
     panelRefs.list.innerHTML = "";
-    panelRefs.badge.textContent = "\u043E\u0431\u044A\u0435\u043A\u0442\u043E\u0432: " + objects.length;
+    const label = "\u043E\u0431\u044A\u0435\u043A\u0442\u043E\u0432: " + objects.length;
+    if (panelRefs.badge) panelRefs.badge.textContent = label;
+    if (panelRefs.hint) panelRefs.hint.textContent = label;
+    const rail = $("#tdRailSummary");
+    if (rail) rail.innerHTML = `${icon("layers", 14)} <b>${objects.length}</b> \u043E\u0431\u044A\u0435\u043A\u0442\u043E\u0432 \xB7 ${icon("cursor", 14)} \u0432\u044B\u0431\u0440\u0430\u043D: ${esc(objects.find((o) => o.id === selected)?.name || "\u2014")}`;
     if (!objects.length) {
-      panelRefs.list.innerHTML = '<div class="td-empty">\u0421\u0446\u0435\u043D\u0430 \u043F\u0443\u0441\u0442\u0430. \u0414\u043E\u0431\u0430\u0432\u044C\u0442\u0435 \u043F\u0440\u0438\u043C\u0438\u0442\u0438\u0432 \u0441\u0432\u0435\u0440\u0445\u0443.</div>';
+      panelRefs.list.innerHTML = '<div class="td-empty">\u0421\u0446\u0435\u043D\u0430 \u043F\u0443\u0441\u0442\u0430. \u0414\u043E\u0431\u0430\u0432\u044C\u0442\u0435 \u043F\u0440\u0438\u043C\u0438\u0442\u0438\u0432.</div>';
       return;
     }
     for (const o of objects) {
@@ -6862,16 +7053,16 @@ reset.addEventListener('click', () => {
       panelRefs.props.innerHTML = '<div class="td-empty">\u0412\u044B\u0431\u0435\u0440\u0438\u0442\u0435 \u043E\u0431\u044A\u0435\u043A\u0442</div>';
       return;
     }
-    const inp = (label, key, i4, step2 = 0.1) => `<div><label>${label}</label>
-    <input type="number" step="${step2}" data-prop="${key}" data-i="${i4}" value="${Number(o[key][i4]).toFixed(2)}"></div>`;
+    const inp = (key, i4, step2 = 0.1) => `<input type="number" step="${step2}" data-prop="${key}" data-i="${i4}" value="${Number(o[key][i4]).toFixed(2)}">`;
+    const rot2 = (i4) => `<input type="number" step="5" data-prop="rot" data-i="${i4}" value="${Math.round(o.rot[i4] * 180 / Math.PI)}">`;
     panelRefs.props.innerHTML = `
     <label>\u0418\u043C\u044F</label><input id="tdName" value="${esc(o.name)}" maxlength="60">
-    <label>\u0426\u0432\u0435\u0442</label><input type="color" id="tdColor" value="${esc(o.color)}" style="width:100%;height:28px;border:1px solid var(--border);border-radius:6px;background:var(--code-bg)">
-    <label>\u041F\u043E\u0437\u0438\u0446\u0438\u044F X / Y / Z</label><div class="td-triple">${inp("X", "pos", 0)}${inp("Y", "pos", 1)}${inp("Z", "pos", 2)}</div>
-    <label>\u041F\u043E\u0432\u043E\u0440\u043E\u0442 X / Y / Z (\u0433\u0440\u0430\u0434\u0443\u0441\u044B)</label><div class="td-triple">
-      ${["X", "Y", "Z"].map((l, i4) => `<div><input type="number" step="5" data-prop="rot" data-i="${i4}" value="${Math.round(o.rot[i4] * 180 / Math.PI)}"></div>`).join("")}</div>
-    <label>\u041C\u0430\u0441\u0448\u0442\u0430\u0431</label><div class="td-triple">${inp("X", "scale", 1)}${inp("Y", "scale", 1)}${inp("Z", "scale", 1)}</div>
-    <div class="rowflex mt8"><button class="mini-btn" id="tdDup">\u0414\u0443\u0431\u043B\u0438\u0440\u043E\u0432\u0430\u0442\u044C</button><button class="mini-btn" id="tdReset">\u0421\u0431\u0440\u043E\u0441\u0438\u0442\u044C</button></div>`;
+    <label>\u0426\u0432\u0435\u0442</label><input type="color" id="tdColor" value="${esc(o.color)}" class="td-color">
+    <label>\u041F\u043E\u0437\u0438\u0446\u0438\u044F X / Y / Z</label><div class="td-triple">${inp("pos", 0)}${inp("pos", 1)}${inp("pos", 2)}</div>
+    <label>\u041F\u043E\u0432\u043E\u0440\u043E\u0442 X / Y / Z (\xB0)</label><div class="td-triple">${rot2(0)}${rot2(1)}${rot2(2)}</div>
+    <label>\u041C\u0430\u0441\u0448\u0442\u0430\u0431 X / Y / Z</label><div class="td-triple">${inp("scale", 0)}${inp("scale", 1)}${inp("scale", 2)}</div>
+    <div class="rowflex mt8"><button class="mini-btn" id="tdDup">${icon("copy", 12)} \u0414\u0443\u0431\u043B\u0438\u0440\u043E\u0432\u0430\u0442\u044C</button>
+      <button class="mini-btn" id="tdReset">${icon("refresh", 12)} \u0421\u0431\u0440\u043E\u0441\u0438\u0442\u044C</button></div>`;
     $("#tdName").oninput = (e) => {
       o.name = e.target.value.slice(0, 60);
       renderList();
@@ -6910,6 +7101,18 @@ reset.addEventListener('click', () => {
       renderProps();
       invalidate();
     };
+  }
+  function invalidate() {
+    dirty = true;
+  }
+  function loop() {
+    const now = performance.now();
+    if (visible && g && now - lastFrame > 28) {
+      lastFrame = now;
+      dirty = true;
+    }
+    if (dirty) render();
+    requestAnimationFrame(loop);
   }
   function standaloneHtml(scene) {
     const data3 = JSON.stringify(scene).replace(/</g, "\\u003c");
@@ -6958,14 +7161,12 @@ draw();
     ctx.openFile?.("3d.html");
   }
   function openThreeDWindow() {
-    if (!host) return null;
-    ctx.selectRailTab?.("three");
-    return ctx.movePanelWindow?.(host, { id: "win-three", title: "3D-\u0440\u0435\u0434\u0430\u043A\u0442\u043E\u0440", icon: "cube", width: 800, height: 540 });
+    return openThreeStage();
   }
   function threeDSummary() {
-    return { objects: objects.length, selected };
+    return threeDStats();
   }
-  var TYPES, DEFAULT_COLORS, host, canvas, g, objects, selected, cam, showGrid, wire, dirty, drag, panelRefs, CACHE;
+  var TYPES, DEFAULT_COLORS, host, canvas, g, objects, selected, cam, showGrid, wire, dirty, drag, panelRefs, stage2, stageCanvas, stageG, visible, drawnPolys, lastFrame, CACHE;
   var init_threeD = __esm({
     "app/src/core/threeD.js"() {
       init_core();
@@ -6991,6 +7192,12 @@ draw();
       dirty = true;
       drag = null;
       panelRefs = {};
+      stage2 = null;
+      stageCanvas = null;
+      stageG = null;
+      visible = false;
+      drawnPolys = 0;
+      lastFrame = 0;
       CACHE = {};
     }
   });
@@ -19626,11 +19833,11 @@ draw();
     }
   }
   function matchRanges(view, maxLength) {
-    let visible = view.visibleRanges;
-    if (visible.length == 1 && visible[0].from == view.viewport.from && visible[0].to == view.viewport.to)
-      return visible;
+    let visible2 = view.visibleRanges;
+    if (visible2.length == 1 && visible2[0].from == view.viewport.from && visible2[0].to == view.viewport.to)
+      return visible2;
     let result = [];
-    for (let { from, to } of visible) {
+    for (let { from, to } of visible2) {
       from = Math.max(view.state.doc.lineAt(from).from, from - maxLength);
       to = Math.min(view.state.doc.lineAt(to).to, to + maxLength);
       if (result.length && result[result.length - 1].to >= from)
@@ -20230,13 +20437,13 @@ draw();
       } else {
         fixedLeft = fixedRange(this.view).left;
       }
-      let visible = this.view.scrollDOM.getBoundingClientRect(), margins = getScrollMargins(this.view);
+      let visible2 = this.view.scrollDOM.getBoundingClientRect(), margins = getScrollMargins(this.view);
       return {
         visible: {
-          left: visible.left + margins.left,
-          top: visible.top + margins.top,
-          right: visible.right - margins.right,
-          bottom: visible.bottom - margins.bottom
+          left: visible2.left + margins.left,
+          top: visible2.top + margins.top,
+          right: visible2.right - margins.right,
+          bottom: visible2.bottom - margins.bottom
         },
         parent: this.parent ? this.container.getBoundingClientRect() : this.view.dom.getBoundingClientRect(),
         pos: this.manager.tooltips.map((t2, i4) => {
@@ -20259,12 +20466,12 @@ draw();
         for (let t2 of this.manager.tooltipViews)
           t2.dom.style.position = "absolute";
       }
-      let { visible, space: space4, scaleX, scaleY } = measured;
+      let { visible: visible2, space: space4, scaleX, scaleY } = measured;
       let others = [];
       for (let i4 = 0; i4 < this.manager.tooltips.length; i4++) {
         let tooltip = this.manager.tooltips[i4], tView = this.manager.tooltipViews[i4], { dom } = tView;
         let pos = measured.pos[i4], size = measured.size[i4];
-        if (!pos || tooltip.clip !== false && (pos.bottom <= Math.max(visible.top, space4.top) || pos.top >= Math.min(visible.bottom, space4.bottom) || pos.right < Math.max(visible.left, space4.left) - 0.1 || pos.left > Math.min(visible.right, space4.right) + 0.1)) {
+        if (!pos || tooltip.clip !== false && (pos.bottom <= Math.max(visible2.top, space4.top) || pos.top >= Math.min(visible2.bottom, space4.bottom) || pos.right < Math.max(visible2.left, space4.left) - 0.1 || pos.left > Math.min(visible2.right, space4.right) + 0.1)) {
           dom.style.top = Outside;
           continue;
         }
@@ -43478,6 +43685,7 @@ draw();
   // app/src/core/editor.js
   var import_js_beautify = __toESM(require_js());
   init_core();
+  init_icons();
   init_state();
 
   // app/src/core/data.js
@@ -44641,7 +44849,7 @@ assert(add(2, 3) === 5, '2 + 3 = 5');` }
       create() {
         const box = document.createElement("div");
         box.style.cssText = "padding:10px 12px;max-width:330px;font:12px var(--sans);line-height:1.5";
-        box.innerHTML = '<b style="color:var(--accent)">' + esc(word) + '</b><div style="margin:5px 0;color:var(--muted)">' + esc(info[0]) + '</div><a href="' + mdnLink(word) + '" target="_blank" style="color:var(--info);font-size:11px"> \u041E\u0442\u043A\u0440\u044B\u0442\u044C MDN \u2197</a>';
+        box.innerHTML = '<b style="color:var(--accent)">' + esc(word) + '</b><div style="margin:5px 0;color:var(--muted)">' + esc(info[0]) + '</div><a href="' + mdnLink(word) + '" target="_blank" style="color:var(--info);font-size:11px"> \u041E\u0442\u043A\u0440\u044B\u0442\u044C MDN ' + icon("external", 12) + "</a>";
         return box;
       }
     };
@@ -45331,9 +45539,9 @@ assert(add(2, 3) === 5, '2 + 3 = 5');` }
       }
       return v;
     }
-    var native = {};
+    var native2 = {};
     ["log", "info", "warn", "error", "debug"].forEach(function(level) {
-      native[level] = console[level];
+      native2[level] = console[level];
       console[level] = function() {
         var args = [].slice.call(arguments).map(function(a) {
           return ser(a);
@@ -45342,7 +45550,7 @@ assert(add(2, 3) === 5, '2 + 3 = 5');` }
           return a.p;
         }).join(" "), time: Date.now() });
         try {
-          native[level].apply(console, arguments);
+          native2[level].apply(console, arguments);
         } catch (e) {
         }
       };
@@ -45360,7 +45568,7 @@ assert(add(2, 3) === 5, '2 + 3 = 5');` }
         }
         return { value: String(r) };
       }), time: Date.now() });
-      native.log.apply(console, arguments);
+      native2.log.apply(console, arguments);
     };
     console.time = function(label) {
       times[label || "default"] = performance.now();
@@ -46083,7 +46291,7 @@ assert(add(2, 3) === 5, '2 + 3 = 5');` }
       const dx = Math.abs(e.offsetX - measureStart.x), dy = Math.abs(e.offsetY - measureStart.y);
       $("#guideV").style.left = Math.min(e.offsetX, measureStart.x) + "px";
       $("#guideH").style.top = Math.min(e.offsetY, measureStart.y) + "px";
-      $("#previewHint").textContent = `\u2194 ${dx}px  \u2195 ${dy}px  (diag ${Math.round(Math.hypot(dx, dy))}px)`;
+      $("#previewHint").textContent = `\u0428 ${dx}px \xB7 \u0412 ${dy}px \xB7 \u0434\u0438\u0430\u0433\u043E\u043D\u0430\u043B\u044C ${Math.round(Math.hypot(dx, dy))}px`;
     });
     wrap?.addEventListener("mouseup", () => {
       measureStart = null;
@@ -46791,6 +46999,7 @@ ${code2}
   init_core();
   init_state();
   init_state();
+  init_icons();
 
   // app/src/core/tools.js
   init_core();
@@ -47415,120 +47624,205 @@ ${f.content}
     renderAssets();
     updateSize();
   }
+  var expanded = /* @__PURE__ */ new Set(["__all__"]);
+  var FILE_META = {
+    html: { ico: "code", cls: "fi-html" },
+    htm: { ico: "code", cls: "fi-html" },
+    css: { ico: "palette", cls: "fi-css" },
+    scss: { ico: "palette", cls: "fi-css" },
+    less: { ico: "palette", cls: "fi-css" },
+    js: { ico: "braces", cls: "fi-js" },
+    mjs: { ico: "braces", cls: "fi-js" },
+    ts: { ico: "braces", cls: "fi-js" },
+    jsx: { ico: "braces", cls: "fi-js" },
+    json: { ico: "brackets", cls: "fi-json" },
+    md: { ico: "file", cls: "fi-md" },
+    svg: { ico: "image", cls: "fi-img" },
+    png: { ico: "image", cls: "fi-img" },
+    jpg: { ico: "image", cls: "fi-img" },
+    jpeg: { ico: "image", cls: "fi-img" },
+    gif: { ico: "image", cls: "fi-img" },
+    webp: { ico: "image", cls: "fi-img" },
+    woff2: { ico: "text", cls: "fi-font" },
+    ttf: { ico: "text", cls: "fi-font" },
+    mp3: { ico: "file", cls: "fi-media" },
+    mp4: { ico: "file", cls: "fi-media" },
+    txt: { ico: "file", cls: "fi-txt" }
+  };
+  function fileIcon(path) {
+    const ext = (path.split(".").pop() || "").toLowerCase();
+    const m = FILE_META[ext] || { ico: "file", cls: "fi-txt" };
+    return `<span class="file-icon ${m.cls}">${icon(m.ico, 15)}</span>`;
+  }
+  function collectNodes() {
+    const root = { dirs: /* @__PURE__ */ new Map(), files: [] };
+    for (const path of listFiles()) {
+      if (treeFilter && !path.toLowerCase().includes(treeFilter)) continue;
+      const parts = path.split("/");
+      let node = root;
+      for (let i4 = 0; i4 < parts.length - 1; i4++) {
+        if (!node.dirs.has(parts[i4])) node.dirs.set(parts[i4], { dirs: /* @__PURE__ */ new Map(), files: [] });
+        node = node.dirs.get(parts[i4]);
+      }
+      node.files.push(path);
+    }
+    return root;
+  }
+  function sortNames(dirs) {
+    return [...dirs.keys()].sort((a, b) => a.localeCompare(b, "ru"));
+  }
+  function isExpanded(path) {
+    return expanded.has("__all__") || expanded.has(path);
+  }
+  function toggleFolder(path) {
+    if (expanded.has("__all__")) {
+      expanded.clear();
+      expanded.add(path);
+      return false;
+    }
+    if (expanded.has(path)) {
+      expanded.delete(path);
+      return false;
+    }
+    expanded.add(path);
+    return true;
+  }
+  function drawNode(host2, node, parent2, depth) {
+    for (const name2 of sortNames(node.dirs)) {
+      const path = parent2 ? parent2 + "/" + name2 : name2;
+      const child = node.dirs.get(name2);
+      const open = isExpanded(path);
+      const count2 = child.files.length + [...child.dirs.values()].reduce((n, d) => n + d.files.length, 0);
+      const row = el("div", {
+        class: "tree-row tree-folder",
+        "data-path": path,
+        "data-dir": "1",
+        style: { paddingLeft: 6 + depth * 14 + "px" }
+      });
+      row.innerHTML = `<span class="twist">${icon(open ? "chevronDown" : "chevronRight", 13)}</span>
+      <span class="file-icon fi-folder">${icon("folder", 15)}</span>
+      <span class="fname">${esc(name2)}</span><span class="tree-meta">${count2}</span>
+      <span class="fmenu">${icon("more", 13)}</span>`;
+      row.querySelector(".twist").onclick = (e) => {
+        e.stopPropagation();
+        toggleFolder(path);
+        renderTree();
+      };
+      row.onclick = (e) => {
+        if (e.target.closest(".fmenu")) return;
+        toggleFolder(path);
+        renderTree();
+      };
+      row.oncontextmenu = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        contextMenu(e, path, true);
+      };
+      row.ondragover = (e) => e.preventDefault();
+      row.ondrop = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const src = e.dataTransfer.getData("text/plain") || dragPath;
+        if (!src || src === path || src.startsWith(path + "/")) return;
+        rename(src, path + "/" + src.split("/").pop());
+        toast(`\u041F\u0435\u0440\u0435\u043C\u0435\u0449\u0435\u043D\u043E \u0432 ${path}/`, "ok");
+        renderTree();
+      };
+      host2.appendChild(row);
+      if (open) drawNode(host2, child, path, depth + 1);
+    }
+    for (const path of [...node.files].sort((a, b) => a.localeCompare(b, "ru"))) {
+      const f = state.files[path];
+      const active = Object.values(state.panes).includes(path);
+      const row = el("div", {
+        class: "tree-row tree-file" + (active ? " active" : ""),
+        draggable: "true",
+        "data-path": path,
+        title: path,
+        style: { paddingLeft: 6 + depth * 14 + "px" }
+      });
+      row.innerHTML = `<span class="twist"></span>${fileIcon(path)}
+      <span class="fname">${esc(path.split("/").pop())}</span>
+      <span class="tree-meta">${fmtBytes(f?.content?.length || 0)}</span>
+      <span class="fmenu">${icon("more", 13)}</span>`;
+      row.onclick = (e) => {
+        if (e.target.closest(".fmenu")) {
+          e.stopPropagation();
+          contextMenu(e, path, false);
+          return;
+        }
+        openFile(path);
+      };
+      row.oncontextmenu = (e) => {
+        e.preventDefault();
+        contextMenu(e, path, false);
+      };
+      row.ondragstart = (e) => {
+        dragPath = path;
+        e.dataTransfer.setData("text/plain", path);
+      };
+      host2.appendChild(row);
+    }
+  }
   function renderTree() {
     const host2 = $("#fileTree");
     if (!host2) return;
     host2.innerHTML = "";
-    const files = listFiles().filter((p) => !treeFilter || p.toLowerCase().includes(treeFilter));
-    const dirs = /* @__PURE__ */ new Set();
-    for (const p of files) {
-      const parts = p.split("/");
-      for (let i4 = 1; i4 < parts.length; i4++) dirs.add(parts.slice(0, i4).join("/"));
+    const root = collectNodes();
+    drawNode(host2, root, "", 0);
+    if (!root.files.length && !root.dirs.size) {
+      host2.appendChild(el("div", {
+        class: "empty-note",
+        html: "\u041F\u0430\u043F\u043A\u0430 \u043F\u0443\u0441\u0442\u0430.<br>\u0421\u043E\u0437\u0434\u0430\u0439\u0442\u0435 HTML, CSS \u0438\u043B\u0438 JS \u0444\u0430\u0439\u043B \u043A\u043D\u043E\u043F\u043A\u043E\u0439 \u0432\u044B\u0448\u0435."
+      }));
     }
-    const children = (parent2) => {
-      const direct = /* @__PURE__ */ new Set();
-      for (const p of files) {
-        const rest = parent2 ? p.startsWith(parent2 + "/") ? p.slice(parent2.length + 1) : null : p;
-        if (rest == null) continue;
-        direct.add(rest.split("/")[0] + (rest.includes("/") ? "/" : ""));
-      }
-      for (const d of dirs) {
-        const rest = parent2 ? d.startsWith(parent2 + "/") ? d.slice(parent2.length + 1) : null : d;
-        if (rest && !rest.includes("/")) direct.add(rest + "/");
-      }
-      return [...direct].sort((a, b) => b.endsWith("/") - a.endsWith("/") || a.localeCompare(b));
-    };
-    const build = (parent2, depth) => {
-      for (const name2 of children(parent2)) {
-        const path = (parent2 ? parent2 + "/" : "") + name2.replace(/\/$/, "");
-        const isDir = name2.endsWith("/");
-        const f = state.files[path];
-        const active = Object.values(state.panes).includes(path);
-        const row = el(
-          "div",
-          {
-            class: "tree-row" + (active ? " active" : ""),
-            draggable: "true",
-            style: { paddingLeft: 7 + depth * 13 + "px" },
-            title: path
-          },
-          el("span", { class: "twist", text: isDir ? "\u25BE" : "" }),
-          f && isImage(path) && safeDataSrc(f.content) ? el("img", { class: "tree-thumb", src: safeDataSrc(f.content), alt: "" }) : el("span", { class: "ftype", text: iconFor(path, isDir) }),
-          el("span", { class: "fname", text: name2.replace(/\/$/, "") }),
-          el("span", { class: "tree-meta", text: isDir ? "" : fmtBytes(f?.content?.length || 0) }),
-          el("span", { class: "fmenu", text: "\u22EF" })
-        );
-        row.addEventListener("click", (e) => {
-          if (e.target.classList.contains("fmenu")) {
-            e.stopPropagation();
-            contextMenu(e, path, isDir);
-            return;
-          }
-          if (isDir) {
-            row.nextElementSibling?.classList?.toggle("hidden");
-            return;
-          }
-          openFile(path);
-        });
-        row.addEventListener("contextmenu", (e) => {
-          e.preventDefault();
-          contextMenu(e, path, isDir);
-        });
-        row.addEventListener("dragstart", (e) => {
-          dragPath = path;
-          e.dataTransfer.setData("text/plain", path);
-        });
-        row.addEventListener("dragover", (e) => {
-          if (isDir) e.preventDefault();
-        });
-        row.addEventListener("drop", (e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          const src = e.dataTransfer.getData("text/plain") || dragPath;
-          if (!src || src === path) return;
-          const target = isDir ? path + "/" + src.split("/").pop() : path;
-          if (isDir) {
-            rename(src, target);
-            toast(`\u041F\u0435\u0440\u0435\u043C\u0435\u0449\u0435\u043D\u043E \u0432 ${path}/`, "ok");
-            renderTree();
-          }
-        });
-        host2.appendChild(row);
-        if (isDir) {
-          const before = host2.children.length;
-          build(path, depth + 1);
-        }
-      }
-    };
-    build("", 0);
-    if (!files.length) host2.appendChild(el("div", { class: "empty-note", text: "\u0424\u0430\u0439\u043B\u043E\u0432 \u043D\u0435\u0442. \u041D\u0430\u0436\u043C\u0438\u0442\u0435 \xAB\uFF0B \u0444\u0430\u0439\u043B\xBB." }));
     updateSize();
   }
-  function iconFor(path, isDir) {
-    if (isDir) return "";
-    const e = (path.split(".").pop() || "").toLowerCase();
-    return {
-      html: "",
-      htm: "",
-      css: "",
-      scss: "",
-      js: "",
-      mjs: "",
-      ts: "",
-      json: "",
-      md: "",
-      png: "",
-      jpg: "",
-      jpeg: "",
-      gif: "",
-      webp: "",
-      svg: "",
-      woff2: "",
-      ttf: "",
-      mp3: "",
-      mp4: "",
-      txt: ""
-    }[e] || "";
+  function quickCreate(ext = "html", folder = "") {
+    const base2 = folder ? folder + "/" : "";
+    let n = 1, path;
+    do {
+      path = `${base2}untitled-${n++}.${ext}`;
+    } while (exists(path));
+    write(path, starterContent(ext, path));
+    renderTree();
+    openFile(path);
+    toast(`\u0421\u043E\u0437\u0434\u0430\u043D \u0444\u0430\u0439\u043B ${path}`, "ok");
+    return path;
+  }
+  function starterContent(ext, path) {
+    const name2 = path.split("/").pop();
+    if (ext === "html") return `<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>${esc(name2)}</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <h1>${esc(name2)}</h1>
+  <script src="script.js"><\/script>
+</body>
+</html>
+`;
+    if (ext === "css") return `/* ${esc(name2)} */
+:root {
+  --accent: #4f8ff7;
+}
+body {
+  font-family: system-ui, sans-serif;
+  margin: 0;
+  padding: 24px;
+}
+`;
+    if (ext === "js") return `// ${esc(name2)}
+console.log('${esc(name2)} \u0437\u0430\u0433\u0440\u0443\u0436\u0435\u043D');
+`;
+    if (ext === "json") return '{\n  "name": "' + esc(name2) + '"\n}\n';
+    if (ext === "md") return `# ${esc(name2)}
+`;
+    return "";
   }
   function updateSize() {
     const n = $("#projectSize"), s = $("#statusSize");
@@ -47552,62 +47846,137 @@ ${f.content}
     const menu = $("#contextMenu");
     if (!menu) return;
     menu.innerHTML = "";
-    const items = [
-      ["\u041E\u0442\u043A\u0440\u044B\u0442\u044C", () => openFile(path)],
-      ["\u041F\u0435\u0440\u0435\u0438\u043C\u0435\u043D\u043E\u0432\u0430\u0442\u044C", () => renameDialog(path)],
-      ["\u0414\u0443\u0431\u043B\u0438\u0440\u043E\u0432\u0430\u0442\u044C", () => {
+    const add2 = (ic, label, fn, danger = false) => {
+      const b = el("button", { class: danger ? "danger" : "" });
+      b.innerHTML = `<span class="cm-ico">${icon(ic, 14)}</span><span>${esc(label)}</span>`;
+      b.onclick = () => {
+        menu.classList.remove("show");
+        fn();
+      };
+      menu.appendChild(b);
+    };
+    if (isDir) {
+      add2("file", "\u041D\u043E\u0432\u044B\u0439 HTML \u0437\u0434\u0435\u0441\u044C", () => quickCreate("html", path));
+      add2("palette", "\u041D\u043E\u0432\u044B\u0439 CSS \u0437\u0434\u0435\u0441\u044C", () => quickCreate("css", path));
+      add2("braces", "\u041D\u043E\u0432\u044B\u0439 JS \u0437\u0434\u0435\u0441\u044C", () => quickCreate("js", path));
+      add2("folder", "\u041D\u043E\u0432\u0430\u044F \u043F\u0430\u043F\u043A\u0430 \u0437\u0434\u0435\u0441\u044C", () => newFileDialog(true, path));
+      menu.appendChild(el("hr"));
+      add2("edit", "\u041F\u0435\u0440\u0435\u0438\u043C\u0435\u043D\u043E\u0432\u0430\u0442\u044C", () => renameDialog(path));
+      add2("trash", "\u0423\u0434\u0430\u043B\u0438\u0442\u044C \u043F\u0430\u043F\u043A\u0443", () => deleteConfirm(path), true);
+    } else {
+      add2("code", "\u041E\u0442\u043A\u0440\u044B\u0442\u044C", () => openFile(path));
+      add2("file", "\u041D\u043E\u0432\u044B\u0439 HTML \u0440\u044F\u0434\u043E\u043C", () => quickCreate("html", path.includes("/") ? path.slice(0, path.lastIndexOf("/")) : ""));
+      add2("palette", "\u041D\u043E\u0432\u044B\u0439 CSS \u0440\u044F\u0434\u043E\u043C", () => quickCreate("css", path.includes("/") ? path.slice(0, path.lastIndexOf("/")) : ""));
+      add2("braces", "\u041D\u043E\u0432\u044B\u0439 JS \u0440\u044F\u0434\u043E\u043C", () => quickCreate("js", path.includes("/") ? path.slice(0, path.lastIndexOf("/")) : ""));
+      menu.appendChild(el("hr"));
+      add2("edit", "\u041F\u0435\u0440\u0435\u0438\u043C\u0435\u043D\u043E\u0432\u0430\u0442\u044C", () => renameDialog(path));
+      add2("copy", "\u0414\u0443\u0431\u043B\u0438\u0440\u043E\u0432\u0430\u0442\u044C", () => {
         copyFile(path);
         renderTree();
         toast("\u0424\u0430\u0439\u043B \u043F\u0440\u043E\u0434\u0443\u0431\u043B\u0438\u0440\u043E\u0432\u0430\u043D", "ok");
-      }],
-      ["\u041A\u043E\u043F\u0438\u0440\u043E\u0432\u0430\u0442\u044C \u043F\u0443\u0442\u044C", () => copy(path)],
-      ["\u041D\u0430\u0439\u0442\u0438 \u0441\u0441\u044B\u043B\u043A\u0438", () => findReferences(path)],
-      ["\u0421\u043A\u0430\u0447\u0430\u0442\u044C", () => downloadFile(path)],
-      ["\u2014", null],
-      ["\u0423\u0434\u0430\u043B\u0438\u0442\u044C", () => deleteConfirm(path)]
-    ];
-    for (const [label, fn] of items) {
-      if (!fn) {
-        menu.appendChild(el("hr"));
-        continue;
-      }
-      menu.appendChild(el("button", { onclick: () => {
-        menu.classList.remove("show");
-        fn();
-      } }, label));
+      });
+      add2("link", "\u041D\u0430\u0439\u0442\u0438 \u0441\u0441\u044B\u043B\u043A\u0438", () => findReferences(path));
+      add2("download", "\u0421\u043A\u0430\u0447\u0430\u0442\u044C", () => downloadFile(path));
+      add2("trash", "\u0423\u0434\u0430\u043B\u0438\u0442\u044C", () => deleteConfirm(path), true);
     }
-    menu.style.left = Math.min(e.clientX, innerWidth - 210) + "px";
-    menu.style.top = Math.min(e.clientY, innerHeight - 260) + "px";
+    menu.style.left = Math.min(e.clientX, innerWidth - 240) + "px";
+    menu.style.top = Math.min(e.clientY, innerHeight - 380) + "px";
     menu.classList.add("show");
     setTimeout(() => document.addEventListener("click", () => menu.classList.remove("show"), { once: true }), 10);
   }
-  function newFileDialog(folder = false) {
+  function newFileDialog(folder = false, basePath = "") {
+    const types3 = [
+      ["html", "HTML-\u0441\u0442\u0440\u0430\u043D\u0438\u0446\u0430"],
+      ["css", "CSS-\u0441\u0442\u0438\u043B\u0438"],
+      ["js", "JavaScript"],
+      ["json", "JSON"],
+      ["md", "Markdown"],
+      ["txt", "\u0422\u0435\u043A\u0441\u0442"]
+    ];
+    const templates = [
+      ["starter", "\u0421\u0442\u0430\u0440\u0442\u043E\u0432\u044B\u0439 \u0448\u0430\u0431\u043B\u043E\u043D"],
+      ["blank", "\u041F\u0443\u0441\u0442\u043E\u0439"],
+      ["html5", "HTML5-\u0441\u043A\u0435\u043B\u0435\u0442"],
+      ["card", "\u041A\u0430\u0440\u0442\u043E\u0447\u043A\u0430"],
+      ["form", "\u0424\u043E\u0440\u043C\u0430"],
+      ["hero", "Hero-\u0441\u0435\u043A\u0446\u0438\u044F"],
+      ["reset", "CSS reset"],
+      ["module", "JS-\u043C\u043E\u0434\u0443\u043B\u044C"],
+      ["fetch", "Fetch \u0441 \u043E\u0448\u0438\u0431\u043A\u0430\u043C\u0438"]
+    ];
     ctx.modal({
       title: folder ? "\u041D\u043E\u0432\u0430\u044F \u043F\u0430\u043F\u043A\u0430" : "\u041D\u043E\u0432\u044B\u0439 \u0444\u0430\u0439\u043B",
-      body: `<div class="field"><label>\u0418\u043C\u044F ${folder ? "\u043F\u0430\u043F\u043A\u0438" : "\u0444\u0430\u0439\u043B\u0430"}</label><input id="dlgName" value="${folder ? "new-folder" : "new-file.html"}" autofocus></div>
-           <div class="muted" style="font-size:11px">\u041C\u043E\u0436\u043D\u043E \u0443\u043A\u0430\u0437\u0430\u0442\u044C \u043F\u0443\u0442\u044C: <code class="inline">components/card.html</code></div>`,
+      narrow: true,
+      body: `${folder ? "" : `<div class="field"><label>\u0422\u0438\u043F \u0444\u0430\u0439\u043B\u0430</label>
+        <select id="dlgType">${types3.map(([v, l]) => `<option value="${v}">${l}</option>`).join("")}</select></div>`}
+      <div class="field"><label>\u0418\u043C\u044F ${folder ? "\u043F\u0430\u043F\u043A\u0438" : "\u0444\u0430\u0439\u043B\u0430"}</label>
+        <input id="dlgName" value="${folder ? "new-folder" : "page"}" autofocus></div>
+      <div class="field"><label>\u041F\u0430\u043F\u043A\u0430 (\u043D\u0435\u043E\u0431\u044F\u0437\u0430\u0442\u0435\u043B\u044C\u043D\u043E)</label>
+        <input id="dlgFolder" value="${esc(basePath)}" placeholder="components"></div>
+      ${folder ? "" : `<div class="field"><label>\u0428\u0430\u0431\u043B\u043E\u043D</label>
+        <select id="dlgTemplate">${templates.map(([v, l]) => `<option value="${v}">${l}</option>`).join("")}</select></div>`}
+      <div class="beginner" style="margin:0">\u041C\u043E\u0436\u043D\u043E \u0443\u043A\u0430\u0437\u0430\u0442\u044C \u0432\u043B\u043E\u0436\u0435\u043D\u043D\u044B\u0439 \u043F\u0443\u0442\u044C, \u043D\u0430\u043F\u0440\u0438\u043C\u0435\u0440 <code class="inline">pages/about.html</code>.</div>`,
       okText: "\u0421\u043E\u0437\u0434\u0430\u0442\u044C",
+      onMount: (root) => {
+        const type = root.querySelector("#dlgType");
+        const sync = () => {
+          const name2 = root.querySelector("#dlgName");
+          if (!name2 || !type) return;
+          if (/^(page|untitled|new-file)(\.|$)/.test(name2.value)) name2.value = "page." + type.value;
+        };
+        type?.addEventListener("change", sync);
+      },
       onOk: (root) => {
-        const name2 = root.querySelector("#dlgName").value.trim();
-        if (!name2) return false;
-        const safeName = esc(name2.slice(0, 200));
-        const path = folder ? name2.replace(/\/$/, "") + "/README.md" : name2;
+        const raw = root.querySelector("#dlgName").value.trim();
+        if (!raw) return false;
+        const dir = root.querySelector("#dlgFolder").value.trim().replace(/^\/+|\/+$/g, "");
+        const ext = folder ? "md" : root.querySelector("#dlgType")?.value || "html";
+        const tpl = root.querySelector("#dlgTemplate")?.value || "starter";
+        let rel = raw;
+        if (folder) rel = raw.replace(/^\/+|\/+$/g, "");
+        else if (!/\.[a-z0-9]+$/i.test(rel)) rel += "." + ext;
+        const path = [dir, rel].filter(Boolean).join("/");
+        if (!safePathKey(path)) {
+          toast("\u041D\u0435\u0434\u043E\u043F\u0443\u0441\u0442\u0438\u043C\u043E\u0435 \u0438\u043C\u044F \u0444\u0430\u0439\u043B\u0430", "err");
+          return false;
+        }
         if (exists(path)) {
           toast("\u0422\u0430\u043A\u043E\u0439 \u0444\u0430\u0439\u043B \u0443\u0436\u0435 \u0435\u0441\u0442\u044C", "err");
           return false;
         }
-        let content2 = "";
-        if (folder) content2 = "# " + name2.replace(/[\r\n]/g, "") + "\n";
-        else if (/\.html$/i.test(path)) content2 = '<!DOCTYPE html>\n<html lang="ru">\n<head><meta charset="utf-8"><title>' + safeName + "</title></head>\n<body>\n  \n</body>\n</html>";
-        else if (/\.css$/i.test(path)) content2 = "/* " + name2.replace(/\*\//g, "").slice(0, 200) + " */\n";
-        else if (/\.js$/i.test(path)) content2 = "// " + name2.replace(/[\r\n]/g, "").slice(0, 200) + "\n";
-        else if (/\.json$/i.test(path)) content2 = "{\n  \n}\n";
-        write(path, content2);
+        const content2 = folder ? `# ${rel}
+` : templateContent(tpl, ext, rel);
+        if (!write(path, content2)) return false;
         renderTree();
-        openFile(path);
-        toast(`\u0421\u043E\u0437\u0434\u0430\u043D\u043E: ${path}`, "ok", "\u0424\u0430\u0439\u043B\u044B");
+        if (!folder) openFile(path);
+        toast(`\u0421\u043E\u0437\u0434\u0430\u043D\u043E: ${path}`, "ok");
       }
     });
+  }
+  function templateContent(tpl, ext, name2) {
+    if (ext !== "html" && tpl === "html5") tpl = "starter";
+    const get = (id2) => SNIPPETS.find((s) => s.id === id2)?.code || "";
+    if (tpl === "blank") return starterContent(ext, name2).replace(/<h1>.*<\/h1>/, "") || "";
+    if (tpl === "html5") return get("html5");
+    if (tpl === "card") return `<!DOCTYPE html>
+<html lang="ru"><head><meta charset="UTF-8"><title>${esc(name2)}</title></head><body>
+${get("card")}
+</body></html>`;
+    if (tpl === "hero") return `<!DOCTYPE html>
+<html lang="ru"><head><meta charset="UTF-8"><title>${esc(name2)}</title></head><body>
+${get("hero")}
+</body></html>`;
+    if (tpl === "form") return `<!DOCTYPE html>
+<html lang="ru"><head><meta charset="UTF-8"><title>${esc(name2)}</title></head><body>
+${get("form")}
+</body></html>`;
+    if (tpl === "reset") return get("reset") || "*{box-sizing:border-box}\n";
+    if (tpl === "module") return `export function hello(name = 'Runlet') {
+  return '\u041F\u0440\u0438\u0432\u0435\u0442, ' + name + '!';
+}
+`;
+    if (tpl === "fetch") return get("fetch") || "";
+    return starterContent(ext, name2);
   }
   function renameDialog(path) {
     ctx.modal({
@@ -48203,6 +48572,53 @@ ${f.content}
     setTimeout(() => f.remove(), 1500);
     toast("\u041E\u0442\u043A\u0440\u044B\u0442\u043E \u0432 \u043D\u043E\u0432\u043E\u0439 \u0432\u043A\u043B\u0430\u0434\u043A\u0435", "ok");
   }
+  async function openOSFolder() {
+    if (window.runlet?.openFolder) {
+      try {
+        const res = await window.runlet.openFolder();
+        if (!res || !res.files) return false;
+        for (const [p, c] of Object.entries(res.files)) {
+          if (safePathKey(p)) write(p, c);
+        }
+        renderTree();
+        emit("project:restoreEditors");
+        toast(`\u0417\u0430\u0433\u0440\u0443\u0436\u0435\u043D\u043E \u0444\u0430\u0439\u043B\u043E\u0432: ${Object.keys(res.files).length}`, "ok");
+        return true;
+      } catch (e) {
+        toast("\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u043E\u0442\u043A\u0440\u044B\u0442\u044C \u043F\u0430\u043F\u043A\u0443: " + e.message, "err");
+        return false;
+      }
+    }
+    const inp = document.createElement("input");
+    inp.type = "file";
+    inp.multiple = true;
+    inp.webkitdirectory = true;
+    inp.onchange = async () => {
+      if (inp.files?.length) await uploadFiles([...inp.files]);
+    };
+    inp.click();
+    return true;
+  }
+  async function saveToDisk() {
+    if (window.runlet?.saveProject) {
+      try {
+        const files = {};
+        for (const [p, f] of Object.entries(state.files)) files[p] = f.content;
+        const res = await window.runlet.saveProject(files);
+        if (res?.ok) {
+          toast(`\u0421\u043E\u0445\u0440\u0430\u043D\u0435\u043D\u043E \u0444\u0430\u0439\u043B\u043E\u0432: ${res.count}`, "ok");
+          return true;
+        }
+        toast("\u0421\u043E\u0445\u0440\u0430\u043D\u0435\u043D\u0438\u0435 \u043E\u0442\u043C\u0435\u043D\u0435\u043D\u043E", "info");
+        return false;
+      } catch (e) {
+        toast("\u041E\u0448\u0438\u0431\u043A\u0430 \u0441\u043E\u0445\u0440\u0430\u043D\u0435\u043D\u0438\u044F: " + e.message, "err");
+        return false;
+      }
+    }
+    exportZip();
+    return true;
+  }
 
   // app/src/core/panels.js
   init_core();
@@ -48211,6 +48627,7 @@ ${f.content}
 
   // app/src/core/analyzer.js
   init_core();
+  init_icons();
   init_state();
   var MAX_ANALYZE_TOTAL = 4 * 1024 * 1024;
   function analysisJob() {
@@ -48282,7 +48699,7 @@ ${f.content}
       badge.style.opacity = report.engine?.startsWith("runlet-python") ? "1" : ".75";
     }
     const st = document.querySelector("#statusEngine");
-    if (st) st.textContent = (report.engine?.startsWith("runlet-python") ? "\u25C9 Python-\u0434\u0432\u0438\u0436\u043E\u043A" : "\u25C9 JS-\u0430\u043D\u0430\u043B\u0438\u0437") + ` \xB7 ${report.elapsed_ms ?? 0} \u043C\u0441`;
+    if (st) st.innerHTML = `<span class="ico">${icon(report.engine?.startsWith("runlet-python") ? "code" : "info", 12)}</span> ` + (report.engine?.startsWith("runlet-python") ? "Python-\u0434\u0432\u0438\u0436\u043E\u043A" : "JS-\u0430\u043D\u0430\u043B\u0438\u0437") + ` \xB7 ${report.elapsed_ms ?? 0} \u043C\u0441`;
     const badgeN = document.querySelector("#analyzeBadge");
     if (badgeN) badgeN.textContent = (report.metrics?.diagnostics?.error || 0) + "";
     const sc = document.querySelector("#statusScore");
@@ -48595,59 +49012,81 @@ ${summary.steps.map((s) => "- " + s.text).join("\n")}
     if (!host2) return;
     const r = state.report;
     if (!r) {
-      host2.innerHTML = `<div class="analysis-hero"><div class="score-ring" style="--score:0"><span class="num">\u2014</span></div>
-      <div class="analysis-hero-text"><h2>\u0427\u0442\u043E \u0434\u0435\u043B\u0430\u0435\u0442 \u0432\u0430\u0448 \u043A\u043E\u0434?</h2>
-      <p class="analysis-desc">\u041D\u0430\u0436\u043C\u0438\u0442\u0435 \xAB\u0410\u043D\u0430\u043B\u0438\u0437 \u043A\u043E\u0434\u0430\xBB \u2014 Python-\u0434\u0432\u0438\u0436\u043E\u043A \u0440\u0430\u0437\u0431\u0435\u0440\u0451\u0442 HTML, CSS \u0438 JS, \u043E\u0431\u044A\u044F\u0441\u043D\u0438\u0442 \u043F\u043E\u0432\u0435\u0434\u0435\u043D\u0438\u0435 \u0438 \u043D\u0430\u0439\u0434\u0451\u0442 \u043E\u0448\u0438\u0431\u043A\u0438.</p>
-      <div class="engine-line"><button class="mini-btn" data-cmd="analyze">\u25B6 \u0417\u0430\u043F\u0443\u0441\u0442\u0438\u0442\u044C \u0430\u043D\u0430\u043B\u0438\u0437</button><span>Ctrl+Shift+A</span></div></div></div>
-      <div class="section"><h3>\u041A\u0430\u043A \u044D\u0442\u043E \u0440\u0430\u0431\u043E\u0442\u0430\u0435\u0442</h3><div class="steps">
-      <div class="step"><span class="step-i">1</span><div>\u0414\u0432\u0438\u0436\u043E\u043A \u0447\u0438\u0442\u0430\u0435\u0442 \u0432\u0441\u0435 \u0444\u0430\u0439\u043B\u044B \u043F\u0440\u043E\u0435\u043A\u0442\u0430 \u0438 \u0441\u0442\u0440\u043E\u0438\u0442 \u043A\u0430\u0440\u0442\u0443: \u0442\u0435\u0433\u0438, id, \u0441\u0435\u043B\u0435\u043A\u0442\u043E\u0440\u044B, \u0444\u0443\u043D\u043A\u0446\u0438\u0438.</div></div>
-      <div class="step"><span class="step-i">2</span><div>\u0421\u043E\u043F\u043E\u0441\u0442\u0430\u0432\u043B\u044F\u0435\u0442 <code class="inline">querySelector('#id')</code> \u0441 \u0440\u0435\u0430\u043B\u044C\u043D\u043E\u0439 \u0440\u0430\u0437\u043C\u0435\u0442\u043A\u043E\u0439 \u2014 \u0438 \u043D\u0430\u0445\u043E\u0434\u0438\u0442 \u0431\u0443\u0434\u0443\u0449\u0438\u0435 <code class="inline">TypeError</code>.</div></div>
-      <div class="step"><span class="step-i">3</span><div>\u0421\u043E\u0431\u0438\u0440\u0430\u0435\u0442 \u043F\u043E\u0432\u0435\u0434\u0435\u043D\u0438\u0435: \u0441\u043E\u0431\u044B\u0442\u0438\u044F, fetch, \u0442\u0430\u0439\u043C\u0435\u0440\u044B, localStorage \u2014 \u0438 \u043F\u0438\u0448\u0435\u0442 \u043F\u043E\u043D\u044F\u0442\u043D\u043E\u0435 \u0440\u0435\u0437\u044E\u043C\u0435.</div></div></div></div>`;
+      host2.innerHTML = `<div class="analysis-hero">
+      <div class="score-ring score-large" style="--score:0"><span class="num">\u2014</span></div>
+      <div class="analysis-hero-text"><span class="verdict ok">\u041E\u0436\u0438\u0434\u0430\u043D\u0438\u0435 \u0430\u043D\u0430\u043B\u0438\u0437\u0430</span>
+        <h2>\u0427\u0442\u043E \u0434\u0435\u043B\u0430\u0435\u0442 \u0432\u0430\u0448 \u043A\u043E\u0434?</h2>
+        <p class="analysis-desc">Python-\u0434\u0432\u0438\u0436\u043E\u043A \u0440\u0430\u0437\u0431\u0435\u0440\u0451\u0442 \u0440\u0430\u0437\u043C\u0435\u0442\u043A\u0443, \u0441\u0442\u0438\u043B\u0438 \u0438 \u0441\u043A\u0440\u0438\u043F\u0442\u044B, \u043E\u0431\u044A\u044F\u0441\u043D\u0438\u0442 \u043F\u043E\u0432\u0435\u0434\u0435\u043D\u0438\u0435 \u0438 \u043F\u043E\u043A\u0430\u0436\u0435\u0442 \u043E\u0448\u0438\u0431\u043A\u0438 \u0441 \u0438\u0441\u043F\u0440\u0430\u0432\u043B\u0435\u043D\u0438\u044F\u043C\u0438.</p>
+        <div class="engine-line"><button class="btn btn-accent" data-cmd="analyze">${icon("chart", 15)} \u0417\u0430\u043F\u0443\u0441\u0442\u0438\u0442\u044C \u0430\u043D\u0430\u043B\u0438\u0437</button>
+          <kbd>Ctrl + Shift + A</kbd></div>
+      </div></div>
+      <div class="section"><h3>\u041A\u0430\u043A \u044D\u0442\u043E \u0440\u0430\u0431\u043E\u0442\u0430\u0435\u0442</h3>
+        <div class="steps">
+          <div class="step"><span class="step-i">${icon("files", 15)}</span><div>\u0414\u0432\u0438\u0436\u043E\u043A \u0447\u0438\u0442\u0430\u0435\u0442 \u0432\u0441\u0435 \u0444\u0430\u0439\u043B\u044B \u043F\u0440\u043E\u0435\u043A\u0442\u0430 \u0438 \u0441\u0442\u0440\u043E\u0438\u0442 \u043A\u0430\u0440\u0442\u0443: \u0442\u0435\u0433\u0438, \u0438\u0434\u0435\u043D\u0442\u0438\u0444\u0438\u043A\u0430\u0442\u043E\u0440\u044B, \u0441\u0435\u043B\u0435\u043A\u0442\u043E\u0440\u044B, \u0444\u0443\u043D\u043A\u0446\u0438\u0438.</div></div>
+          <div class="step"><span class="step-i">${icon("target", 15)}</span><div>\u0421\u0432\u0435\u0440\u044F\u0435\u0442 <code class="inline">querySelector('#id')</code> \u0441 \u0440\u0430\u0437\u043C\u0435\u0442\u043A\u043E\u0439 \u0438 \u043D\u0430\u0445\u043E\u0434\u0438\u0442 \u0431\u0443\u0434\u0443\u0449\u0438\u0435 <code class="inline">TypeError</code>.</div></div>
+          <div class="step"><span class="step-i">${icon("refresh", 15)}</span><div>\u0421\u043E\u0431\u0438\u0440\u0430\u0435\u0442 \u043F\u043E\u0432\u0435\u0434\u0435\u043D\u0438\u0435: \u0441\u043E\u0431\u044B\u0442\u0438\u044F, \u0437\u0430\u043F\u0440\u043E\u0441\u044B, \u0442\u0430\u0439\u043C\u0435\u0440\u044B, \u0445\u0440\u0430\u043D\u0438\u043B\u0438\u0449\u0435 \u2014 \u0438 \u043F\u0438\u0448\u0435\u0442 \u043F\u043E\u043D\u044F\u0442\u043D\u043E\u0435 \u0440\u0435\u0437\u044E\u043C\u0435.</div></div>
+        </div></div>`;
       return;
     }
     const py = r.engine?.startsWith("runlet-python");
+    const d = r.diagnostics || [];
+    const count2 = (sev) => d.filter((x2) => x2.sev === sev).length;
+    const errors = count2("error"), warns = count2("warning"), infos = count2("info") + count2("hint");
+    const gradeEntries = Object.entries(r.grades || {});
+    const gradeColor = (v) => v >= 80 ? "var(--ok)" : v >= 60 ? "var(--warn)" : "var(--err)";
+    const stat = (cls, ic, label, n, hint) => `<div class="a-stat ${cls}">
+      <div class="a-stat-ico">${icon(ic, 19)}</div><div class="a-stat-num">${n}</div>
+      <div class="a-stat-label">${label}</div><div class="a-stat-hint">${hint}</div></div>`;
     host2.innerHTML = `
     <div class="analysis-hero">
-      <div class="score-ring" style="--score:${r.score}"><span class="num">${r.score}</span><span class="lbl">/ 100</span></div>
+      <div class="score-ring score-large" style="--score:${r.score}"><span class="num">${r.score}</span><span class="lbl">\u0438\u0437 100</span></div>
       <div class="analysis-hero-text">
-        <span class="verdict ${r.summary.verdict_level}">${esc(r.summary.verdict)}</span>
+        <span class="verdict ${r.summary.verdict_level}">${icon(r.summary.verdict_level === "ok" ? "check" : "info", 13)} ${esc(r.summary.verdict)}</span>
         <h2>${esc(r.summary.headline)}</h2>
         <p class="analysis-desc">${esc(r.summary.description)}</p>
-        <div class="engine-line"><span class="pill ${py ? "pill-accent" : ""}">${icon(py ? "code" : "info", 12)} ${py ? "Python-\u0434\u0432\u0438\u0436\u043E\u043A" : "JS-\u0430\u043D\u0430\u043B\u0438\u0437"}</span>
-          <span>${r.elapsed_ms} \u043C\u0441</span><span>${r.diagnostics.length} \u0437\u0430\u043C\u0435\u0447\u0430\u043D\u0438\u0439</span>
-          <button class="mini-btn" data-cmd="analyze">${icon("refresh", 12)} \u041E\u0431\u043D\u043E\u0432\u0438\u0442\u044C</button>
-          <button class="mini-btn" data-cmd="analysisReport">${icon("maximize", 12)} \u0420\u0430\u0437\u0432\u0435\u0440\u043D\u0443\u0442\u044C</button></div>
+        <div class="engine-line">
+          <span class="pill ${py ? "pill-accent" : ""}">${icon(py ? "code" : "info", 13)} ${py ? "Python-\u0434\u0432\u0438\u0436\u043E\u043A" : "JS-\u0430\u043D\u0430\u043B\u0438\u0437"}</span>
+          <span>${r.elapsed_ms} \u043C\u0441</span>
+          <button class="mini-btn" data-cmd="analyze">${icon("refresh", 13)} \u041E\u0431\u043D\u043E\u0432\u0438\u0442\u044C</button>
+          <button class="mini-btn" data-cmd="analysisReport">${icon("maximize", 13)} \u041F\u043E\u0434\u0440\u043E\u0431\u043D\u0435\u0435</button></div>
       </div>
     </div>
-    <div class="grade-bars">${Object.entries(r.grades).map(([k, v]) => `
-      <div class="grade"><span>${gradesRu[k] || k}</span><b>${v}</b><div class="bar"><i style="width:${v}%"></i></div></div>`).join("")}</div>
+    <div class="analysis-stats">
+      ${stat("is-error", "close", "\u041E\u0448\u0438\u0431\u043A\u0438", errors, "\u043D\u0443\u0436\u043D\u043E \u0438\u0441\u043F\u0440\u0430\u0432\u0438\u0442\u044C")}
+      ${stat("is-warn", "info", "\u041F\u0440\u0435\u0434\u0443\u043F\u0440\u0435\u0436\u0434\u0435\u043D\u0438\u044F", warns, "\u0441\u0442\u043E\u0438\u0442 \u043F\u0440\u043E\u0432\u0435\u0440\u0438\u0442\u044C")}
+      ${stat("is-info", "spark", "\u0421\u043E\u0432\u0435\u0442\u044B", infos, "\u043C\u043E\u0436\u043D\u043E \u0443\u043B\u0443\u0447\u0448\u0438\u0442\u044C")}
+    </div>
     <div class="section"><h3>\u0427\u0442\u043E \u043F\u0440\u043E\u0438\u0437\u043E\u0439\u0434\u0451\u0442 \u043F\u0440\u0438 \u0437\u0430\u043F\u0443\u0441\u043A\u0435 <span class="count">${r.summary.steps.length} \u0448\u0430\u0433\u043E\u0432</span></h3>
-      <div class="steps">${r.summary.steps.map((s, i4) => `<div class="step"><span class="step-i">${s.icon === "error" ? "!" : i4 + 1}</span>
+      <div class="steps">${r.summary.steps.map((s, i4) => `<div class="step"><span class="step-i">${s.icon === "error" ? icon("close", 14) : i4 + 1}</span>
         <div>${esc(s.text)}<span class="conf">${esc(s.confidence)}</span></div></div>`).join("")}</div></div>
-    <div class="section"><h3>\u041E\u0448\u0438\u0431\u043A\u0438 \u0438 \u0437\u0430\u043C\u0435\u0447\u0430\u043D\u0438\u044F <span class="count">${r.diagnostics.length}</span></h3>
-      <div class="sev-filters">${["all", "error", "warning", "info", "hint"].map((f) => `<button class="sev-chip ${diagFilter === f ? "active" : ""}" data-sev="${f}">${sevRu[f]} <span class="n">${f === "all" ? r.diagnostics.length : r.diagnostics.filter((d) => d.sev === f).length}</span></button>`).join("")}
-        <button class="sev-chip" data-cmd="fixAll">${icon("wand", 12)} \u0418\u0441\u043F\u0440\u0430\u0432\u0438\u0442\u044C</button></div>
+    <div class="section"><h3>\u041E\u0448\u0438\u0431\u043A\u0438 \u0438 \u0437\u0430\u043C\u0435\u0447\u0430\u043D\u0438\u044F <span class="count">${d.length}</span></h3>
+      <div class="sev-filters">${["all", "error", "warning", "info", "hint"].map((f) => `<button class="sev-chip ${diagFilter === f ? "active" : ""}" data-sev="${f}">${sevRu[f]} <span class="n">${f === "all" ? d.length : count2(f)}</span></button>`).join("")}
+        <button class="sev-chip" data-cmd="fixAll">${icon("wand", 13)} \u0418\u0441\u043F\u0440\u0430\u0432\u0438\u0442\u044C</button></div>
       <div class="diag-list">${diagnosticsHtml(r)}</div></div>
+    <div class="section"><h3>\u041A\u0430\u0447\u0435\u0441\u0442\u0432\u043E \u043F\u043E \u043D\u0430\u043F\u0440\u0430\u0432\u043B\u0435\u043D\u0438\u044F\u043C</h3>
+      <div class="quality-grid">${gradeEntries.map(([k, v]) => `<div class="quality-item">
+        <div class="quality-row"><span>${gradesRu[k] || k}</span><b style="color:${gradeColor(v)}">${v}</b></div>
+        <div class="quality-bar"><i style="width:${v}%;background:${gradeColor(v)}"></i></div></div>`).join("")}</div></div>
     ${chipsHtml(r)}
     <div class="section"><h3>\u0414\u043B\u044F \u043D\u043E\u0432\u0438\u0447\u043A\u0430 <button class="mini-btn" id="beginnerToggle" style="margin-left:auto">${beginnerMode ? "\u0421\u043A\u0440\u044B\u0442\u044C" : "\u041E\u0431\u044A\u044F\u0441\u043D\u0438\u0442\u044C"}</button></h3>
       <div class="beginner ${beginnerMode ? "" : "hidden"}" id="beginnerBox"><ul>${r.summary.beginner.map((b) => `<li>${esc(b)}</li>`).join("")}</ul></div></div>
-    <div class="rowflex" style="padding:0 14px 14px">
-      <button class="mini-btn" data-cmd="exportReportMd">${icon("download", 12)} Markdown</button>
-      <button class="mini-btn" data-cmd="exportReportJson">${icon("download", 12)} JSON</button>
-      <button class="mini-btn" data-cmd="copyReport">${icon("copy", 12)} \u041A\u043E\u043F\u0438\u0440\u043E\u0432\u0430\u0442\u044C</button>
-      <button class="mini-btn" data-cmd="helpWelcome">${icon("help", 12)} \u041A\u0430\u043A \u0440\u0430\u0431\u043E\u0442\u0430\u0442\u044C</button>
+    <div class="rowflex analysis-actions">
+      <button class="mini-btn" data-cmd="exportReportMd">${icon("download", 13)} Markdown</button>
+      <button class="mini-btn" data-cmd="exportReportJson">${icon("download", 13)} JSON</button>
+      <button class="mini-btn" data-cmd="copyReport">${icon("copy", 13)} \u041A\u043E\u043F\u0438\u0440\u043E\u0432\u0430\u0442\u044C</button>
+      <button class="mini-btn" data-cmd="helpWelcome">${icon("help", 13)} \u041A\u0430\u043A \u0440\u0430\u0431\u043E\u0442\u0430\u0442\u044C</button>
       </div>`;
     host2.querySelectorAll("[data-sev]").forEach((b) => b.addEventListener("click", () => {
       diagFilter = b.dataset.sev;
       renderAnalysis();
     }));
     host2.querySelectorAll(".diag-top .file").forEach((b) => b.addEventListener("click", () => {
-      const d = r.diagnostics.find((x2) => x2.id === b.dataset.rid && x2.line === +b.dataset.line);
-      if (d) gotoDiagnostic(d);
+      const d2 = r.diagnostics.find((x2) => x2.id === b.dataset.rid && x2.line === +b.dataset.line);
+      if (d2) gotoDiagnostic(d2);
     }));
     host2.querySelectorAll("[data-fix]").forEach((b) => b.addEventListener("click", () => {
-      const d = r.diagnostics.find((x2) => x2.id === b.dataset.fix && x2.line === +b.dataset.line);
-      if (d) applyFix(d);
+      const d2 = r.diagnostics.find((x2) => x2.id === b.dataset.fix && x2.line === +b.dataset.line);
+      if (d2) applyFix(d2);
     }));
     host2.querySelectorAll(".diag-msg").forEach((n) => n.addEventListener("click", () => n.parentElement.querySelector(".diag-why")?.classList.toggle("hidden")));
     $("#beginnerToggle")?.addEventListener("click", () => {
@@ -48661,9 +49100,9 @@ ${summary.steps.map((s) => "- " + s.text).join("\n")}
     const list2 = r.diagnostics.filter((d) => diagFilter === "all" || d.sev === diagFilter);
     if (!list2.length) return '<div class="empty-note">\u0417\u0434\u0435\u0441\u044C \u0447\u0438\u0441\u0442\u043E </div>';
     return list2.slice(0, 90).map((d) => `<div class="diag ${d.sev}">
-    <div class="diag-top"><span class="sev ${d.sev}">${{ error: "\u041E\u0428\u0418\u0411\u041A\u0410", warning: "\u0412\u041D\u0418\u041C\u0410\u041D\u0418\u0415", info: "\u0418\u041D\u0424\u041E", hint: "\u0421\u041E\u0412\u0415\u0422" }[d.sev]}</span>
+    <div class="diag-top"><span class="sev ${d.sev}">${icon(d.sev === "error" ? "close" : d.sev === "warning" ? "info" : "spark", 12)} ${{ error: "\u041E\u0428\u0418\u0411\u041A\u0410", warning: "\u0412\u041D\u0418\u041C\u0410\u041D\u0418\u0415", info: "\u0418\u041D\u0424\u041E", hint: "\u0421\u041E\u0412\u0415\u0422" }[d.sev]}</span>
       <span>${esc(d.id)} \xB7 ${esc(gradesRu[d.cat] || d.cat)}</span>
-      <span class="file" data-rid="${esc(d.id)}" data-line="${d.line}">${esc(d.file)}:${d.line} \u2197</span></div>
+      <span class="file" data-rid="${esc(d.id)}" data-line="${d.line}">${esc(d.file)}:${d.line} ${icon("arrowRight", 11)}</span></div>
     <p class="diag-msg">${esc(d.msg)}</p>
     ${d.why ? `<div class="diag-why hidden"><b>\u041F\u043E\u0447\u0435\u043C\u0443:</b> ${esc(d.why)}</div>` : ""}
     ${d.fix ? `<div class="diag-fix"> ${esc(d.fix)}</div>` : ""}
@@ -48677,11 +49116,11 @@ ${summary.steps.map((s) => "- " + s.text).join("\n")}
     const chips = [];
     for (const e of (b.events || []).slice(0, 6)) chips.push(`<span class="chip"> <b>${esc(e.type)}</b> \u2192 ${esc(e.target)}</span>`);
     for (const n of (b.network || []).slice(0, 4)) chips.push(`<span class="chip"> <b>${esc(n.method || "fetch")}</b> ${esc(String(n.url).slice(0, 40))}</span>`);
-    for (const t2 of (b.timers || []).slice(0, 3)) chips.push(`<span class="chip">\u23F1 ${esc(t2.kind || "timer")}</span>`);
+    for (const t2 of (b.timers || []).slice(0, 3)) chips.push(`<span class="chip">${icon("clock", 13)} ${esc(t2.kind || "timer")}</span>`);
     for (const s of (b.storage || []).slice(0, 4)) chips.push(`<span class="chip"> <b>${esc(s.store)}</b> ${esc(s.key)}</span>`);
     for (const c of (b.colors || []).slice(0, 6)) {
       const col = sanitizeColor(c.value, "transparent");
-      chips.push(`<span class="chip"> <b style="color:${col}">\u25A0</b> ${esc(String(c.value).slice(0, 40))}</span>`);
+      chips.push(`<span class="chip">${icon("palette", 13)} <i class="chip-swatch" style="background:${col}"></i> ${esc(String(c.value).slice(0, 40))}</span>`);
     }
     if (!chips.length) return "";
     return `<div class="section"><h3>\u041F\u043E\u0432\u0435\u0434\u0435\u043D\u0438\u0435 \u043A\u043E\u0434\u0430</h3><div class="chips">${chips.join("")}</div></div>`;
@@ -48759,7 +49198,7 @@ ${summary.steps.map((s) => "- " + s.text).join("\n")}
       <button class="mini-btn" id="logJson">JSON</button></div>
       <div class="console-list" id="logList" style="flex:1;overflow:auto"></div>
       <div class="repl-bar"><span class="repl-prompt">\u203A</span><input id="replInput" placeholder="\u0412\u0432\u0435\u0434\u0438\u0442\u0435 JS-\u0432\u044B\u0440\u0430\u0436\u0435\u043D\u0438\u0435 (Enter \u2014 \u0432\u044B\u043F\u043E\u043B\u043D\u0438\u0442\u044C)" autocomplete="off">
-      <button class="mini-btn" id="replRun">\u21B5</button></div>`;
+      <button class="mini-btn" id="replRun">${icon("arrowRight", 13)}</button></div>`;
       host2.querySelector("#logLevel").addEventListener("change", (e) => {
         state.consoleFilter = e.target.value;
         renderConsole();
@@ -48828,7 +49267,7 @@ ${summary.steps.map((s) => "- " + s.text).join("\n")}
     list2.innerHTML = rows.slice(-400).map((l) => {
       let extra = "";
       if (l.table) extra = `<table class="log-table"><tr>${Object.keys(l.table[0] || {}).map((k) => `<th>${esc(k)}</th>`).join("")}</tr>${l.table.map((row) => `<tr>${Object.values(row).map((v) => `<td>${esc(v)}</td>`).join("")}</tr>`).join("")}</table>`;
-      else if (l.args?.length && typeof l.args[0] === "object" && l.args[0]?.k === "array") extra = `<div class="log-obj">\u25B6 ${esc(l.args[0].p)}</div>`;
+      else if (l.args?.length && typeof l.args[0] === "object" && l.args[0]?.k === "array") extra = `<div class="log-obj">${icon("chevronRight", 12)} ${esc(l.args[0].p)}</div>`;
       if (l.stack) extra += `<div style="color:var(--dim);font-size:9px;white-space:pre-wrap">${esc(l.stack.slice(0, 400))}</div>`;
       return `<div class="log-row ${l.level}"><span class="lvl">${esc(l.level)}</span>
       <span class="txt">${esc(l.text || "")}${extra}</span>
@@ -48849,11 +49288,11 @@ ${summary.steps.map((s) => "- " + s.text).join("\n")}
     const bps = Object.entries(state.breakpoints).flatMap(([f, arr]) => arr.map((b) => ({ ...b, file: f })));
     const trace = state.trace || [];
     host2.innerHTML = `<div class="insp-toolbar">
-      <button class="mini-btn" id="dbgRefresh">\u21BB \u0422\u0440\u0430\u0441\u0441\u0438\u0440\u043E\u0432\u043A\u0430</button>
-      <button class="mini-btn" id="dbgStepInto">\u2193 Step into</button>
-      <button class="mini-btn" id="dbgStepOver">\u2192 Step over</button>
-      <button class="mini-btn" id="dbgStepOut">\u2191 Step out</button>
-      <button class="mini-btn" id="dbgResume">\u25B6 Resume</button>
+      <button class="mini-btn" id="dbgRefresh">${icon("refresh", 13)} \u0422\u0440\u0430\u0441\u0441\u0438\u0440\u043E\u0432\u043A\u0430</button>
+      <button class="mini-btn" id="dbgStepInto">${icon("arrowDown", 13)} Step into</button>
+      <button class="mini-btn" id="dbgStepOver">${icon("arrowRight", 13)} Step over</button>
+      <button class="mini-btn" id="dbgStepOut">${icon("arrowUp", 13)} Step out</button>
+      <button class="mini-btn" id="dbgResume">${icon("play", 13)} Resume</button>
       <button class="mini-btn" id="dbgAddBp">\uFF0B \u0422\u043E\u0447\u043A\u0430</button></div>
     <div class="section"><h3>\u0422\u043E\u0447\u043A\u0438 \u043E\u0441\u0442\u0430\u043D\u043E\u0432\u0430 <span class="count">${bps.length}</span></h3>
       <div class="debug-steps">${bps.length ? bps.map((b) => `<div class="kv"><span>${esc(b.file)}:${b.line}</span>
@@ -48958,8 +49397,8 @@ ${summary.steps.map((s) => "- " + s.text).join("\n")}
     const host2 = $("#domPanel");
     if (!host2) return;
     const selected2 = state.selectedElement;
-    host2.innerHTML = `<div class="insp-toolbar"><button class="mini-btn" id="domRefresh">\u21BB \u041E\u0431\u043D\u043E\u0432\u0438\u0442\u044C DOM</button>
-      <button class="mini-btn" id="domInspect">\u2316 \u0418\u043D\u0441\u043F\u0435\u043A\u0442\u043E\u0440</button><button class="mini-btn" id="domA11y"> a11y</button>
+    host2.innerHTML = `<div class="insp-toolbar"><button class="mini-btn" id="domRefresh">${icon("refresh", 13)} \u041E\u0431\u043D\u043E\u0432\u0438\u0442\u044C DOM</button>
+      <button class="mini-btn" id="domInspect">${icon("target", 13)} \u0418\u043D\u0441\u043F\u0435\u043A\u0442\u043E\u0440</button><button class="mini-btn" id="domA11y"> a11y</button>
       <button class="mini-btn" id="domSpeech"> \u0421\u043A\u0440\u0438\u043D\u0440\u0438\u0434\u0435\u0440</button></div>
     <div class="dom-tree" id="domTreeBox">${state.domTree ? domHtml(state.domTree, 0) : '<div class="empty-note">\u041D\u0430\u0436\u043C\u0438\u0442\u0435 \xAB\u041E\u0431\u043D\u043E\u0432\u0438\u0442\u044C DOM\xBB</div>'}</div>
     <div class="section"><h3>Computed styles ${selected2 ? "\u2014 " + esc(selected2.tag) : ""}</h3>
@@ -48989,7 +49428,7 @@ ${summary.steps.map((s) => "- " + s.text).join("\n")}
       return '<div class="kv"><span style="max-width:55%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + esc(n.url) + '">' + esc(n.method || "GET") + " " + esc(n.url) + '</span><b style="color:' + color + '">' + (n.status || "\u2014") + "</b><span>" + (n.ms || 0) + "ms" + (n.local ? " \xB7 VFS" : "") + "</span></div>";
     }).join("");
     const empty3 = '<div class="empty-note">\u0417\u0430\u043F\u0440\u043E\u0441\u043E\u0432 \u043F\u043E\u043A\u0430 \u043D\u0435\u0442. \u0412\u044B\u0437\u043E\u0432\u0438\u0442\u0435 fetch() \u2014 \u0437\u0430\u043F\u0440\u043E\u0441 \u043F\u043E\u044F\u0432\u0438\u0442\u0441\u044F \u0437\u0434\u0435\u0441\u044C.</div>';
-    host2.innerHTML = '<div class="insp-toolbar"><button class="mini-btn" id="netRefresh">\u21BB</button><span class="muted">' + items.length + ' \u0437\u0430\u043F\u0440\u043E\u0441\u043E\u0432</span><button class="mini-btn" id="netClear">\u041E\u0447\u0438\u0441\u0442\u0438\u0442\u044C</button></div><div class="debug-steps">' + (rows || empty3) + "</div>";
+    host2.innerHTML = `<div class="insp-toolbar"><button class="mini-btn" id="netRefresh">${icon("refresh", 13)}</button><span class="muted">` + items.length + ' \u0437\u0430\u043F\u0440\u043E\u0441\u043E\u0432</span><button class="mini-btn" id="netClear">\u041E\u0447\u0438\u0441\u0442\u0438\u0442\u044C</button></div><div class="debug-steps">' + (rows || empty3) + "</div>";
     host2.querySelector("#netRefresh").onclick = () => send("getNetwork", {});
     host2.querySelector("#netClear").onclick = () => {
       state.network = [];
@@ -49001,7 +49440,7 @@ ${summary.steps.map((s) => "- " + s.text).join("\n")}
     if (!host2) return;
     const d = state.storageData || {};
     const block = (title, obj) => `<div class="section"><h3>${title}</h3><div class="debug-steps">${Object.entries(obj || {}).map(([k, v]) => `<div class="kv"><span>${esc(k)}</span><b>${esc(String(v).slice(0, 60))}</b></div>`).join("") || '<div class="dim">\u043F\u0443\u0441\u0442\u043E</div>'}</div></div>`;
-    host2.innerHTML = `<div class="insp-toolbar"><button class="mini-btn" id="stRefresh">\u21BB \u041E\u0431\u043D\u043E\u0432\u0438\u0442\u044C</button><span class="muted">\u0438\u0437\u043E\u043B\u0438\u0440\u043E\u0432\u0430\u043D\u043E \u0432 sandbox</span></div>` + block("localStorage", d.local) + block("sessionStorage", d.session) + `<div class="section"><h3>Cookies</h3><div class="debug-steps"><div class="kv"><span>document.cookie</span><b>${esc(d.cookies || "\u2014")}</b></div></div></div>`;
+    host2.innerHTML = `<div class="insp-toolbar"><button class="mini-btn" id="stRefresh">${icon("refresh", 13)} \u041E\u0431\u043D\u043E\u0432\u0438\u0442\u044C</button><span class="muted">\u0438\u0437\u043E\u043B\u0438\u0440\u043E\u0432\u0430\u043D\u043E \u0432 sandbox</span></div>` + block("localStorage", d.local) + block("sessionStorage", d.session) + `<div class="section"><h3>Cookies</h3><div class="debug-steps"><div class="kv"><span>document.cookie</span><b>${esc(d.cookies || "\u2014")}</b></div></div></div>`;
     host2.querySelector("#stRefresh").onclick = () => send("getStorage", {});
   }
   function renderPerf() {
@@ -49010,7 +49449,7 @@ ${summary.steps.map((s) => "- " + s.text).join("\n")}
     const p = state.perf || {}, r = state.report;
     const size = Object.values(state.files).reduce((n, f) => n + (f.content?.length || 0), 0);
     const lighthouse = r?.score ?? Math.max(0, 100 - Math.round(size / 2e3));
-    host2.innerHTML = `<div class="insp-toolbar"><button class="mini-btn" id="perfRefresh">\u21BB \u0417\u0430\u043C\u0435\u0440\u044B</button>
+    host2.innerHTML = `<div class="insp-toolbar"><button class="mini-btn" id="perfRefresh">${icon("refresh", 13)} \u0417\u0430\u043C\u0435\u0440\u044B</button>
     <button class="mini-btn" id="perfTips">\u0421\u043E\u0432\u0435\u0442\u044B</button><span class="spacer"></span>
     <span class="muted">Lighthouse-\u043F\u043E\u0434\u043E\u0431\u043D\u0430\u044F \u043E\u0446\u0435\u043D\u043A\u0430: <b style="color:${lighthouse > 75 ? "var(--ok)" : "var(--warn)"}">${lighthouse}</b></span></div>
     <div class="grade-bars" style="padding-top:12px">
@@ -49188,7 +49627,7 @@ ${summary.steps.map((s) => "- " + s.text).join("\n")}
       body: `<div class="beginner">${esc(lesson.theory)}</div>
       <h4 style="margin:14px 0 6px">\u0417\u0430\u0434\u0430\u043D\u0438\u0435</h4><p>${esc(lesson.task)}</p>
       <div class="field"><label>\u0412\u0430\u0448 \u043A\u043E\u0434 (\u043F\u0430\u043D\u0435\u043B\u044C ${lesson.lang})</label><textarea id="lessonCode" rows="9" style="font:12px var(--mono)">${esc(getDoc(pane).slice(0, 2e3))}</textarea></div>
-      <div class="rowflex"><button class="mini-btn" id="lessonLoad">\u21BB \u0417\u0430\u0433\u0440\u0443\u0437\u0438\u0442\u044C \u0441\u0442\u0430\u0440\u0442\u043E\u0432\u044B\u0439 \u043A\u043E\u0434</button>
+      <div class="rowflex"><button class="mini-btn" id="lessonLoad">${icon("refresh", 13)} \u0417\u0430\u0433\u0440\u0443\u0437\u0438\u0442\u044C \u0441\u0442\u0430\u0440\u0442\u043E\u0432\u044B\u0439 \u043A\u043E\u0434</button>
         <button class="mini-btn" id="lessonHint"> \u041F\u043E\u0434\u0441\u043A\u0430\u0437\u043A\u0430</button><button class="mini-btn" id="lessonCheck"> \u041F\u0440\u043E\u0432\u0435\u0440\u0438\u0442\u044C</button></div>
       <div id="lessonResult" class="mt8"></div>`,
       okText: "\u0417\u0430\u043A\u0440\u044B\u0442\u044C",
@@ -49260,8 +49699,8 @@ ${summary.steps.map((s) => "- " + s.text).join("\n")}
     box.innerHTML = `<div class="list-rows">${steps.map((s, i5) => `<div class="list-row viz-step" data-i="${i5}" style="opacity:.45;transition:.3s">
     <b style="width:22px;height:22px;border-radius:8px;background:var(--accent);color:#fff;display:grid;place-items:center">${i5 + 1}</b>
     <div class="grow"><b>${esc(s[0])}</b><small>${esc(s[1])}</small></div></div>`).join("")}</div>
-    <div class="rowflex mt8"><button class="mini-btn" id="vizPlay">\u25B6 \u041F\u0440\u043E\u0438\u0433\u0440\u0430\u0442\u044C</button>
-      <button class="mini-btn" id="vizNext">\u0428\u0430\u0433 \u2192</button><span class="muted" id="vizStatus" style="font-size:11px"></span></div>`;
+    <div class="rowflex mt8"><button class="mini-btn" id="vizPlay">${icon("play", 13)} \u041F\u0440\u043E\u0438\u0433\u0440\u0430\u0442\u044C</button>
+      <button class="mini-btn" id="vizNext">\u0428\u0430\u0433 ${icon("arrowRight", 13)}</button><span class="muted" id="vizStatus" style="font-size:11px"></span></div>`;
     let i4 = -1;
     const show = (n) => {
       i4 = n;
@@ -49701,8 +50140,8 @@ return (typeof register === "function") ? register(api) : null;');
       narrow: true,
       body: `<div style="text-align:center"><div id="pomoTime" style="font-size:58px;font-weight:800;letter-spacing:-3px">25:00</div>
       <div class="muted">\u0420\u0430\u0431\u043E\u0442\u0430 25 \u043C\u0438\u043D / \u043E\u0442\u0434\u044B\u0445 5 \u043C\u0438\u043D</div>
-      <div class="rowflex mt8" style="justify-content:center"><button class="mini-btn" id="pomoStart">\u25B6 \u0421\u0442\u0430\u0440\u0442</button>
-      <button class="mini-btn" id="pomoReset">\u21BB \u0421\u0431\u0440\u043E\u0441</button></div></div>`,
+      <div class="rowflex mt8" style="justify-content:center"><button class="mini-btn" id="pomoStart">${icon("play", 13)} \u0421\u0442\u0430\u0440\u0442</button>
+      <button class="mini-btn" id="pomoReset">${icon("refresh", 13)} \u0421\u0431\u0440\u043E\u0441</button></div></div>`,
       okText: "\u0417\u0430\u043A\u0440\u044B\u0442\u044C",
       onMount: (root) => {
         let left = 25 * 60, timer = null;
@@ -49770,45 +50209,12 @@ ${p.map((x2, i4) => `  --brand-${i4 + 1}: ${x2};`).join("\n")}
       onMount: (root) => {
         const upd = () => {
           const parts = root.querySelector("#dgIn").value.split("->");
-          root.querySelector("#dgOut").innerHTML = parts.map((s, i4) => `<div style="padding:8px 14px;border-radius:12px;background:var(--accent);color:#fff">${esc(s.trim())}</div>${i4 < parts.length - 1 ? "<div>\u2193</div>" : ""}`).join("");
+          root.querySelector("#dgOut").innerHTML = parts.map((s, i4) => `<div style="padding:8px 14px;border-radius:12px;background:var(--accent);color:#fff">${esc(s.trim())}</div>${i4 < parts.length - 1 ? `<div style="text-align:center;color:var(--accent)">${icon("chevronDown", 16)}</div>` : ""}`).join("");
         };
         root.querySelector("#dgIn").addEventListener("input", upd);
         upd();
       }
     });
-  }
-  function initFeatures() {
-    const host2 = $("#featuresPanel");
-    if (!host2) return;
-    const c = coverage();
-    host2.innerHTML = `<div class="beginner" style="margin:0 0 10px"><b>\u041A\u0430\u0440\u0442\u0430 \u0438\u0434\u0435\u0439: ${c.done} \u0440\u0435\u0430\u043B\u0438\u0437\u043E\u0432\u0430\u043D\u043E, ${c.partial} \u0447\u0430\u0441\u0442\u0438\u0447\u043D\u043E, \u0432\u0441\u0435\u0433\u043E ${c.total}.</b><br>
-    <div class="progress mt8"><i style="width:${c.percent}%"></i></div>
-    <small class="dim"> \u0441\u0434\u0435\u043B\u0430\u043D\u043E \xB7  \u0447\u0430\u0441\u0442\u0438\u0447\u043D\u043E \xB7  \u0432 \u043F\u043B\u0430\u043D\u0430\u0445</small></div>
-    <input id="featFilter" placeholder="\u0424\u0438\u043B\u044C\u0442\u0440 \u043F\u043E \u043D\u0430\u0437\u0432\u0430\u043D\u0438\u044E\u2026" style="width:100%;height:29px;border-radius:9px;border:1px solid var(--border);background:var(--code-bg);padding:0 9px;margin-bottom:8px">
-    <div id="featList"></div>`;
-    const list2 = host2.querySelector("#featList");
-    const draw = (q) => {
-      list2.innerHTML = "";
-      for (const cat of FEATURES) {
-        const items = cat.items.map((name2, i4) => ({ n: cat.from + i4, name: name2 })).filter((x2) => !q || x2.name.toLowerCase().includes(q.toLowerCase()));
-        if (!items.length) continue;
-        const d = items.filter((x2) => IMPLEMENTED.has(x2.n)).length;
-        const box = el(
-          "div",
-          { class: "feat-cat" },
-          el("h4", {}, cat.name, el("span", { class: "cov", text: `${d}/${items.length}` }))
-        );
-        const grid = el("div", { class: "feat-grid" });
-        for (const it of items) {
-          const cls = IMPLEMENTED.has(it.n) ? "done" : PARTIAL_SET.has(it.n) ? "partial" : "";
-          grid.appendChild(el("span", { class: "feat-item " + cls, title: `${it.n}. ${it.name} \u2014 ${cls === "done" ? "\u0440\u0435\u0430\u043B\u0438\u0437\u043E\u0432\u0430\u043D\u043E" : cls === "partial" ? "\u0447\u0430\u0441\u0442\u0438\u0447\u043D\u043E" : "\u0432 \u043F\u043B\u0430\u043D\u0430\u0445"}`, text: `${it.n}. ${it.name}` }));
-        }
-        box.appendChild(grid);
-        list2.appendChild(box);
-      }
-    };
-    draw("");
-    host2.querySelector("#featFilter").addEventListener("input", debounce((e) => draw(e.target.value), 150));
   }
 
   // app/src/core/commands.js
@@ -49819,6 +50225,247 @@ ${p.map((x2, i4) => `  --brand-${i4 + 1}: ${x2};`).join("\n")}
   init_core();
   init_state();
   init_icons();
+
+  // app/src/core/shellui.js
+  init_core();
+  init_icons();
+  var MENUS = {
+    file: {
+      title: "\u0424\u0430\u0439\u043B",
+      icon: "folder",
+      sections: [
+        { label: "\u041F\u0440\u043E\u0435\u043A\u0442", items: [
+          ["projectManager", "\u041C\u0435\u043D\u044E \u043F\u0440\u043E\u0435\u043A\u0442\u043E\u0432"],
+          ["save", "\u0421\u043E\u0445\u0440\u0430\u043D\u0438\u0442\u044C"],
+          ["exportProject", "\u042D\u043A\u0441\u043F\u043E\u0440\u0442 \u043F\u0440\u043E\u0435\u043A\u0442\u0430"],
+          ["importProject", "\u0418\u043C\u043F\u043E\u0440\u0442 \u043F\u0440\u043E\u0435\u043A\u0442\u0430"],
+          ["exportAllProjects", "\u042D\u043A\u0441\u043F\u043E\u0440\u0442 \u0432\u0441\u0435\u0445 \u043F\u0440\u043E\u0435\u043A\u0442\u043E\u0432"]
+        ] },
+        { label: "\u0424\u0430\u0439\u043B\u044B", items: [
+          ["newFile", "\u041D\u043E\u0432\u044B\u0439 \u0444\u0430\u0439\u043B"],
+          ["newFolder", "\u041D\u043E\u0432\u0430\u044F \u043F\u0430\u043F\u043A\u0430"],
+          ["upload", "\u0417\u0430\u0433\u0440\u0443\u0437\u0438\u0442\u044C \u0441 \u043A\u043E\u043C\u043F\u044C\u044E\u0442\u0435\u0440\u0430"],
+          ["openOSFolder", "\u041E\u0442\u043A\u0440\u044B\u0442\u044C \u043F\u0430\u043F\u043A\u0443 \u0441 \u0434\u0438\u0441\u043A\u0430"]
+        ] },
+        { label: "\u041E\u0431\u043C\u0435\u043D", items: [
+          ["download", "\u0421\u043A\u0430\u0447\u0430\u0442\u044C ZIP"],
+          ["importZip", "\u0418\u043C\u043F\u043E\u0440\u0442 ZIP"],
+          ["importHtml", "\u0418\u043C\u043F\u043E\u0440\u0442 HTML-\u0444\u0430\u0439\u043B\u0430"],
+          ["importUrl", "\u0418\u043C\u043F\u043E\u0440\u0442 \u043F\u043E \u0441\u0441\u044B\u043B\u043A\u0435"],
+          ["exportSingleHtml", "\u0421\u043E\u0431\u0440\u0430\u0442\u044C \u043E\u0434\u0438\u043D HTML"],
+          ["saveToDisk", "\u0421\u043E\u0445\u0440\u0430\u043D\u0438\u0442\u044C \u043F\u0440\u043E\u0435\u043A\u0442 \u043D\u0430 \u0434\u0438\u0441\u043A"]
+        ] }
+      ]
+    },
+    more: {
+      title: "\u0415\u0449\u0451",
+      icon: "more",
+      sections: [
+        { label: "\u0420\u0435\u0434\u0430\u043A\u0442\u043E\u0440", items: [
+          ["format", "\u0424\u043E\u0440\u043C\u0430\u0442\u0438\u0440\u043E\u0432\u0430\u0442\u044C"],
+          ["snippets", "\u0421\u043D\u0438\u043F\u043F\u0435\u0442\u044B"],
+          ["emmet", "\u0420\u0430\u0437\u0432\u0435\u0440\u043D\u0443\u0442\u044C Emmet"],
+          ["gotoLine", "\u041F\u0435\u0440\u0435\u0439\u0442\u0438 \u043A \u0441\u0442\u0440\u043E\u043A\u0435"],
+          ["toggleWrap", "\u041F\u0435\u0440\u0435\u043D\u043E\u0441 \u0441\u0442\u0440\u043E\u043A"],
+          ["fontZoomIn", "\u041A\u0440\u0443\u043F\u043D\u0435\u0435"],
+          ["fontZoomOut", "\u041C\u0435\u043B\u044C\u0447\u0435"]
+        ] },
+        { label: "\u0417\u0430\u043F\u0443\u0441\u043A \u0438 \u0438\u043D\u0441\u0442\u0440\u0443\u043C\u0435\u043D\u0442\u044B", items: [
+          ["liveServer", "Live Server"],
+          ["openSite", "\u0421\u0430\u0439\u0442 \u0432 \u043E\u043A\u043D\u0435"],
+          ["openSiteExternal", "\u041E\u0442\u043A\u0440\u044B\u0442\u044C \u0432 \u0431\u0440\u0430\u0443\u0437\u0435\u0440\u0435"],
+          ["openThreeD", "3D-\u0440\u0435\u0434\u0430\u043A\u0442\u043E\u0440"],
+          ["cssLab", "CSS-\u043B\u0430\u0431\u043E\u0440\u0430\u0442\u043E\u0440\u0438\u044F"],
+          ["jsTools", "JS-\u0438\u043D\u0441\u0442\u0440\u0443\u043C\u0435\u043D\u0442\u044B"],
+          ["htmlTools", "HTML-\u0433\u0435\u043D\u0435\u0440\u0430\u0442\u043E\u0440\u044B"],
+          ["securityScan", "\u041F\u0440\u043E\u0432\u0435\u0440\u043A\u0430 \u0431\u0435\u0437\u043E\u043F\u0430\u0441\u043D\u043E\u0441\u0442\u0438"]
+        ] },
+        { label: "\u0412\u0438\u0434", items: [
+          ["theme", "\u0421\u043C\u0435\u043D\u0438\u0442\u044C \u0442\u0435\u043C\u0443"],
+          ["density", "\u041F\u043B\u043E\u0442\u043D\u043E\u0441\u0442\u044C"],
+          ["layoutColumns", "\u0422\u0440\u0438 \u043A\u043E\u043B\u043E\u043D\u043A\u0438"],
+          ["layoutRows", "\u0422\u0440\u0438 \u0441\u0442\u0440\u043E\u043A\u0438"],
+          ["layoutTabs", "\u0412\u043A\u043B\u0430\u0434\u043A\u0438"],
+          ["windowedMode", "\u041E\u043A\u043E\u043D\u043D\u044B\u0439 \u0440\u0435\u0436\u0438\u043C"],
+          ["appMinimize", "\u0421\u0432\u0435\u0440\u043D\u0443\u0442\u044C \u043E\u043A\u043D\u043E"],
+          ["appMaximize", "\u0420\u0430\u0437\u0432\u0435\u0440\u043D\u0443\u0442\u044C \u043D\u0430 \u0432\u0435\u0441\u044C \u044D\u043A\u0440\u0430\u043D"]
+        ] },
+        { label: "\u0421\u043F\u0440\u0430\u0432\u043A\u0430", items: [
+          ["analysisReport", "\u041F\u043E\u043B\u043D\u044B\u0439 \u043E\u0442\u0447\u0451\u0442 \u0430\u043D\u0430\u043B\u0438\u0437\u0430"],
+          ["tour", "\u0422\u0443\u0440 \u043F\u043E \u0438\u043D\u0442\u0435\u0440\u0444\u0435\u0439\u0441\u0443"],
+          ["helpWelcome", "\u041A\u0430\u043A \u0440\u0430\u0431\u043E\u0442\u0430\u0442\u044C"],
+          ["learn", "\u0423\u0440\u043E\u043A\u0438"],
+          ["shortcuts", "\u0413\u043E\u0440\u044F\u0447\u0438\u0435 \u043A\u043B\u0430\u0432\u0438\u0448\u0438"],
+          ["settings", "\u041D\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0438"]
+        ] }
+      ]
+    }
+  };
+  var menuLayer = null;
+  function closeMenu() {
+    if (!menuLayer) return;
+    menuLayer.innerHTML = "";
+    menuLayer.classList.remove("show");
+    $$("[data-menu]").forEach((b) => b.classList.remove("active"));
+  }
+  function openMenu(kind, anchor) {
+    const def = MENUS[kind];
+    if (!def || !anchor) return;
+    if (menuLayer?.classList.contains("show") && menuLayer.dataset.kind === kind) {
+      closeMenu();
+      return;
+    }
+    closeMenu();
+    menuLayer = menuLayer || $("#menuLayer");
+    if (!menuLayer) return;
+    menuLayer.dataset.kind = kind;
+    const box = el("div", { class: "dropdown-menu" });
+    const head = el("div", { class: "dropdown-head" });
+    head.innerHTML = icon(def.icon, 15) + `<b>${esc(def.title)}</b>`;
+    box.appendChild(head);
+    for (const sec of def.sections) {
+      box.appendChild(el("div", { class: "dropdown-label", text: sec.label }));
+      for (const [id2, label] of sec.items) {
+        const c = commands.get(id2);
+        const item = el("button", { class: "dropdown-item", "data-cmd": id2 });
+        const ic = c?.icon || "chevronRight";
+        item.innerHTML = `<span class="di-ico">${icon(ic, 15)}</span><span class="di-label">${esc(label)}</span>` + (c?.key ? `<kbd>${esc(c.key)}</kbd>` : "");
+        item.addEventListener("click", () => {
+          closeMenu();
+          runCommand(id2);
+        });
+        box.appendChild(item);
+      }
+    }
+    const r = anchor.getBoundingClientRect();
+    box.style.left = Math.max(8, Math.min(innerWidth - 300, r.left)) + "px";
+    box.style.top = Math.max(8, Math.min(innerHeight - 460, r.bottom + 6)) + "px";
+    menuLayer.appendChild(box);
+    menuLayer.classList.add("show");
+    anchor.classList.add("active");
+  }
+  function initMenus() {
+    menuLayer = $("#menuLayer");
+    $$("[data-menu]").forEach((btn) => btn.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      openMenu(btn.dataset.menu, btn);
+    }));
+    document.addEventListener("click", (e) => {
+      if (!e.target.closest(".dropdown-menu") && !e.target.closest("[data-menu]")) closeMenu();
+    });
+    window.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") closeMenu();
+    }, true);
+    window.addEventListener("resize", closeMenu);
+  }
+  var native = false;
+  function isNativeFrame() {
+    return native;
+  }
+  function windowControl(act) {
+    const body = document.body;
+    if (act === "minimize") {
+      if (native) {
+        window.runlet.windowControl("minimize");
+        return;
+      }
+      body.classList.add("app-min");
+      body.classList.remove("app-closed");
+      toast("\u041E\u043A\u043D\u043E \u0441\u0432\u0451\u0440\u043D\u0443\u0442\u043E \u2014 \u043D\u0430\u0436\u043C\u0438\u0442\u0435 Runlet \u0432 \u043F\u0430\u043D\u0435\u043B\u0438 \u0437\u0430\u0434\u0430\u0447", "info");
+    } else if (act === "maximize") {
+      if (native) {
+        window.runlet.windowControl("maximize");
+        return;
+      }
+      body.classList.toggle("app-max");
+      body.classList.remove("app-min", "app-closed");
+    } else if (act === "close") {
+      if (native) {
+        window.runlet.windowControl("close");
+        return;
+      }
+      body.classList.add("app-closed");
+      body.classList.remove("app-min");
+    } else if (act === "restore") {
+      body.classList.remove("app-min", "app-closed");
+    }
+    emit("appwindow:changed", act);
+  }
+  function initAppWindow() {
+    native = !!(window.runlet?.isElectron && state.settings.nativeFrame);
+    const body = document.body;
+    body.classList.toggle("native-frame", native);
+    body.classList.toggle("windowed-app", !native && !!state.settings.appWindowed);
+    const host2 = $("#winControls");
+    if (host2) {
+      host2.innerHTML = "";
+      const defs = [
+        ["minimize", "minus", "\u0421\u0432\u0435\u0440\u043D\u0443\u0442\u044C"],
+        ["maximize", "maximize", "\u0420\u0430\u0437\u0432\u0435\u0440\u043D\u0443\u0442\u044C"],
+        ["close", "close", "\u0417\u0430\u043A\u0440\u044B\u0442\u044C"]
+      ];
+      for (const [act, ic, title] of defs) {
+        const b = el("button", {
+          class: act === "close" ? "wc-close" : "",
+          title,
+          "aria-label": title
+        });
+        b.innerHTML = icon(ic, 13);
+        b.onclick = () => windowControl(act);
+        host2.appendChild(b);
+      }
+    }
+    const bar = $("#desktopBar");
+    if (bar) {
+      bar.innerHTML = "";
+      const btn = el("button", { class: "taskbar-app", title: "\u0412\u0435\u0440\u043D\u0443\u0442\u044C Runlet" });
+      btn.innerHTML = icon("code", 16) + "<span>Runlet</span>";
+      btn.onclick = () => windowControl("restore");
+      bar.appendChild(btn);
+      const hint = el("span", { class: "taskbar-hint", text: "\u041E\u043A\u043D\u043E \u0441\u0432\u0451\u0440\u043D\u0443\u0442\u043E" });
+      bar.appendChild(hint);
+    }
+    const closed = $("#desktopClosed");
+    if (closed) {
+      closed.innerHTML = "";
+      const card = el("div", { class: "desktop-card" });
+      card.innerHTML = `<div class="desktop-logo">${icon("code", 30)}</div>
+      <h2>Runlet \u0437\u0430\u043A\u0440\u044B\u0442</h2><p>\u041F\u0440\u0438\u043B\u043E\u0436\u0435\u043D\u0438\u0435 \u0441\u0432\u0451\u0440\u043D\u0443\u0442\u043E \u043D\u0430 \u0440\u0430\u0431\u043E\u0447\u0438\u0439 \u0441\u0442\u043E\u043B. \u0414\u0430\u043D\u043D\u044B\u0435 \u043F\u0440\u043E\u0435\u043A\u0442\u0430 \u0441\u043E\u0445\u0440\u0430\u043D\u0435\u043D\u044B.</p>`;
+      const open = el("button", { class: "btn btn-accent", text: "\u041E\u0442\u043A\u0440\u044B\u0442\u044C Runlet" });
+      open.onclick = () => windowControl("restore");
+      card.appendChild(open);
+      closed.appendChild(card);
+    }
+    on("appwindow:changed", () => {
+      const min = $(".taskbar-hint");
+      if (min) min.textContent = body.classList.contains("app-min") ? "\u041E\u043A\u043D\u043E \u0441\u0432\u0451\u0440\u043D\u0443\u0442\u043E" : "\u0420\u0430\u0431\u043E\u0447\u0438\u0439 \u0441\u0442\u043E\u043B";
+    });
+  }
+  function setAppWindowed(v) {
+    state.settings.appWindowed = !!v;
+    document.body.classList.toggle("windowed-app", !native && !!v);
+    emit("settings:changed");
+    return state.settings.appWindowed;
+  }
+  function refreshZoomLabel() {
+    const l = $("#fontSizeLabel");
+    if (l) l.textContent = Math.round(state.settings.fontSize) + "px";
+    const b = $("#wrapToggle");
+    if (b) b.classList.toggle("active", !!state.settings.wrap);
+    const a = $("#animToggle");
+    if (a) a.classList.toggle("active", state.settings.animations !== false);
+  }
+  function initZoom() {
+    window.addEventListener("wheel", (e) => {
+      if (!e.ctrlKey && !e.metaKey) return;
+      e.preventDefault();
+      setFontZoom(e.deltaY < 0 ? 1 : -1);
+      refreshZoomLabel();
+    }, { passive: false });
+    on("settings:changed", refreshZoomLabel);
+    refreshZoomLabel();
+  }
 
   // app/src/core/projects.js
   init_core();
@@ -50525,12 +51172,11 @@ frame();
     if (windowed) {
       const live = ctx.liveStatus?.();
       openSiteWindow(live?.running ? live.url : null, ctx.srcdoc?.());
-      const three = $("#threePanel");
-      if (three) movePanelWindow(three, { id: "win-three", title: "3D-\u0440\u0435\u0434\u0430\u043A\u0442\u043E\u0440", icon: "cube", width: 760, height: 520 });
+      ctx.openThreeStage?.();
       const cons = $("#consolePanel");
       if (cons) movePanelWindow(cons, { id: "win-console", title: "\u041A\u043E\u043D\u0441\u043E\u043B\u044C", icon: "terminal", width: 620, height: 360 });
     } else {
-      for (const id2 of ["site", "win-three", "win-console"]) closeWindow(id2);
+      for (const id2 of ["site", "win-console"]) closeWindow(id2);
     }
     state.settings.windowedMode = windowed;
     ctx.applySettings?.();
@@ -50610,8 +51256,8 @@ frame();
         host2.appendChild(b);
       }
     };
-    build(state.settings.toolbarButtons, primary, false);
-    build(state.settings.toolbarSecondary, secondary, true);
+    build((state.settings.toolbarButtons || []).slice(0, 4), primary, false);
+    build((state.settings.toolbarSecondary || []).slice(0, 2), secondary, true);
     hydrateIcons(primary);
     hydrateIcons(secondary);
     const badge = $("#analyzeBadge");
@@ -50993,17 +51639,22 @@ frame();
       <button class="mini-btn" data-slotdown="${group}" data-i="${i4}">${icon("arrowDown", 12)}</button>
       <button class="mini-btn" data-slotdel="${group}" data-i="${i4}">${icon("trash", 12)}</button></div>`).join("");
     const pages = {
-      editor: `<div class="field-row">
-        ${field("\u0420\u0430\u0437\u043C\u0435\u0440 \u0448\u0440\u0438\u0444\u0442\u0430", "fontSize", "number", 'min="9" max="28"')}
-        ${field("\u041C\u0435\u0436\u0441\u0442\u0440\u043E\u0447\u043D\u044B\u0439 \u0438\u043D\u0442\u0435\u0440\u0432\u0430\u043B", "lineHeight", "number", 'step="0.1" min="1" max="2.5"')}
+      editor: `<div class="beginner" style="margin:0 0 10px">\u041A\u043E\u0434 \u0447\u0438\u0442\u0430\u0435\u0442\u0441\u044F \u043A\u0440\u0443\u043F\u043D\u043E: 16px \u0438 \u0441\u0432\u043E\u0431\u043E\u0434\u043D\u044B\u0439 \u0438\u043D\u0442\u0435\u0440\u0432\u0430\u043B 1.55.
+      \u041C\u0430\u0441\u0448\u0442\u0430\u0431 \u043C\u0435\u043D\u044F\u0435\u0442\u0441\u044F \u043A\u043D\u043E\u043F\u043A\u0430\u043C\u0438 \u043D\u0430 \u043F\u0430\u043D\u0435\u043B\u0438 \u0438\u043B\u0438 Ctrl + \u043A\u043E\u043B\u0435\u0441\u043E \u043C\u044B\u0448\u0438.</div>
+      <div class="field-row">
+        ${field("\u0420\u0430\u0437\u043C\u0435\u0440 \u0448\u0440\u0438\u0444\u0442\u0430 \u043A\u043E\u0434\u0430, px", "fontSize", "number", 'min="14" max="24" step="1"')}
+        ${field("\u041C\u0435\u0436\u0441\u0442\u0440\u043E\u0447\u043D\u044B\u0439 \u0438\u043D\u0442\u0435\u0440\u0432\u0430\u043B", "lineHeight", "number", 'step="0.05" min="1.4" max="1.9"')}
         ${field("\u0428\u0438\u0440\u0438\u043D\u0430 \u0442\u0430\u0431\u0443\u043B\u044F\u0446\u0438\u0438", "tabSize", "number", 'min="1" max="8"')}
         <div class="field"><label>\u0428\u0440\u0438\u0444\u0442 \u0440\u0435\u0434\u0430\u043A\u0442\u043E\u0440\u0430</label><select data-set="fontFamily">
           ${["mono", "system", "courier", "sans"].map((v) => `<option value="${v}" ${s.fontFamily === v ? "selected" : ""}>${v}</option>`).join("")}</select></div>
       </div>
       <h4 style="margin:10px 0 5px;font-size:11px">\u041E\u0442\u043E\u0431\u0440\u0430\u0436\u0435\u043D\u0438\u0435</h4>
-      <div class="rowflex">${bool("\u041F\u0440\u043E\u0431\u0435\u043B\u044B \u0438 \u0442\u0430\u0431\u044B", "showWhitespace")}${bool("\u041D\u0435\u0432\u0438\u0434\u0438\u043C\u044B\u0435 \u0441\u0438\u043C\u0432\u043E\u043B\u044B", "showInvisibles")}
-        ${bool("\u041F\u0435\u0440\u0435\u043D\u043E\u0441 \u0441\u0442\u0440\u043E\u043A", "wrap")}${bool("\u041C\u0438\u043D\u0438-\u043A\u0430\u0440\u0442\u0430", "minimap")}${bool("\u0425\u043B\u0435\u0431\u043D\u044B\u0435 \u043A\u0440\u043E\u0448\u043A\u0438", "breadcrumbs")}
-        ${bool("\u041F\u043B\u0430\u0432\u043D\u0430\u044F \u043F\u0440\u043E\u043A\u0440\u0443\u0442\u043A\u0430", "smoothScroll")}${bool("\u0423\u0431\u0438\u0440\u0430\u0442\u044C \u043F\u0440\u043E\u0431\u0435\u043B\u044B \u0432 \u043A\u043E\u043D\u0446\u0435", "trimTrailingWhitespace")}</div>
+      <div class="rowflex">${bool("\u041F\u0435\u0440\u0435\u043D\u043E\u0441 \u0434\u043B\u0438\u043D\u043D\u044B\u0445 \u0441\u0442\u0440\u043E\u043A", "wrap")}${bool("\u041C\u0438\u043D\u0438-\u043A\u0430\u0440\u0442\u0430", "minimap")}
+        ${bool("\u041F\u0440\u043E\u0431\u0435\u043B\u044B \u0438 \u0442\u0430\u0431\u044B", "showWhitespace")}${bool("\u0425\u043B\u0435\u0431\u043D\u044B\u0435 \u043A\u0440\u043E\u0448\u043A\u0438", "breadcrumbs")}
+        ${bool("\u041F\u043B\u0430\u0432\u043D\u0430\u044F \u043F\u0440\u043E\u043A\u0440\u0443\u0442\u043A\u0430", "smoothScroll")}</div>
+      <div class="rowflex mt8"><button class="mini-btn" id="setContrast">\u041F\u0440\u043E\u0432\u0435\u0440\u0438\u0442\u044C \u043A\u043E\u043D\u0442\u0440\u0430\u0441\u0442\u043D\u043E\u0441\u0442\u044C \u0438\u043D\u0442\u0435\u0440\u0444\u0435\u0439\u0441\u0430</button>
+        <button class="mini-btn" id="setFontReset">\u0412\u0435\u0440\u043D\u0443\u0442\u044C 16px</button>
+        <span class="muted" style="font-size:11px">WCAG: \u0442\u0435\u043A\u0441\u0442 \u2265 4.5:1, \u0438\u043A\u043E\u043D\u043A\u0438 \u2265 3:1</span></div>
       <h4 style="margin:12px 0 5px;font-size:11px">\u041F\u0440\u0435\u0441\u0435\u0442\u044B</h4>
       <div class="tabs-line">${Object.entries(PRESETS).map(([k, v]) => `<button data-preset="${k}" class="${s.presets === k ? "active" : ""}">${v.label}</button>`).join("")}</div>`,
       preview: `<div class="field-row">
@@ -51033,7 +51684,13 @@ frame();
         <button class="mini-btn" id="tbAddSecondaryBtn">\u0414\u043E\u0431\u0430\u0432\u0438\u0442\u044C</button>
         <button class="mini-btn" id="tbReset">\u0421\u0431\u0440\u043E\u0441\u0438\u0442\u044C \u043D\u0430\u0431\u043E\u0440</button></div>`,
       windows: `<div class="list-rows">
-        <div class="list-row"><div class="grow"><b>\u041E\u043A\u043E\u043D\u043D\u044B\u0439 \u0440\u0435\u0436\u0438\u043C</b><small>\u0421\u0430\u0439\u0442, 3D \u0438 \u043A\u043E\u043D\u0441\u043E\u043B\u044C \u0432 \u043F\u043B\u0430\u0432\u0430\u044E\u0449\u0438\u0445 \u043E\u043A\u043D\u0430\u0445</small></div>
+        <div class="list-row"><div class="grow"><b>\u041E\u043A\u043E\u043D\u043D\u044B\u0439 \u0440\u0435\u0436\u0438\u043C \u043F\u0440\u0438\u043B\u043E\u0436\u0435\u043D\u0438\u044F</b><small>\u041E\u0431\u044B\u0447\u043D\u043E\u0435 \u043E\u043A\u043D\u043E: \u0441\u0432\u0435\u0440\u043D\u0443\u0442\u044C, \u0440\u0430\u0437\u0432\u0435\u0440\u043D\u0443\u0442\u044C, \u0437\u0430\u043A\u0440\u044B\u0442\u044C \u2014 \u043D\u0435 \u043F\u043E\u043B\u043D\u043E\u044D\u043A\u0440\u0430\u043D\u043D\u044B\u0439 \u0440\u0435\u0436\u0438\u043C</small></div>
+          <label class="chk"><input type="checkbox" data-set="appWindowed" ${s.appWindowed !== false ? "checked" : ""}> \u0432\u043A\u043B\u044E\u0447\u0451\u043D</label></div>
+        <div class="list-row"><div class="grow"><b>\u0421\u0438\u0441\u0442\u0435\u043C\u043D\u0430\u044F \u0440\u0430\u043C\u043A\u0430 \u043E\u043A\u043D\u0430</b><small>Electron: \u0441\u0442\u0430\u043D\u0434\u0430\u0440\u0442\u043D\u044B\u0435 \u043A\u043D\u043E\u043F\u043A\u0438 \u043E\u043A\u043D\u0430 \u041E\u0421</small></div>
+          <label class="chk"><input type="checkbox" data-set="nativeFrame" ${s.nativeFrame ? "checked" : ""}> \u0432\u043A\u043B\u044E\u0447\u0435\u043D\u0430</label></div>
+        <div class="list-row"><div class="grow"><b>\u0410\u043D\u0438\u043C\u0430\u0446\u0438\u0438 \u0438\u043D\u0442\u0435\u0440\u0444\u0435\u0439\u0441\u0430</b><small>\u041F\u043B\u0430\u0432\u043D\u044B\u0435 \u043F\u0435\u0440\u0435\u0445\u043E\u0434\u044B, \u043F\u043E\u044F\u0432\u043B\u0435\u043D\u0438\u0435 \u043F\u0430\u043D\u0435\u043B\u0435\u0439</small></div>
+          <label class="chk"><input type="checkbox" data-set="animations" ${s.animations !== false ? "checked" : ""}> \u0432\u043A\u043B\u044E\u0447\u0435\u043D\u044B</label></div>
+        <div class="list-row"><div class="grow"><b>\u041E\u043A\u043E\u043D\u043D\u044B\u0439 \u0440\u0435\u0436\u0438\u043C \u043F\u0430\u043D\u0435\u043B\u0435\u0439</b><small>\u0421\u0430\u0439\u0442, 3D \u0438 \u043A\u043E\u043D\u0441\u043E\u043B\u044C \u0432 \u043F\u043B\u0430\u0432\u0430\u044E\u0449\u0438\u0445 \u043E\u043A\u043D\u0430\u0445</small></div>
           <button class="mini-btn ${isWindowed() ? "active" : ""}" id="wndToggle">${isWindowed() ? "\u0412\u044B\u043A\u043B\u044E\u0447\u0438\u0442\u044C" : "\u0412\u043A\u043B\u044E\u0447\u0438\u0442\u044C"}</button></div>
         <div class="list-row"><div class="grow"><b>\u0421\u0438\u0441\u0442\u0435\u043C\u043D\u0430\u044F \u0440\u0430\u043C\u043A\u0430 \u043E\u043A\u043D\u0430</b><small>\u0422\u043E\u043B\u044C\u043A\u043E Electron; \u043F\u0440\u0438\u043B\u043E\u0436\u0435\u043D\u0438\u0435 \u043F\u0435\u0440\u0435\u0437\u0430\u043F\u0443\u0441\u0442\u0438\u0442 \u043E\u043A\u043D\u043E</small></div>
           <button class="mini-btn ${s.nativeFrame ? "active" : ""}" id="wndFrame">${s.nativeFrame ? "\u0412\u043A\u043B" : "\u0412\u044B\u043A\u043B"}</button></div>
@@ -51092,8 +51749,20 @@ frame();
             const k = inp.dataset.set;
             const v = inp.type === "checkbox" ? inp.checked : inp.type === "number" ? +inp.value : inp.value;
             state.settings[k] = v;
+            if (k === "appWindowed") setAppWindowed(v);
+            if (k === "nativeFrame") ctx.setNativeFrame?.(v);
             applySettings();
+            refreshZoomLabel();
           }));
+          body.querySelector("#setContrast")?.addEventListener("click", () => ctx.runCommand?.("contrastCheck"));
+          body.querySelector("#setFontReset")?.addEventListener("click", () => {
+            state.settings.fontSize = 16;
+            state.settings.lineHeight = 1.55;
+            applySettings();
+            refreshZoomLabel();
+            closeModal();
+            settingsModal("editor");
+          });
           body.querySelectorAll("[data-sandbox]").forEach((inp) => inp.addEventListener("change", () => {
             state.settings.sandboxPermissions = { ...state.settings.sandboxPermissions || {}, [inp.dataset.sandbox]: inp.checked };
             applySettings();
@@ -51297,16 +51966,7 @@ frame();
     });
   }
   function initWindowControls() {
-    if (!window.runlet?.isElectron) return;
-    const host2 = $("#winControls");
-    for (const [label, act] of [["\u2014", "minimize"], ["\u25A1", "maximize"], ["\xD7", "close"]]) {
-      host2.appendChild(el("button", {
-        class: act === "close" ? "wc-close" : "",
-        text: label,
-        onclick: () => window.runlet.windowControl(act)
-      }));
-    }
-    $("#titlebar")?.classList.add("electron");
+    if (window.runlet?.isElectron) $("#titlebar")?.classList.add("electron");
   }
   function showWelcome() {
     const cards = [
@@ -51357,7 +52017,7 @@ frame();
       <div class="launch-logo"><div class="brand-mark">${icon("code", 22)}</div><div><b>Runlet</b><br><span>studio 2.0</span></div></div>
       <h1 class="launch-title">\u0420\u0435\u0434\u0430\u043A\u0442\u043E\u0440 \u0441\u0430\u0439\u0442\u043E\u0432,<br>\u0432 \u043A\u043E\u0442\u043E\u0440\u043E\u043C \u0432\u0441\u0451 \u043F\u043E\u043D\u044F\u0442\u043D\u043E.</h1>
       <p class="launch-lead">\u041F\u0440\u043E\u0435\u043A\u0442\u044B, \u0436\u0438\u0432\u043E\u0439 \u043F\u0440\u0435\u0434\u043F\u0440\u043E\u0441\u043C\u043E\u0442\u0440, \u043B\u043E\u043A\u0430\u043B\u044C\u043D\u044B\u0439 \u0441\u0435\u0440\u0432\u0435\u0440, 3D \u0438 \u0430\u043D\u0430\u043B\u0438\u0437 \u043A\u043E\u0434\u0430 \u2014 \u0432 \u043E\u0434\u043D\u043E\u043C \u043E\u043A\u043D\u0435 \u0431\u0435\u0437 \u043B\u0438\u0448\u043D\u0435\u0433\u043E \u0448\u0443\u043C\u0430.</p>
-      <div class="launch-steps">${steps.map(([i4, t2, d]) => `<div class="launch-step"><div class="launch-step-i">${icon(i4, 16)}</div>
+      <div class="launch-steps">${steps.map(([i4, t2, d], k) => `<div class="launch-step anim-in" style="--i:${k}"><div class="launch-step-i">${icon(i4, 16)}</div>
         <div><b>${t2}</b><span>${d}</span></div></div>`).join("")}</div>
       <div class="launch-foot"><button class="btn btn-ghost" id="launchWelcome">\u041A\u0430\u043A \u0440\u0430\u0431\u043E\u0442\u0430\u0442\u044C</button>
         <button class="btn btn-ghost" id="launchTour">\u0422\u0443\u0440</button></div>
@@ -51370,7 +52030,7 @@ frame();
         <select id="prjTemplate">${TEMPLATES.map((t2) => `<option value="${t2.id}" ${t2.id === chosen ? "selected" : ""}>${t2.name}</option>`).join("")}</select>
         <button class="btn btn-accent" id="prjCreate">${icon("plus", 15)} \u0421\u043E\u0437\u0434\u0430\u0442\u044C</button>
       </div>
-      <div class="template-grid" id="prjTemplates">${TEMPLATES.map((t2) => `<div class="template-card ${t2.id === chosen ? "active" : ""}" data-tpl="${t2.id}">${icon(t2.icon, 17)}<b>${t2.name}</b><small>${t2.desc}</small></div>`).join("")}</div>
+      <div class="template-grid" id="prjTemplates">${TEMPLATES.map((t2, k) => `<div class="template-card anim-in" style="--i:${k}" data-tpl="${t2.id}">${icon(t2.icon, 17)}<b>${t2.name}</b><small>${t2.desc}</small></div>`).join("")}</div>
       <div class="launch-head"><div><h2 style="font-size:13px">\u041C\u043E\u0438 \u043F\u0440\u043E\u0435\u043A\u0442\u044B</h2></div>
         <div class="rowflex"><button class="mini-btn" id="prjExportAll">${icon("download", 13)} \u042D\u043A\u0441\u043F\u043E\u0440\u0442 \u0432\u0441\u0435\u0445</button>
           <button class="mini-btn" id="prjExport">${icon("archive", 13)} \u042D\u043A\u0441\u043F\u043E\u0440\u0442</button></div></div>
@@ -51462,8 +52122,8 @@ frame();
     layer3.innerHTML = `<div class="tour-spot" style="left:${r.left - 6}px;top:${r.top - 6}px;width:${r.width + 12}px;height:${r.height + 12}px"></div>
     <div class="tour-box" style="left:${Math.min(innerWidth - 320, Math.max(12, r.left))}px;top:${Math.min(innerHeight - 180, r.bottom + 16)}px">
       <h4>${esc(step2.title)}</h4><p>${esc(step2.text)}</p>
-      <div class="tour-nav"><button class="mini-btn" id="tourPrev">\u2190</button>
-        <button class="mini-btn" id="tourNext">${tourIndex === tourSteps.length - 1 ? "\u0413\u043E\u0442\u043E\u0432\u043E" : "\u0414\u0430\u043B\u0435\u0435 \u2192"}</button>
+      <div class="tour-nav"><button class="mini-btn" id="tourPrev">${icon("arrowLeft", 13)}</button>
+        <button class="mini-btn" id="tourNext">${tourIndex === tourSteps.length - 1 ? "\u0413\u043E\u0442\u043E\u0432\u043E" : `\u0414\u0430\u043B\u0435\u0435 ${icon("arrowRight", 13)}`}</button>
         <button class="mini-btn" id="tourSkip">\u041F\u0440\u043E\u043F\u0443\u0441\u0442\u0438\u0442\u044C</button>
         <span class="tour-step">${tourIndex + 1}/${tourSteps.length}</span></div></div>`;
     layer3.querySelector("#tourPrev").onclick = () => {
@@ -52024,10 +52684,9 @@ frame();
       selectRailTab("learn");
       renderLearn();
     });
-    cmd2("features", "\u041A\u0430\u0440\u0442\u0430 500 \u0438\u0434\u0435\u0439", "\u041E\u0441\u043D\u043E\u0432\u043D\u043E\u0435", "list", () => {
-      selectRailTab("features");
-      initFeatures();
-    });
+    cmd2("features", "\u041A\u0430\u0440\u0442\u0430 \u0438\u0434\u0435\u0439", "\u041E\u0441\u043D\u043E\u0432\u043D\u043E\u0435", "list", () => {
+      toast("\u0412\u043A\u043B\u0430\u0434\u043A\u0430 \xAB\u0418\u0434\u0435\u0438\xBB \u0443\u0434\u0430\u043B\u0435\u043D\u0430 \u0438\u0437 \u0438\u043D\u0442\u0435\u0440\u0444\u0435\u0439\u0441\u0430", "info");
+    }, { hidden: true });
     cmd2("applySettings", "\u041F\u0440\u0438\u043C\u0435\u043D\u0438\u0442\u044C \u043D\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0438", "\u041E\u0441\u043D\u043E\u0432\u043D\u043E\u0435", "refresh", () => {
       applySettings();
       applyEditorSettings();
@@ -52395,8 +53054,9 @@ POST /api/run</pre>`,
     cmd2("detachEditor", "\u0420\u0435\u0434\u0430\u043A\u0442\u043E\u0440 \u0432 \u043E\u043A\u043D\u0435", "\u041E\u043A\u043D\u0430", "window", (p) => detachEditor(typeof p === "string" ? p : state.activePane));
     cmd2("openThreeD", "3D-\u0440\u0435\u0434\u0430\u043A\u0442\u043E\u0440", "3D", "cube", () => {
       selectRailTab("three");
-      emit("three:show");
+      openThreeStage();
     });
+    cmd2("openThreeWindow", "3D \u0432 \u043E\u043A\u043D\u0435", "3D", "window", () => openThreeStage());
     cmd2("openThreeWindow", "3D \u0432 \u043E\u043A\u043D\u0435", "3D", "window", () => ctx.openThreeWindow?.());
     cmd2("threeAdd", "\u0414\u043E\u0431\u0430\u0432\u0438\u0442\u044C \u043E\u0431\u044A\u0435\u043A\u0442", "3D", "plus", () => {
       selectRailTab("three");
@@ -52404,6 +53064,66 @@ POST /api/run</pre>`,
     });
     cmd2("threeExport", "\u042D\u043A\u0441\u043F\u043E\u0440\u0442 3D \u0432 \u043F\u0440\u043E\u0435\u043A\u0442", "3D", "download", () => exportToProject());
     cmd2("helpWelcome", "\u041A\u0430\u043A \u0440\u0430\u0431\u043E\u0442\u0430\u0442\u044C", "\u041E\u0441\u043D\u043E\u0432\u043D\u043E\u0435", "info", () => showWelcome());
+    cmd2("quickNewHtml", "\u041D\u043E\u0432\u044B\u0439 HTML-\u0444\u0430\u0439\u043B", "\u0424\u0430\u0439\u043B\u044B", "code", () => quickCreate("html"));
+    cmd2("quickNewCss", "\u041D\u043E\u0432\u044B\u0439 CSS-\u0444\u0430\u0439\u043B", "\u0424\u0430\u0439\u043B\u044B", "palette", () => quickCreate("css"));
+    cmd2("quickNewJs", "\u041D\u043E\u0432\u044B\u0439 JS-\u0444\u0430\u0439\u043B", "\u0424\u0430\u0439\u043B\u044B", "braces", () => quickCreate("js"));
+    cmd2("openOSFolder", "\u041E\u0442\u043A\u0440\u044B\u0442\u044C \u043F\u0430\u043F\u043A\u0443 \u0441 \u0434\u0438\u0441\u043A\u0430", "\u0424\u0430\u0439\u043B\u044B", "folder", () => openOSFolder());
+    cmd2("saveToDisk", "\u0421\u043E\u0445\u0440\u0430\u043D\u0438\u0442\u044C \u043F\u0440\u043E\u0435\u043A\u0442 \u043D\u0430 \u0434\u0438\u0441\u043A", "\u0424\u0430\u0439\u043B\u044B", "save", () => saveToDisk());
+    cmd2("fontZoomIn", "\u0423\u0432\u0435\u043B\u0438\u0447\u0438\u0442\u044C \u0448\u0440\u0438\u0444\u0442 \u043A\u043E\u0434\u0430", "\u0420\u0435\u0434\u0430\u043A\u0442\u043E\u0440", "plus", () => {
+      setFontZoom(1);
+      refreshZoomLabel();
+    });
+    cmd2("fontZoomOut", "\u0423\u043C\u0435\u043D\u044C\u0448\u0438\u0442\u044C \u0448\u0440\u0438\u0444\u0442 \u043A\u043E\u0434\u0430", "\u0420\u0435\u0434\u0430\u043A\u0442\u043E\u0440", "minus", () => {
+      setFontZoom(-1);
+      refreshZoomLabel();
+    });
+    cmd2("fontZoomReset", "\u0421\u0431\u0440\u043E\u0441\u0438\u0442\u044C \u043C\u0430\u0441\u0448\u0442\u0430\u0431", "\u0420\u0435\u0434\u0430\u043A\u0442\u043E\u0440", "refresh", () => {
+      setFontZoom(0, 16);
+      refreshZoomLabel();
+    });
+    cmd2("toggleWrap", "\u041F\u0435\u0440\u0435\u043D\u043E\u0441 \u0434\u043B\u0438\u043D\u043D\u044B\u0445 \u0441\u0442\u0440\u043E\u043A", "\u0420\u0435\u0434\u0430\u043A\u0442\u043E\u0440", "wrap", () => {
+      toggleWrap();
+      refreshZoomLabel();
+    });
+    cmd2("toggleAnimations", "\u0410\u043D\u0438\u043C\u0430\u0446\u0438\u0438 \u0438\u043D\u0442\u0435\u0440\u0444\u0435\u0439\u0441\u0430", "\u0412\u0438\u0434", "spark", () => {
+      state.settings.animations = state.settings.animations === false;
+      applySettings();
+      refreshZoomLabel();
+      toast(state.settings.animations ? "\u0410\u043D\u0438\u043C\u0430\u0446\u0438\u0438 \u0432\u043A\u043B\u044E\u0447\u0435\u043D\u044B" : "\u0410\u043D\u0438\u043C\u0430\u0446\u0438\u0438 \u0432\u044B\u043A\u043B\u044E\u0447\u0435\u043D\u044B", "info");
+    });
+    cmd2("appMinimize", "\u0421\u0432\u0435\u0440\u043D\u0443\u0442\u044C \u043E\u043A\u043D\u043E \u043F\u0440\u043E\u0433\u0440\u0430\u043C\u043C\u044B", "\u041E\u043A\u043D\u0430", "minus", () => windowControl("minimize"));
+    cmd2("appMaximize", "\u0420\u0430\u0437\u0432\u0435\u0440\u043D\u0443\u0442\u044C \u043E\u043A\u043D\u043E \u043F\u0440\u043E\u0433\u0440\u0430\u043C\u043C\u044B", "\u041E\u043A\u043D\u0430", "maximize", () => windowControl("maximize"));
+    cmd2("appRestore", "\u0412\u0435\u0440\u043D\u0443\u0442\u044C \u043E\u043A\u043D\u043E \u043F\u0440\u043E\u0433\u0440\u0430\u043C\u043C\u044B", "\u041E\u043A\u043D\u0430", "window", () => windowControl("restore"));
+    cmd2("toggleAppWindow", "\u041E\u043A\u043E\u043D\u043D\u044B\u0439 \u0440\u0435\u0436\u0438\u043C \u043F\u0440\u0438\u043B\u043E\u0436\u0435\u043D\u0438\u044F", "\u041E\u043A\u043D\u0430", "window", () => {
+      const v = setAppWindowed(!state.settings.appWindowed);
+      toast(v ? "\u041E\u043A\u043E\u043D\u043D\u044B\u0439 \u0440\u0435\u0436\u0438\u043C: \u043C\u043E\u0436\u043D\u043E \u0441\u0432\u0435\u0440\u043D\u0443\u0442\u044C \u0438 \u0434\u0432\u0438\u0433\u0430\u0442\u044C" : "\u041D\u0430 \u0432\u0435\u0441\u044C \u044D\u043A\u0440\u0430\u043D", "info");
+    });
+    cmd2("contrastCheck", "\u041F\u0440\u043E\u0432\u0435\u0440\u043A\u0430 \u043A\u043E\u043D\u0442\u0440\u0430\u0441\u0442\u043D\u043E\u0441\u0442\u0438 \u0438\u043D\u0442\u0435\u0440\u0444\u0435\u0439\u0441\u0430", "\u0414\u043E\u0441\u0442\u0443\u043F\u043D\u043E\u0441\u0442\u044C", "eye", () => {
+      const cs = getComputedStyle(document.documentElement);
+      const g2 = (n) => cs.getPropertyValue(n).trim();
+      const pairs = [
+        ["\u041E\u0441\u043D\u043E\u0432\u043D\u043E\u0439 \u0442\u0435\u043A\u0441\u0442", g2("--text"), g2("--card")],
+        ["\u0412\u0442\u043E\u0440\u043E\u0441\u0442\u0435\u043F\u0435\u043D\u043D\u044B\u0439 \u0442\u0435\u043A\u0441\u0442", g2("--muted"), g2("--card")],
+        ["\u041D\u043E\u043C\u0435\u0440\u0430 \u0441\u0442\u0440\u043E\u043A / \u043F\u043E\u0434\u043F\u0438\u0441\u0438", g2("--dim"), g2("--code-bg")],
+        ["\u041E\u0448\u0438\u0431\u043A\u0438", g2("--err"), g2("--card")],
+        ["\u041F\u0440\u0435\u0434\u0443\u043F\u0440\u0435\u0436\u0434\u0435\u043D\u0438\u044F", g2("--warn"), g2("--card")],
+        ["\u0423\u0441\u043F\u0435\u0445", g2("--ok"), g2("--card")]
+      ];
+      const rows = pairs.map(([name2, fg, bg]) => {
+        const r = contrastRatio(fg, bg);
+        const ok = r >= 4.5;
+        return `<div class="list-row"><div class="grow"><b>${esc(name2)}</b>
+        <small>${esc(fg)} \u043D\u0430 ${esc(bg)}</small></div>
+        <b style="color:${ok ? "var(--ok)" : "var(--err)"}">${r.toFixed(2)}:1 ${ok ? "OK" : "\u043C\u0430\u043B\u043E"}</b></div>`;
+      }).join("");
+      ctx.modal({
+        title: "\u041A\u043E\u043D\u0442\u0440\u0430\u0441\u0442\u043D\u043E\u0441\u0442\u044C \u0438\u043D\u0442\u0435\u0440\u0444\u0435\u0439\u0441\u0430 (WCAG)",
+        wide: false,
+        okText: "\u0417\u0430\u043A\u0440\u044B\u0442\u044C",
+        body: `<div class="beginner" style="margin:0 0 10px">\u041D\u043E\u0440\u043C\u0430 \u0434\u043B\u044F \u043E\u0431\u044B\u0447\u043D\u043E\u0433\u043E \u0442\u0435\u043A\u0441\u0442\u0430 \u2014 \u043D\u0435 \u043D\u0438\u0436\u0435 4.5:1, \u0434\u043B\u044F \u043A\u0440\u0443\u043F\u043D\u043E\u0433\u043E \u0438 \u0438\u043A\u043E\u043D\u043E\u043A \u2014 3:1.</div>
+        <div class="list-rows">${rows}</div>`
+      });
+    });
     cmd2("openFile", "\u041E\u0442\u043A\u0440\u044B\u0442\u044C \u0444\u0430\u0439\u043B", "\u0424\u0430\u0439\u043B\u044B", "file", (p) => {
       if (typeof p === "string") openFile(p);
     }, { hidden: true });
@@ -52419,6 +53139,7 @@ POST /api/run</pre>`,
   }
 
   // app/src/main.js
+  init_threeD();
   init_threeD();
   var started = performance.now();
   async function boot() {
@@ -52467,11 +53188,17 @@ POST /api/run</pre>`,
         height: 640,
         html: srcdoc()
       }),
-      openThreeWindow: openThreeDWindow,
+      openThreeWindow: openThreeStage,
+      openThreeStage,
       movePanelWindow,
       detachEditor,
       windowCount,
       setNativeFrame: (v) => window.runlet?.setFrame?.(v),
+      windowControl,
+      isNativeFrame,
+      threeDStats,
+      threeDRender,
+      setAppWindowed,
       toggleLiveServer
     });
     const restored = await initStorage();
@@ -52490,14 +53217,17 @@ POST /api/run</pre>`,
     initPanels();
     initLearn();
     initPlugins();
-    initFeatures();
     initThreeD();
     initWindows();
     initLiveServer();
     initCommands();
     initUI();
+    initMenus();
+    initZoom();
+    initAppWindow();
     hydrateIcons();
-    if (window.runlet?.setFrame && state.settings.nativeFrame) window.runlet.setFrame(true);
+    refreshZoomLabel();
+    if (window.runlet?.setFrame && !state.settings.nativeFrame) window.runlet.setFrame(false);
     if (state.settings.windowedMode && !state.settings.showLauncher) setTimeout(() => toggleWindowedMode(), 900);
     applyEditorSettings();
     applyLayout(state.layout);
@@ -52662,6 +53392,12 @@ POST /api/run</pre>`,
       toggleLiveServer,
       srcdoc: () => srcdoc(),
       scene3d: () => Promise.resolve().then(() => (init_threeD(), threeD_exports)).then((m) => m.getScene()),
+      threeD: () => threeDStats(),
+      openThreeD: () => openThreeStage(),
+      contrastRatio,
+      setFontZoom,
+      toggleWrap,
+      windowControl,
       console: {
         clear: () => {
           state.logs = [];
