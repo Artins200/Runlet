@@ -1,9 +1,10 @@
 /* Runlet shared core: state, tiny event bus, DOM helpers, settings, i18n. */
+import { icon } from './icons.js';
 
 export const DEFAULT_SETTINGS = {
   theme: 'auto', accent: '#4f8ff7', density: 'comfy',
-  fontSize: 13, fontFamily: 'mono', lineHeight: 1.6, tabSize: 2,
-  showWhitespace: false, showInvisibles: true, wrap: false,
+  fontSize: 16, fontFamily: 'mono', lineHeight: 1.55, tabSize: 2,
+  showWhitespace: false, showInvisibles: true, wrap: true,
   cursorStyle: 'smooth', smoothScroll: true, stickyHeaders: true,
   minimap: true, breadcrumbs: true, autoRun: true, autoRunDelay: 650,
   autoAnalyze: true, autoAnalyzeDelay: 1600, autoSave: true, autoSaveInterval: 20,
@@ -11,11 +12,13 @@ export const DEFAULT_SETTINGS = {
   presets: 'balanced', locale: 'ru', firstRun: true, welcomeSeen: false,
   pythonEngine: true, hotCss: true, hotJs: true, codeToPreview: true,
   timeLimit: 4000, confirmDelete: true,
-  showLauncher: true, windowedMode: false, nativeFrame: false, livePort: 5500,
+  showLauncher: true, windowedMode: false, nativeFrame: true, livePort: 5500,
+  appWindowed: true, animations: true,
+  fontSizeMin: 12, fontSizeMax: 28,
   // Customisable quick-action toolbar. Commands come from the registry;
   // users can replace any entry from a preset list in Settings -> Buttons.
-  toolbarButtons: ['run', 'liveServer', 'openSite', 'format', 'save', 'download', 'exportProject', 'importProject'],
-  toolbarSecondary: ['analyze', 'windowedMode', 'openThreeD', 'tour', 'helpWelcome'],
+  toolbarButtons: ['run', 'save'],
+  toolbarSecondary: ['analyze'],
   // Least-privilege sandbox for the preview iframe. Enabling these widens the
   // attack surface for untrusted/shared projects — keep them off by default.
   sandboxPermissions: { popups: false, modals: false, downloads: false,
@@ -261,10 +264,12 @@ export async function copy(text) {
   }
 }
 export function toast(msg, type = 'info', title = '') {
-  const icons = { ok: '', err: '', warn: '', info: 'ℹ' };
+  const icons = { ok: 'check', err: 'close', warn: 'info', info: 'info' };
   const box = $('#toasts'); if (!box) return;
-  const node = el('div', { class: 'toast ' + type },
-    el('span', { class: 't-icon', text: icons[type] || '•' }),
+  const ic = document.createElement('span');
+  ic.className = 't-icon';
+  ic.innerHTML = icon(icons[type] || 'info', 15);
+  const node = el('div', { class: 'toast ' + type }, ic,
     el('div', {}, title ? el('b', { text: title }) : null, el('span', { text: msg })));
   box.appendChild(node);
   setTimeout(() => { node.style.opacity = '0'; node.style.transform = 'translateX(30px)'; node.style.transition = '.25s'; }, 3800);
@@ -338,9 +343,9 @@ export function sanitizeColor(v, fallback = '#7c6cf6') {
 export function applyTheme() {
   const s = state.settings;
   // Settings may come from an imported JSON file — never trust their types.
-  s.accent = sanitizeColor(s.accent);
-  s.fontSize = Math.max(9, Math.min(28, Number(s.fontSize) || 13));
-  s.lineHeight = Math.max(1, Math.min(2.5, Number(s.lineHeight) || 1.6));
+  s.accent = sanitizeColor(s.accent, '#4f8ff7');
+  s.fontSize = Math.max(12, Math.min(28, Number(s.fontSize) || 16));
+  s.lineHeight = Math.max(1.3, Math.min(2, Number(s.lineHeight) || 1.55));
   s.tabSize = Math.max(1, Math.min(8, Math.round(Number(s.tabSize) || 2)));
   s.theme = ['auto', 'dark', 'light', 'contrast'].includes(s.theme) ? s.theme : 'auto';
   s.density = ['comfy', 'compact'].includes(s.density) ? s.density : 'comfy';
@@ -349,10 +354,12 @@ export function applyTheme() {
   if (theme === 'auto') theme = matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
   document.documentElement.dataset.theme = theme;
   document.documentElement.dataset.density = s.density;
+  document.documentElement.dataset.anim = s.animations === false ? 'off' : 'on';
   document.documentElement.style.setProperty('--accent', s.accent);
   document.documentElement.style.setProperty('--accent2', shiftHue(s.accent, 42));
   document.documentElement.style.setProperty('--cm-fs', s.fontSize + 'px');
   document.documentElement.style.setProperty('--cm-lh', String(s.lineHeight));
+  document.documentElement.style.setProperty('--fs-ui', (s.fontSize > 18 ? 15 : 14) + 'px');
   const mono = {
     mono: '"JetBrains Mono", "Fira Code", "SF Mono", Consolas, monospace',
     system: 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace',
@@ -412,4 +419,40 @@ export function matchKey(e, combo) {
   const want = k.key === 'Esc' ? 'Escape' : k.key;
   return !!(e.ctrlKey || e.metaKey) === k.ctrl && e.altKey === k.alt && e.shiftKey === k.shift &&
     (key === want || key.toLowerCase() === String(want).toLowerCase());
+}
+
+
+/* ── readability helpers ──────────────────────────────────────────── */
+export function setFontZoom(delta, absolute = null) {
+  const s = state.settings;
+  const next = absolute == null ? s.fontSize + delta : absolute;
+  s.fontSize = Math.max(12, Math.min(28, Math.round(next * 10) / 10));
+  applyTheme();
+  emit('settings:changed');
+  const lab = $('#fontSizeLabel');
+  if (lab) lab.textContent = Math.round(s.fontSize) + 'px';
+  return s.fontSize;
+}
+export function toggleWrap(force = null) {
+  state.settings.wrap = force == null ? !state.settings.wrap : !!force;
+  applyTheme();
+  emit('settings:changed');
+  const b = $('#wrapToggle');
+  if (b) b.classList.toggle('active', state.settings.wrap);
+  return state.settings.wrap;
+}
+/** WCAG 2.1 relative luminance + contrast ratio for #rrggbb values. */
+export function hexLum(hex) {
+  const h = String(hex || '').replace('#','');
+  if (!/^[0-9a-f]{6}$/i.test(h)) return 0;
+  const ch = [0,2,4].map(i => {
+    const v = parseInt(h.slice(i,i+2),16)/255;
+    return v <= 0.03928 ? v/12.92 : Math.pow((v+0.055)/1.055, 2.4);
+  });
+  return 0.2126*ch[0] + 0.7152*ch[1] + 0.0722*ch[2];
+}
+export function contrastRatio(a, b) {
+  const l1 = hexLum(a), l2 = hexLum(b);
+  const hi = Math.max(l1,l2), lo = Math.min(l1,l2);
+  return Math.round((hi+0.05)/(lo+0.05)*100)/100;
 }

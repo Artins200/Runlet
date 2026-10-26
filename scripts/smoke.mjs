@@ -74,8 +74,27 @@ check('CSS variables applied', !!w.document.documentElement.style.getPropertyVal
 // New UI: launcher, icons, toolbar, devices, 3D, projects, windows
 check('Project launcher shown', !!w.document.querySelector('#startScreen .launch'));
 check('Launcher has project rows', w.document.querySelectorAll('#prjList .project-row').length >= 1);
-check('Toolbar rendered from presets', w.document.querySelectorAll('#toolbarPrimary [data-cmd]').length >= 5);
-check('Secondary toolbar rendered', w.document.querySelectorAll('#toolbarSecondary [data-cmd]').length >= 2);
+check('Toolbar simplified (only primary actions)', w.document.querySelectorAll('#toolbarPrimary [data-cmd]').length >= 2 && w.document.querySelectorAll('#toolbarPrimary [data-cmd]').length <= 4);
+check('Secondary toolbar rendered', w.document.querySelectorAll('#toolbarSecondary [data-cmd]').length >= 1);
+check('Grouped menus instead of 15+ buttons', w.document.querySelectorAll('[data-menu]').length === 2 &&
+  w.document.querySelectorAll('#toolbar [data-cmd]').length <= 12);
+check('Readable code: font >= 16px, line-height >= 1.5', parseFloat(w.Runlet.settings.fontSize) >= 16 && parseFloat(w.Runlet.settings.lineHeight) >= 1.5,
+  `${w.Runlet.settings.fontSize}px / ${w.Runlet.settings.lineHeight}`);
+check('Word wrap enabled by default', w.Runlet.settings.wrap === true);
+const cssText = await (await fetch(ORIGIN + '/dist/styles.css')).text();
+const darkBlock = (cssText.match(/html\[data-theme="dark"\]\s*\{([\s\S]*?)\}/) || [])[1] || '';
+const tok = n => (darkBlock.match(new RegExp('--' + n + ':\\s*(#[0-9a-f]{6})', 'i')) || [])[1] || '#000000';
+const cr = w.Runlet.contrastRatio;
+check('WCAG contrast: text / muted / dim on card', cr(tok('text'), tok('card')) >= 4.5 &&
+  cr(tok('muted'), tok('card')) >= 4.5 && cr(tok('dim'), tok('code-bg')) >= 4.5,
+  `text ${cr(tok('text'), tok('card'))}, muted ${cr(tok('muted'), tok('card'))}, dim ${cr(tok('dim'), tok('code-bg'))}`);
+check('Windowed app shell with controls', w.document.body.classList.contains('windowed-app') &&
+  w.document.querySelectorAll('#winControls button').length === 3);
+check('3D stage exists with canvas', !!w.document.querySelector('#threeStage #tdCanvas'));
+check('3D scene has primitives', w.Runlet.threeD().objects >= 2, 'objects=' + w.Runlet.threeD().objects);
+check('File tree has SVG icons only', w.document.querySelectorAll('#fileTree .tree-row svg').length >= 3 &&
+  !/\p{Extended_Pictographic}/u.test(w.document.querySelector('#fileTree')?.textContent || ''));
+check('No Ideas tab', !w.document.querySelector('[data-rail-tab="features"]'));
 check('SVG icons hydrated', w.document.querySelectorAll('svg.ico').length >= 10);
 check('No emoji in UI labels', !/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}]/u.test(w.document.body.textContent || ''));
 const devBtns = [...w.document.querySelectorAll('#deviceSwitch [data-device]')].map(b => b.dataset.device);
@@ -85,6 +104,29 @@ check('Windows layer exists', !!w.document.querySelector('#windowsLayer'));
 check('Live Server bar exists', !!w.document.querySelector('#liveBar'));
 check('Inspector sub-tabs grouped', w.document.querySelectorAll('#inspectorTabs .insp-tab').length === 5 &&
   w.document.querySelectorAll('#inspectorSubTabs .sub-tab').length === 4);
+// interactive: open 3D stage and verify the renderer actually draws polygons
+try {
+  w.Runlet.openThreeD();
+  await new Promise(r => setTimeout(r, 80));
+  const st = w.Runlet.threeD();
+  check('3D stage opens and renders', st.visible === true && st.drawn > 0, `drawn=${st.drawn}, ${st.width}x${st.height}`);
+} catch (e) { check('3D stage opens and renders', false, e.message); }
+try {
+  w.Runlet.runCommand('quickNewHtml');
+  check('Create HTML file works', !!(await w.Runlet.project()), w.Runlet.listFiles().filter(f => /\.html$/.test(f)).length + ' html files');
+} catch (e) { check('Create HTML file works', false, e.message); }
+try {
+  w.Runlet.runCommand('appMinimize');
+  check('App can be minimized like a normal program', w.document.body.classList.contains('app-min'));
+  w.Runlet.runCommand('appRestore');
+  check('App restores from taskbar', !w.document.body.classList.contains('app-min'));
+} catch (e) { check('App can be minimized like a normal program', false, e.message); }
+try {
+  w.Runlet.runCommand('contrastCheck');
+  check('Contrast audit dialog opens', w.document.querySelector('#modalRoot')?.classList.contains('show'));
+  w.Runlet.runCommand('closeWindows');
+} catch (e) { check('Contrast audit dialog opens', false, e.message); }
+
 check('Public API exposes projects/windows/live', typeof w.Runlet.projects === 'function' &&
   typeof w.Runlet.toggleWindowedMode === 'function' && typeof w.Runlet.liveStatus === 'function');
 

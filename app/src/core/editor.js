@@ -29,6 +29,7 @@ import { tags as T } from '@lezer/highlight';
 import * as acorn from 'acorn';
 import beautify from 'js-beautify';
 import { state, ctx, $, $$, emit, on, toast, debounce, esc } from './core.js';
+import { icon } from './icons.js';
 import { read, write, exists, isText, paneOf } from './state.js';
 import { HTML_TAGS, HTML_ATTRS, CSS_PROPS, CSS_VALUES, CSS_FUNCTIONS, JS_COMPLETIONS,
          EMMET_CSS, DOCS, mdnLink, SNIPPETS } from './data.js';
@@ -167,7 +168,7 @@ const hover = hoverTooltip((view, pos) => {
       const box = document.createElement('div');
       box.style.cssText = 'padding:10px 12px;max-width:330px;font:12px var(--sans);line-height:1.5';
       box.innerHTML = '<b style="color:var(--accent)">' + esc(word) + '</b><div style="margin:5px 0;color:var(--muted)">' + esc(info[0]) + '</div>' +
-        '<a href="' + mdnLink(word) + '" target="_blank" style="color:var(--info);font-size:11px"> Открыть MDN ↗</a>';
+        '<a href="' + mdnLink(word) + '" target="_blank" style="color:var(--info);font-size:11px"> Открыть MDN ' + icon('external', 12) + '</a>';
       return box;
     }
   };

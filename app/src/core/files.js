@@ -7,7 +7,8 @@ import {
   projectJSON, importProjectJSON, encodeShare, allTextFiles, paneOf, makeFile
 } from './state.js';
 import { setPaneFile, getDoc, setDoc, insertText, goto } from './editor.js';
-import { CDN_LIBS } from './data.js';
+import { CDN_LIBS, SNIPPETS } from './data.js';
+import { icon } from './icons.js';
 import {
   processImage, placeholderImage, optimizeSvg, faviconFrom, generateSEO,
   generateAltFor, unusedAssets, SVG_ICONS, staticSite, embedCode
@@ -41,75 +42,126 @@ export function initFiles() {
   renderTree(); renderLibs(); renderAssets(); updateSize();
 }
 
-/* ── file tree ──────────────────────────────────────────────────── */
+/* ── file tree: real nested folders, SVG icons, expand / collapse ───── */
+const expanded = new Set(['__all__']);
+const FILE_META = {
+  html: { ico: 'code', cls: 'fi-html' }, htm: { ico: 'code', cls: 'fi-html' },
+  css: { ico: 'palette', cls: 'fi-css' }, scss: { ico: 'palette', cls: 'fi-css' },
+  less: { ico: 'palette', cls: 'fi-css' },
+  js: { ico: 'braces', cls: 'fi-js' }, mjs: { ico: 'braces', cls: 'fi-js' },
+  ts: { ico: 'braces', cls: 'fi-js' }, jsx: { ico: 'braces', cls: 'fi-js' },
+  json: { ico: 'brackets', cls: 'fi-json' }, md: { ico: 'file', cls: 'fi-md' },
+  svg: { ico: 'image', cls: 'fi-img' }, png: { ico: 'image', cls: 'fi-img' },
+  jpg: { ico: 'image', cls: 'fi-img' }, jpeg: { ico: 'image', cls: 'fi-img' },
+  gif: { ico: 'image', cls: 'fi-img' }, webp: { ico: 'image', cls: 'fi-img' },
+  woff2: { ico: 'text', cls: 'fi-font' }, ttf: { ico: 'text', cls: 'fi-font' },
+  mp3: { ico: 'file', cls: 'fi-media' }, mp4: { ico: 'file', cls: 'fi-media' },
+  txt: { ico: 'file', cls: 'fi-txt' }
+};
+function fileIcon(path) {
+  const ext = (path.split('.').pop() || '').toLowerCase();
+  const m = FILE_META[ext] || { ico: 'file', cls: 'fi-txt' };
+  return `<span class="file-icon ${m.cls}">${icon(m.ico, 15)}</span>`;
+}
+function collectNodes() {
+  const root = { dirs: new Map(), files: [] };
+  for (const path of listFiles()) {
+    if (treeFilter && !path.toLowerCase().includes(treeFilter)) continue;
+    const parts = path.split('/');
+    let node = root;
+    for (let i = 0; i < parts.length - 1; i++) {
+      if (!node.dirs.has(parts[i])) node.dirs.set(parts[i], { dirs: new Map(), files: [] });
+      node = node.dirs.get(parts[i]);
+    }
+    node.files.push(path);
+  }
+  return root;
+}
+function sortNames(dirs) {
+  return [...dirs.keys()].sort((a, b) => a.localeCompare(b, 'ru'));
+}
+function isExpanded(path) { return expanded.has('__all__') || expanded.has(path); }
+function toggleFolder(path) {
+  if (expanded.has('__all__')) { expanded.clear(); expanded.add(path); return false; }
+  if (expanded.has(path)) { expanded.delete(path); return false; }
+  expanded.add(path); return true;
+}
+function drawNode(host, node, parent, depth) {
+  for (const name of sortNames(node.dirs)) {
+    const path = parent ? parent + '/' + name : name;
+    const child = node.dirs.get(name);
+    const open = isExpanded(path);
+    const count = child.files.length + [...child.dirs.values()].reduce((n, d) => n + d.files.length, 0);
+    const row = el('div', { class: 'tree-row tree-folder', 'data-path': path, 'data-dir': '1',
+                            style: { paddingLeft: (6 + depth * 14) + 'px' } });
+    row.innerHTML = `<span class="twist">${icon(open ? 'chevronDown' : 'chevronRight', 13)}</span>
+      <span class="file-icon fi-folder">${icon('folder', 15)}</span>
+      <span class="fname">${esc(name)}</span><span class="tree-meta">${count}</span>
+      <span class="fmenu">${icon('more', 13)}</span>`;
+    row.querySelector('.twist').onclick = e => { e.stopPropagation(); toggleFolder(path); renderTree(); };
+    row.onclick = e => { if (e.target.closest('.fmenu')) return; toggleFolder(path); renderTree(); };
+    row.oncontextmenu = e => { e.preventDefault(); e.stopPropagation(); contextMenu(e, path, true); };
+    row.ondragover = e => e.preventDefault();
+    row.ondrop = e => {
+      e.preventDefault(); e.stopPropagation();
+      const src = e.dataTransfer.getData('text/plain') || dragPath;
+      if (!src || src === path || src.startsWith(path + '/')) return;
+      rename(src, path + '/' + src.split('/').pop());
+      toast(`Перемещено в ${path}/`, 'ok'); renderTree();
+    };
+    host.appendChild(row);
+    if (open) drawNode(host, child, path, depth + 1);
+  }
+  for (const path of [...node.files].sort((a, b) => a.localeCompare(b, 'ru'))) {
+    const f = state.files[path];
+    const active = Object.values(state.panes).includes(path);
+    const row = el('div', { class: 'tree-row tree-file' + (active ? ' active' : ''),
+                            draggable: 'true', 'data-path': path, title: path,
+                            style: { paddingLeft: (6 + depth * 14) + 'px' } });
+    row.innerHTML = `<span class="twist"></span>${fileIcon(path)}
+      <span class="fname">${esc(path.split('/').pop())}</span>
+      <span class="tree-meta">${fmtBytes(f?.content?.length || 0)}</span>
+      <span class="fmenu">${icon('more', 13)}</span>`;
+    row.onclick = e => {
+      if (e.target.closest('.fmenu')) { e.stopPropagation(); contextMenu(e, path, false); return; }
+      openFile(path);
+    };
+    row.oncontextmenu = e => { e.preventDefault(); contextMenu(e, path, false); };
+    row.ondragstart = e => { dragPath = path; e.dataTransfer.setData('text/plain', path); };
+    host.appendChild(row);
+  }
+}
 export function renderTree() {
   const host = $('#fileTree'); if (!host) return;
   host.innerHTML = '';
-  const files = listFiles().filter(p => !treeFilter || p.toLowerCase().includes(treeFilter));
-  const dirs = new Set();
-  for (const p of files) {
-    const parts = p.split('/');
-    for (let i = 1; i < parts.length; i++) dirs.add(parts.slice(0, i).join('/'));
+  const root = collectNodes();
+  drawNode(host, root, '', 0);
+  if (!root.files.length && !root.dirs.size) {
+    host.appendChild(el('div', { class: 'empty-note',
+      html: 'Папка пуста.<br>Создайте HTML, CSS или JS файл кнопкой выше.' }));
   }
-  const children = parent => {
-    const direct = new Set();
-    for (const p of files) {
-      const rest = parent ? (p.startsWith(parent + '/') ? p.slice(parent.length + 1) : null) : p;
-      if (rest == null) continue;
-      direct.add(rest.split('/')[0] + (rest.includes('/') ? '/' : ''));
-    }
-    for (const d of dirs) {
-      const rest = parent ? (d.startsWith(parent + '/') ? d.slice(parent.length + 1) : null) : d;
-      if (rest && !rest.includes('/')) direct.add(rest + '/');
-    }
-    return [...direct].sort((a, b) => (b.endsWith('/') - a.endsWith('/')) || a.localeCompare(b));
-  };
-  const build = (parent, depth) => {
-    for (const name of children(parent)) {
-      const path = (parent ? parent + '/' : '') + name.replace(/\/$/, '');
-      const isDir = name.endsWith('/');
-      const f = state.files[path];
-      const active = Object.values(state.panes).includes(path);
-      const row = el('div', { class: 'tree-row' + (active ? ' active' : ''), draggable: 'true',
-                              style: { paddingLeft: (7 + depth * 13) + 'px' }, title: path },
-        el('span', { class: 'twist', text: isDir ? '▾' : '' }),
-        f && isImage(path) && safeDataSrc(f.content) ?
-          el('img', { class: 'tree-thumb', src: safeDataSrc(f.content), alt: '' }) :
-          el('span', { class: 'ftype', text: iconFor(path, isDir) }),
-        el('span', { class: 'fname', text: name.replace(/\/$/, '') }),
-        el('span', { class: 'tree-meta', text: isDir ? '' : fmtBytes(f?.content?.length || 0) }),
-        el('span', { class: 'fmenu', text: '⋯' }));
-      row.addEventListener('click', e => {
-        if (e.target.classList.contains('fmenu')) { e.stopPropagation(); contextMenu(e, path, isDir); return; }
-        if (isDir) { row.nextElementSibling?.classList?.toggle('hidden'); return; }
-        openFile(path);
-      });
-      row.addEventListener('contextmenu', e => { e.preventDefault(); contextMenu(e, path, isDir); });
-      row.addEventListener('dragstart', e => { dragPath = path; e.dataTransfer.setData('text/plain', path); });
-      row.addEventListener('dragover', e => { if (isDir) e.preventDefault(); });
-      row.addEventListener('drop', e => {
-        e.preventDefault(); e.stopPropagation();
-        const src = e.dataTransfer.getData('text/plain') || dragPath;
-        if (!src || src === path) return;
-        const target = isDir ? path + '/' + src.split('/').pop() : path;
-        if (isDir) { rename(src, target); toast(`Перемещено в ${path}/`, 'ok'); renderTree(); }
-      });
-      host.appendChild(row);
-      if (isDir) { const before = host.children.length; build(path, depth + 1); }
-    }
-  };
-  build('', 0);
-  if (!files.length) host.appendChild(el('div', { class: 'empty-note', text: 'Файлов нет. Нажмите «＋ файл».' }));
   updateSize();
 }
-function iconFor(path, isDir) {
-  if (isDir) return '';
-  const e = (path.split('.').pop() || '').toLowerCase();
-  return ({ html: '', htm: '', css: '', scss: '', js: '', mjs: '', ts: '',
-            json: '', md: '', png: '', jpg: '', jpeg: '', gif: '', webp: '',
-            svg: '', woff2: '', ttf: '', mp3: '', mp4: '', txt: '' })[e] || '';
+export function quickCreate(ext = 'html', folder = '') {
+  const base = folder ? folder + '/' : '';
+  let n = 1, path;
+  do { path = `${base}untitled-${n++}.${ext}`; } while (exists(path));
+  write(path, starterContent(ext, path));
+  renderTree(); openFile(path);
+  toast(`Создан файл ${path}`, 'ok');
+  return path;
+}
+function starterContent(ext, path) {
+  const name = path.split('/').pop();
+  if (ext === 'html') return `<!DOCTYPE html>\n<html lang="ru">\n<head>\n  <meta charset="UTF-8">\n  <meta name="viewport" content="width=device-width, initial-scale=1">\n  <title>${esc(name)}</title>\n  <link rel="stylesheet" href="style.css">\n</head>\n<body>\n  <h1>${esc(name)}</h1>\n  <script src="script.js"></script>\n</body>\n</html>\n`;
+  if (ext === 'css') return `/* ${esc(name)} */\n:root {\n  --accent: #4f8ff7;\n}\nbody {\n  font-family: system-ui, sans-serif;\n  margin: 0;\n  padding: 24px;\n}\n`;
+  if (ext === 'js') return `// ${esc(name)}\nconsole.log('${esc(name)} загружен');\n`;
+  if (ext === 'json') return '{\n  "name": "' + esc(name) + '"\n}\n';
+  if (ext === 'md') return `# ${esc(name)}\n`;
+  return '';
 }
 export function updateSize() {
+
   const n = $('#projectSize'), s = $('#statusSize');
   const text = `${listFiles().length} файлов · ${fmtBytes(projectSize())}`;
   if (n) n.textContent = text;
@@ -129,50 +181,102 @@ export function openFile(path) {
 function contextMenu(e, path, isDir) {
   const menu = $('#contextMenu'); if (!menu) return;
   menu.innerHTML = '';
-  const items = [
-    ['Открыть', () => openFile(path)],
-    ['Переименовать', () => renameDialog(path)],
-    ['Дублировать', () => { copyFile(path); renderTree(); toast('Файл продублирован', 'ok'); }],
-    ['Копировать путь', () => copy(path)],
-    ['Найти ссылки', () => findReferences(path)],
-    ['Скачать', () => downloadFile(path)],
-    ['—', null],
-    ['Удалить', () => deleteConfirm(path)]
-  ];
-  for (const [label, fn] of items) {
-    if (!fn) { menu.appendChild(el('hr')); continue; }
-    menu.appendChild(el('button', { onclick: () => { menu.classList.remove('show'); fn(); } }, label));
+  const add = (ic, label, fn, danger = false) => {
+    const b = el('button', { class: danger ? 'danger' : '' });
+    b.innerHTML = `<span class="cm-ico">${icon(ic, 14)}</span><span>${esc(label)}</span>`;
+    b.onclick = () => { menu.classList.remove('show'); fn(); };
+    menu.appendChild(b);
+  };
+  if (isDir) {
+    add('file', 'Новый HTML здесь', () => quickCreate('html', path));
+    add('palette', 'Новый CSS здесь', () => quickCreate('css', path));
+    add('braces', 'Новый JS здесь', () => quickCreate('js', path));
+    add('folder', 'Новая папка здесь', () => newFileDialog(true, path));
+    menu.appendChild(el('hr'));
+    add('edit', 'Переименовать', () => renameDialog(path));
+    add('trash', 'Удалить папку', () => deleteConfirm(path), true);
+  } else {
+    add('code', 'Открыть', () => openFile(path));
+    add('file', 'Новый HTML рядом', () => quickCreate('html', path.includes('/') ? path.slice(0, path.lastIndexOf('/')) : ''));
+    add('palette', 'Новый CSS рядом', () => quickCreate('css', path.includes('/') ? path.slice(0, path.lastIndexOf('/')) : ''));
+    add('braces', 'Новый JS рядом', () => quickCreate('js', path.includes('/') ? path.slice(0, path.lastIndexOf('/')) : ''));
+    menu.appendChild(el('hr'));
+    add('edit', 'Переименовать', () => renameDialog(path));
+    add('copy', 'Дублировать', () => { copyFile(path); renderTree(); toast('Файл продублирован', 'ok'); });
+    add('link', 'Найти ссылки', () => findReferences(path));
+    add('download', 'Скачать', () => downloadFile(path));
+    add('trash', 'Удалить', () => deleteConfirm(path), true);
   }
-  menu.style.left = Math.min(e.clientX, innerWidth - 210) + 'px';
-  menu.style.top = Math.min(e.clientY, innerHeight - 260) + 'px';
+  menu.style.left = Math.min(e.clientX, innerWidth - 240) + 'px';
+  menu.style.top = Math.min(e.clientY, innerHeight - 380) + 'px';
   menu.classList.add('show');
   setTimeout(() => document.addEventListener('click', () => menu.classList.remove('show'), { once: true }), 10);
 }
 
 /* ── CRUD dialogs ───────────────────────────────────────────────── */
-export function newFileDialog(folder = false) {
+export function newFileDialog(folder = false, basePath = '') {
+  const types = [
+    ['html', 'HTML-страница'], ['css', 'CSS-стили'], ['js', 'JavaScript'],
+    ['json', 'JSON'], ['md', 'Markdown'], ['txt', 'Текст']
+  ];
+  const templates = [
+    ['starter', 'Стартовый шаблон'], ['blank', 'Пустой'], ['html5', 'HTML5-скелет'],
+    ['card', 'Карточка'], ['form', 'Форма'], ['hero', 'Hero-секция'],
+    ['reset', 'CSS reset'], ['module', 'JS-модуль'], ['fetch', 'Fetch с ошибками']
+  ];
   ctx.modal({
-    title: folder ? 'Новая папка' : 'Новый файл',
-    body: `<div class="field"><label>Имя ${folder ? 'папки' : 'файла'}</label><input id="dlgName" value="${folder ? 'new-folder' : 'new-file.html'}" autofocus></div>
-           <div class="muted" style="font-size:11px">Можно указать путь: <code class="inline">components/card.html</code></div>`,
+    title: folder ? 'Новая папка' : 'Новый файл', narrow: true,
+    body: `${folder ? '' : `<div class="field"><label>Тип файла</label>
+        <select id="dlgType">${types.map(([v, l]) => `<option value="${v}">${l}</option>`).join('')}</select></div>`}
+      <div class="field"><label>Имя ${folder ? 'папки' : 'файла'}</label>
+        <input id="dlgName" value="${folder ? 'new-folder' : 'page'}" autofocus></div>
+      <div class="field"><label>Папка (необязательно)</label>
+        <input id="dlgFolder" value="${esc(basePath)}" placeholder="components"></div>
+      ${folder ? '' : `<div class="field"><label>Шаблон</label>
+        <select id="dlgTemplate">${templates.map(([v, l]) => `<option value="${v}">${l}</option>`).join('')}</select></div>`}
+      <div class="beginner" style="margin:0">Можно указать вложенный путь, например <code class="inline">pages/about.html</code>.</div>`,
     okText: 'Создать',
+    onMount: root => {
+      const type = root.querySelector('#dlgType');
+      const sync = () => {
+        const name = root.querySelector('#dlgName');
+        if (!name || !type) return;
+        if (/^(page|untitled|new-file)(\.|$)/.test(name.value)) name.value = 'page.' + type.value;
+      };
+      type?.addEventListener('change', sync);
+    },
     onOk: root => {
-      const name = root.querySelector('#dlgName').value.trim();
-      if (!name) return false;
-      const safeName = esc(name.slice(0, 200));
-      const path = folder ? name.replace(/\/$/, '') + '/README.md' : name;
+      const raw = root.querySelector('#dlgName').value.trim();
+      if (!raw) return false;
+      const dir = root.querySelector('#dlgFolder').value.trim().replace(/^\/+|\/+$/g, '');
+      const ext = folder ? 'md' : (root.querySelector('#dlgType')?.value || 'html');
+      const tpl = root.querySelector('#dlgTemplate')?.value || 'starter';
+      let rel = raw;
+      if (folder) rel = raw.replace(/^\/+|\/+$/g, '');
+      else if (!/\.[a-z0-9]+$/i.test(rel)) rel += '.' + ext;
+      const path = [dir, rel].filter(Boolean).join('/');
+      if (!safePathKey(path)) { toast('Недопустимое имя файла', 'err'); return false; }
       if (exists(path)) { toast('Такой файл уже есть', 'err'); return false; }
-      let content = '';
-      if (folder) content = '# ' + name.replace(/[\r\n]/g, '') + '\n';
-      else if (/\.html$/i.test(path)) content = '<!DOCTYPE html>\n<html lang="ru">\n<head><meta charset="utf-8"><title>' + safeName + '</title></head>\n<body>\n  \n</body>\n</html>';
-      else if (/\.css$/i.test(path)) content = '/* ' + name.replace(/\*\//g, '').slice(0, 200) + ' */\n';
-      else if (/\.js$/i.test(path)) content = '// ' + name.replace(/[\r\n]/g, '').slice(0, 200) + '\n';
-      else if (/\.json$/i.test(path)) content = '{\n  \n}\n';
-      write(path, content);
-      renderTree(); openFile(path);
-      toast(`Создано: ${path}`, 'ok', 'Файлы');
+      const content = folder ? `# ${rel}\n` : templateContent(tpl, ext, rel);
+      if (!write(path, content)) return false;
+      renderTree();
+      if (!folder) openFile(path);
+      toast(`Создано: ${path}`, 'ok');
     }
   });
+}
+function templateContent(tpl, ext, name) {
+  if (ext !== 'html' && tpl === 'html5') tpl = 'starter';
+  const get = id => SNIPPETS.find(s => s.id === id)?.code || '';
+  if (tpl === 'blank') return starterContent(ext, name).replace(/<h1>.*<\/h1>/, '') || '';
+  if (tpl === 'html5') return get('html5');
+  if (tpl === 'card') return `<!DOCTYPE html>\n<html lang="ru"><head><meta charset="UTF-8"><title>${esc(name)}</title></head><body>\n${get('card')}\n</body></html>`;
+  if (tpl === 'hero') return `<!DOCTYPE html>\n<html lang="ru"><head><meta charset="UTF-8"><title>${esc(name)}</title></head><body>\n${get('hero')}\n</body></html>`;
+  if (tpl === 'form') return `<!DOCTYPE html>\n<html lang="ru"><head><meta charset="UTF-8"><title>${esc(name)}</title></head><body>\n${get('form')}\n</body></html>`;
+  if (tpl === 'reset') return get('reset') || '*{box-sizing:border-box}\n';
+  if (tpl === 'module') return `export function hello(name = 'Runlet') {\n  return 'Привет, ' + name + '!';\n}\n`;
+  if (tpl === 'fetch') return get('fetch') || '';
+  return starterContent(ext, name);
 }
 export function renameDialog(path) {
   ctx.modal({
@@ -624,4 +728,40 @@ function postForm(url, data) {
   }
   document.body.appendChild(f); f.submit(); setTimeout(() => f.remove(), 1500);
   toast('Открыто в новой вкладке', 'ok');
+}
+
+
+/* ── real filesystem bridge (Electron) ────────────────────────────── */
+export async function openOSFolder() {
+  if (window.runlet?.openFolder) {
+    try {
+      const res = await window.runlet.openFolder();
+      if (!res || !res.files) return false;
+      for (const [p, c] of Object.entries(res.files)) {
+        if (safePathKey(p)) write(p, c);
+      }
+      renderTree(); emit('project:restoreEditors');
+      toast(`Загружено файлов: ${Object.keys(res.files).length}`, 'ok');
+      return true;
+    } catch (e) { toast('Не удалось открыть папку: ' + e.message, 'err'); return false; }
+  }
+  const inp = document.createElement('input');
+  inp.type = 'file'; inp.multiple = true; inp.webkitdirectory = true;
+  inp.onchange = async () => { if (inp.files?.length) await uploadFiles([...inp.files]); };
+  inp.click();
+  return true;
+}
+export async function saveToDisk() {
+  if (window.runlet?.saveProject) {
+    try {
+      const files = {};
+      for (const [p, f] of Object.entries(state.files)) files[p] = f.content;
+      const res = await window.runlet.saveProject(files);
+      if (res?.ok) { toast(`Сохранено файлов: ${res.count}`, 'ok'); return true; }
+      toast('Сохранение отменено', 'info');
+      return false;
+    } catch (e) { toast('Ошибка сохранения: ' + e.message, 'err'); return false; }
+  }
+  exportZip();
+  return true;
 }

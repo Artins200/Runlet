@@ -97,7 +97,7 @@ export function openLesson(lesson) {
     body: `<div class="beginner">${esc(lesson.theory)}</div>
       <h4 style="margin:14px 0 6px">Задание</h4><p>${esc(lesson.task)}</p>
       <div class="field"><label>Ваш код (панель ${lesson.lang})</label><textarea id="lessonCode" rows="9" style="font:12px var(--mono)">${esc(getDoc(pane).slice(0, 2000))}</textarea></div>
-      <div class="rowflex"><button class="mini-btn" id="lessonLoad">↻ Загрузить стартовый код</button>
+      <div class="rowflex"><button class="mini-btn" id="lessonLoad">${icon('refresh', 13)} Загрузить стартовый код</button>
         <button class="mini-btn" id="lessonHint"> Подсказка</button><button class="mini-btn" id="lessonCheck"> Проверить</button></div>
       <div id="lessonResult" class="mt8"></div>`,
     okText: 'Закрыть',
@@ -160,8 +160,8 @@ function drawViz(kind) {
   box.innerHTML = `<div class="list-rows">${steps.map((s, i) => `<div class="list-row viz-step" data-i="${i}" style="opacity:.45;transition:.3s">
     <b style="width:22px;height:22px;border-radius:8px;background:var(--accent);color:#fff;display:grid;place-items:center">${i + 1}</b>
     <div class="grow"><b>${esc(s[0])}</b><small>${esc(s[1])}</small></div></div>`).join('')}</div>
-    <div class="rowflex mt8"><button class="mini-btn" id="vizPlay">▶ Проиграть</button>
-      <button class="mini-btn" id="vizNext">Шаг →</button><span class="muted" id="vizStatus" style="font-size:11px"></span></div>`;
+    <div class="rowflex mt8"><button class="mini-btn" id="vizPlay">${icon('play', 13)} Проиграть</button>
+      <button class="mini-btn" id="vizNext">Шаг ${icon('arrowRight', 13)}</button><span class="muted" id="vizStatus" style="font-size:11px"></span></div>`;
   let i = -1;
   const show = n => {
     i = n; box.querySelectorAll('.viz-step').forEach((s, j) => s.style.opacity = j <= n ? '1' : '.45');
@@ -453,8 +453,8 @@ function pluginPomodoro() {
   ctx.modal({ title: 'Помодоро', narrow: true,
     body: `<div style="text-align:center"><div id="pomoTime" style="font-size:58px;font-weight:800;letter-spacing:-3px">25:00</div>
       <div class="muted">Работа 25 мин / отдых 5 мин</div>
-      <div class="rowflex mt8" style="justify-content:center"><button class="mini-btn" id="pomoStart">▶ Старт</button>
-      <button class="mini-btn" id="pomoReset">↻ Сброс</button></div></div>`,
+      <div class="rowflex mt8" style="justify-content:center"><button class="mini-btn" id="pomoStart">${icon('play', 13)} Старт</button>
+      <button class="mini-btn" id="pomoReset">${icon('refresh', 13)} Сброс</button></div></div>`,
     okText: 'Закрыть',
     onMount: root => {
       let left = 25 * 60, timer = null;
@@ -492,7 +492,7 @@ function pluginDiagram() {
     onMount: root => {
       const upd = () => {
         const parts = root.querySelector('#dgIn').value.split('->');
-        root.querySelector('#dgOut').innerHTML = parts.map((s, i) => `<div style="padding:8px 14px;border-radius:12px;background:var(--accent);color:#fff">${esc(s.trim())}</div>${i < parts.length - 1 ? '<div>↓</div>' : ''}`).join('');
+        root.querySelector('#dgOut').innerHTML = parts.map((s, i) => `<div style="padding:8px 14px;border-radius:12px;background:var(--accent);color:#fff">${esc(s.trim())}</div>${i < parts.length - 1 ? `<div style="text-align:center;color:var(--accent)">${icon('chevronDown', 16)}</div>` : ''}`).join('');
       };
       root.querySelector('#dgIn').addEventListener('input', upd); upd();
     } });

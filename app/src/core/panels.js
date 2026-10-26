@@ -44,48 +44,70 @@ export function renderAnalysis() {
   const host = $('#analysisPanel'); if (!host) return;
   const r = state.report;
   if (!r) {
-    host.innerHTML = `<div class="analysis-hero"><div class="score-ring" style="--score:0"><span class="num">—</span></div>
-      <div class="analysis-hero-text"><h2>Что делает ваш код?</h2>
-      <p class="analysis-desc">Нажмите «Анализ кода» — Python-движок разберёт HTML, CSS и JS, объяснит поведение и найдёт ошибки.</p>
-      <div class="engine-line"><button class="mini-btn" data-cmd="analyze">▶ Запустить анализ</button><span>Ctrl+Shift+A</span></div></div></div>
-      <div class="section"><h3>Как это работает</h3><div class="steps">
-      <div class="step"><span class="step-i">1</span><div>Движок читает все файлы проекта и строит карту: теги, id, селекторы, функции.</div></div>
-      <div class="step"><span class="step-i">2</span><div>Сопоставляет <code class="inline">querySelector('#id')</code> с реальной разметкой — и находит будущие <code class="inline">TypeError</code>.</div></div>
-      <div class="step"><span class="step-i">3</span><div>Собирает поведение: события, fetch, таймеры, localStorage — и пишет понятное резюме.</div></div></div></div>`;
+    host.innerHTML = `<div class="analysis-hero">
+      <div class="score-ring score-large" style="--score:0"><span class="num">—</span></div>
+      <div class="analysis-hero-text"><span class="verdict ok">Ожидание анализа</span>
+        <h2>Что делает ваш код?</h2>
+        <p class="analysis-desc">Python-движок разберёт разметку, стили и скрипты, объяснит поведение и покажет ошибки с исправлениями.</p>
+        <div class="engine-line"><button class="btn btn-accent" data-cmd="analyze">${icon('chart', 15)} Запустить анализ</button>
+          <kbd>Ctrl + Shift + A</kbd></div>
+      </div></div>
+      <div class="section"><h3>Как это работает</h3>
+        <div class="steps">
+          <div class="step"><span class="step-i">${icon('files', 15)}</span><div>Движок читает все файлы проекта и строит карту: теги, идентификаторы, селекторы, функции.</div></div>
+          <div class="step"><span class="step-i">${icon('target', 15)}</span><div>Сверяет <code class="inline">querySelector('#id')</code> с разметкой и находит будущие <code class="inline">TypeError</code>.</div></div>
+          <div class="step"><span class="step-i">${icon('refresh', 15)}</span><div>Собирает поведение: события, запросы, таймеры, хранилище — и пишет понятное резюме.</div></div>
+        </div></div>`;
     return;
   }
   const py = r.engine?.startsWith('runlet-python');
+  const d = r.diagnostics || [];
+  const count = sev => d.filter(x => x.sev === sev).length;
+  const errors = count('error'), warns = count('warning'), infos = count('info') + count('hint');
+  const gradeEntries = Object.entries(r.grades || {});
+  const gradeColor = v => v >= 80 ? 'var(--ok)' : v >= 60 ? 'var(--warn)' : 'var(--err)';
+  const stat = (cls, ic, label, n, hint) => `<div class="a-stat ${cls}">
+      <div class="a-stat-ico">${icon(ic, 19)}</div><div class="a-stat-num">${n}</div>
+      <div class="a-stat-label">${label}</div><div class="a-stat-hint">${hint}</div></div>`;
   host.innerHTML = `
     <div class="analysis-hero">
-      <div class="score-ring" style="--score:${r.score}"><span class="num">${r.score}</span><span class="lbl">/ 100</span></div>
+      <div class="score-ring score-large" style="--score:${r.score}"><span class="num">${r.score}</span><span class="lbl">из 100</span></div>
       <div class="analysis-hero-text">
-        <span class="verdict ${r.summary.verdict_level}">${esc(r.summary.verdict)}</span>
+        <span class="verdict ${r.summary.verdict_level}">${icon(r.summary.verdict_level === 'ok' ? 'check' : 'info', 13)} ${esc(r.summary.verdict)}</span>
         <h2>${esc(r.summary.headline)}</h2>
         <p class="analysis-desc">${esc(r.summary.description)}</p>
-        <div class="engine-line"><span class="pill ${py ? 'pill-accent' : ''}">${icon(py ? 'code' : 'info', 12)} ${py ? 'Python-движок' : 'JS-анализ'}</span>
-          <span>${r.elapsed_ms} мс</span><span>${r.diagnostics.length} замечаний</span>
-          <button class="mini-btn" data-cmd="analyze">${icon('refresh', 12)} Обновить</button>
-          <button class="mini-btn" data-cmd="analysisReport">${icon('maximize', 12)} Развернуть</button></div>
+        <div class="engine-line">
+          <span class="pill ${py ? 'pill-accent' : ''}">${icon(py ? 'code' : 'info', 13)} ${py ? 'Python-движок' : 'JS-анализ'}</span>
+          <span>${r.elapsed_ms} мс</span>
+          <button class="mini-btn" data-cmd="analyze">${icon('refresh', 13)} Обновить</button>
+          <button class="mini-btn" data-cmd="analysisReport">${icon('maximize', 13)} Подробнее</button></div>
       </div>
     </div>
-    <div class="grade-bars">${Object.entries(r.grades).map(([k, v]) => `
-      <div class="grade"><span>${gradesRu[k] || k}</span><b>${v}</b><div class="bar"><i style="width:${v}%"></i></div></div>`).join('')}</div>
+    <div class="analysis-stats">
+      ${stat('is-error', 'close', 'Ошибки', errors, 'нужно исправить')}
+      ${stat('is-warn', 'info', 'Предупреждения', warns, 'стоит проверить')}
+      ${stat('is-info', 'spark', 'Советы', infos, 'можно улучшить')}
+    </div>
     <div class="section"><h3>Что произойдёт при запуске <span class="count">${r.summary.steps.length} шагов</span></h3>
-      <div class="steps">${r.summary.steps.map((s, i) => `<div class="step"><span class="step-i">${s.icon === 'error' ? '!' : i + 1}</span>
+      <div class="steps">${r.summary.steps.map((s, i) => `<div class="step"><span class="step-i">${s.icon === 'error' ? icon('close', 14) : (i + 1)}</span>
         <div>${esc(s.text)}<span class="conf">${esc(s.confidence)}</span></div></div>`).join('')}</div></div>
-    <div class="section"><h3>Ошибки и замечания <span class="count">${r.diagnostics.length}</span></h3>
+    <div class="section"><h3>Ошибки и замечания <span class="count">${d.length}</span></h3>
       <div class="sev-filters">${['all', 'error', 'warning', 'info', 'hint'].map(f =>
-        `<button class="sev-chip ${diagFilter === f ? 'active' : ''}" data-sev="${f}">${sevRu[f]} <span class="n">${f === 'all' ? r.diagnostics.length : r.diagnostics.filter(d => d.sev === f).length}</span></button>`).join('')}
-        <button class="sev-chip" data-cmd="fixAll">${icon('wand', 12)} Исправить</button></div>
+        `<button class="sev-chip ${diagFilter === f ? 'active' : ''}" data-sev="${f}">${sevRu[f]} <span class="n">${f === 'all' ? d.length : count(f)}</span></button>`).join('')}
+        <button class="sev-chip" data-cmd="fixAll">${icon('wand', 13)} Исправить</button></div>
       <div class="diag-list">${diagnosticsHtml(r)}</div></div>
+    <div class="section"><h3>Качество по направлениям</h3>
+      <div class="quality-grid">${gradeEntries.map(([k, v]) => `<div class="quality-item">
+        <div class="quality-row"><span>${gradesRu[k] || k}</span><b style="color:${gradeColor(v)}">${v}</b></div>
+        <div class="quality-bar"><i style="width:${v}%;background:${gradeColor(v)}"></i></div></div>`).join('')}</div></div>
     ${chipsHtml(r)}
     <div class="section"><h3>Для новичка <button class="mini-btn" id="beginnerToggle" style="margin-left:auto">${beginnerMode ? 'Скрыть' : 'Объяснить'}</button></h3>
       <div class="beginner ${beginnerMode ? '' : 'hidden'}" id="beginnerBox"><ul>${r.summary.beginner.map(b => `<li>${esc(b)}</li>`).join('')}</ul></div></div>
-    <div class="rowflex" style="padding:0 14px 14px">
-      <button class="mini-btn" data-cmd="exportReportMd">${icon('download', 12)} Markdown</button>
-      <button class="mini-btn" data-cmd="exportReportJson">${icon('download', 12)} JSON</button>
-      <button class="mini-btn" data-cmd="copyReport">${icon('copy', 12)} Копировать</button>
-      <button class="mini-btn" data-cmd="helpWelcome">${icon('help', 12)} Как работать</button>
+    <div class="rowflex analysis-actions">
+      <button class="mini-btn" data-cmd="exportReportMd">${icon('download', 13)} Markdown</button>
+      <button class="mini-btn" data-cmd="exportReportJson">${icon('download', 13)} JSON</button>
+      <button class="mini-btn" data-cmd="copyReport">${icon('copy', 13)} Копировать</button>
+      <button class="mini-btn" data-cmd="helpWelcome">${icon('help', 13)} Как работать</button>
       </div>`;
   host.querySelectorAll('[data-sev]').forEach(b => b.addEventListener('click', () => { diagFilter = b.dataset.sev; renderAnalysis(); }));
   host.querySelectorAll('.diag-top .file').forEach(b => b.addEventListener('click', () => {
@@ -105,9 +127,9 @@ function diagnosticsHtml(r) {
   const list = r.diagnostics.filter(d => diagFilter === 'all' || d.sev === diagFilter);
   if (!list.length) return '<div class="empty-note">Здесь чисто </div>';
   return list.slice(0, 90).map(d => `<div class="diag ${d.sev}">
-    <div class="diag-top"><span class="sev ${d.sev}">${({ error: 'ОШИБКА', warning: 'ВНИМАНИЕ', info: 'ИНФО', hint: 'СОВЕТ' })[d.sev]}</span>
+    <div class="diag-top"><span class="sev ${d.sev}">${icon(d.sev === 'error' ? 'close' : d.sev === 'warning' ? 'info' : 'spark', 12)} ${({ error: 'ОШИБКА', warning: 'ВНИМАНИЕ', info: 'ИНФО', hint: 'СОВЕТ' })[d.sev]}</span>
       <span>${esc(d.id)} · ${esc(gradesRu[d.cat] || d.cat)}</span>
-      <span class="file" data-rid="${esc(d.id)}" data-line="${d.line}">${esc(d.file)}:${d.line} ↗</span></div>
+      <span class="file" data-rid="${esc(d.id)}" data-line="${d.line}">${esc(d.file)}:${d.line} ${icon('arrowRight', 11)}</span></div>
     <p class="diag-msg">${esc(d.msg)}</p>
     ${d.why ? `<div class="diag-why hidden"><b>Почему:</b> ${esc(d.why)}</div>` : ''}
     ${d.fix ? `<div class="diag-fix"> ${esc(d.fix)}</div>` : ''}
@@ -121,11 +143,11 @@ function chipsHtml(r) {
   const chips = [];
   for (const e of (b.events || []).slice(0, 6)) chips.push(`<span class="chip"> <b>${esc(e.type)}</b> → ${esc(e.target)}</span>`);
   for (const n of (b.network || []).slice(0, 4)) chips.push(`<span class="chip"> <b>${esc(n.method || 'fetch')}</b> ${esc(String(n.url).slice(0, 40))}</span>`);
-  for (const t of (b.timers || []).slice(0, 3)) chips.push(`<span class="chip">⏱ ${esc(t.kind || 'timer')}</span>`);
+  for (const t of (b.timers || []).slice(0, 3)) chips.push(`<span class="chip">${icon('clock', 13)} ${esc(t.kind || 'timer')}</span>`);
   for (const s of (b.storage || []).slice(0, 4)) chips.push(`<span class="chip"> <b>${esc(s.store)}</b> ${esc(s.key)}</span>`);
   for (const c of (b.colors || []).slice(0, 6)) {
     const col = sanitizeColor(c.value, 'transparent');
-    chips.push(`<span class="chip"> <b style="color:${col}">■</b> ${esc(String(c.value).slice(0, 40))}</span>`);
+    chips.push(`<span class="chip">${icon('palette', 13)} <i class="chip-swatch" style="background:${col}"></i> ${esc(String(c.value).slice(0, 40))}</span>`);
   }
   if (!chips.length) return '';
   return `<div class="section"><h3>Поведение кода</h3><div class="chips">${chips.join('')}</div></div>`;
@@ -195,7 +217,7 @@ export function renderConsole() {
       <button class="mini-btn" id="logJson">JSON</button></div>
       <div class="console-list" id="logList" style="flex:1;overflow:auto"></div>
       <div class="repl-bar"><span class="repl-prompt">›</span><input id="replInput" placeholder="Введите JS-выражение (Enter — выполнить)" autocomplete="off">
-      <button class="mini-btn" id="replRun">↵</button></div>`;
+      <button class="mini-btn" id="replRun">${icon('arrowRight', 13)}</button></div>`;
     host.querySelector('#logLevel').addEventListener('change', e => { state.consoleFilter = e.target.value; renderConsole(); });
     host.querySelector('#logSearch').addEventListener('input', debounce(e => { state.consoleSearch = e.target.value; renderConsole(); }, 200));
     host.querySelector('#logGroup').addEventListener('change', e => { state.consoleGroup = e.target.checked; renderConsole(); });
@@ -234,7 +256,7 @@ export function renderConsole() {
   list.innerHTML = rows.slice(-400).map(l => {
     let extra = '';
     if (l.table) extra = `<table class="log-table"><tr>${Object.keys(l.table[0] || {}).map(k => `<th>${esc(k)}</th>`).join('')}</tr>${l.table.map(row => `<tr>${Object.values(row).map(v => `<td>${esc(v)}</td>`).join('')}</tr>`).join('')}</table>`;
-    else if (l.args?.length && typeof l.args[0] === 'object' && l.args[0]?.k === 'array') extra = `<div class="log-obj">▶ ${esc(l.args[0].p)}</div>`;
+    else if (l.args?.length && typeof l.args[0] === 'object' && l.args[0]?.k === 'array') extra = `<div class="log-obj">${icon('chevronRight', 12)} ${esc(l.args[0].p)}</div>`;
     if (l.stack) extra += `<div style="color:var(--dim);font-size:9px;white-space:pre-wrap">${esc(l.stack.slice(0, 400))}</div>`;
     return `<div class="log-row ${l.level}"><span class="lvl">${esc(l.level)}</span>
       <span class="txt">${esc(l.text || '')}${extra}</span>
@@ -252,11 +274,11 @@ export function renderDebug() {
   const bps = Object.entries(state.breakpoints).flatMap(([f, arr]) => arr.map(b => ({ ...b, file: f })));
   const trace = state.trace || [];
   host.innerHTML = `<div class="insp-toolbar">
-      <button class="mini-btn" id="dbgRefresh">↻ Трассировка</button>
-      <button class="mini-btn" id="dbgStepInto">↓ Step into</button>
-      <button class="mini-btn" id="dbgStepOver">→ Step over</button>
-      <button class="mini-btn" id="dbgStepOut">↑ Step out</button>
-      <button class="mini-btn" id="dbgResume">▶ Resume</button>
+      <button class="mini-btn" id="dbgRefresh">${icon('refresh', 13)} Трассировка</button>
+      <button class="mini-btn" id="dbgStepInto">${icon('arrowDown', 13)} Step into</button>
+      <button class="mini-btn" id="dbgStepOver">${icon('arrowRight', 13)} Step over</button>
+      <button class="mini-btn" id="dbgStepOut">${icon('arrowUp', 13)} Step out</button>
+      <button class="mini-btn" id="dbgResume">${icon('play', 13)} Resume</button>
       <button class="mini-btn" id="dbgAddBp">＋ Точка</button></div>
     <div class="section"><h3>Точки останова <span class="count">${bps.length}</span></h3>
       <div class="debug-steps">${bps.length ? bps.map(b => `<div class="kv"><span>${esc(b.file)}:${b.line}</span>
@@ -326,8 +348,8 @@ export function addBreakpointDialog() {
 export function renderDom() {
   const host = $('#domPanel'); if (!host) return;
   const selected = state.selectedElement;
-  host.innerHTML = `<div class="insp-toolbar"><button class="mini-btn" id="domRefresh">↻ Обновить DOM</button>
-      <button class="mini-btn" id="domInspect">⌖ Инспектор</button><button class="mini-btn" id="domA11y"> a11y</button>
+  host.innerHTML = `<div class="insp-toolbar"><button class="mini-btn" id="domRefresh">${icon('refresh', 13)} Обновить DOM</button>
+      <button class="mini-btn" id="domInspect">${icon('target', 13)} Инспектор</button><button class="mini-btn" id="domA11y"> a11y</button>
       <button class="mini-btn" id="domSpeech"> Скринридер</button></div>
     <div class="dom-tree" id="domTreeBox">${state.domTree ? domHtml(state.domTree, 0) : '<div class="empty-note">Нажмите «Обновить DOM»</div>'}</div>
     <div class="section"><h3>Computed styles ${selected ? '— ' + esc(selected.tag) : ''}</h3>
@@ -359,7 +381,7 @@ export function renderNetwork() {
       '</b><span>' + (n.ms || 0) + 'ms' + (n.local ? ' · VFS' : '') + '</span></div>';
   }).join('');
   const empty = '<div class="empty-note">Запросов пока нет. Вызовите fetch() — запрос появится здесь.</div>';
-  host.innerHTML = '<div class="insp-toolbar"><button class="mini-btn" id="netRefresh">↻</button>' +
+  host.innerHTML = `<div class="insp-toolbar"><button class="mini-btn" id="netRefresh">${icon('refresh', 13)}</button>` +
     '<span class="muted">' + items.length + ' запросов</span><button class="mini-btn" id="netClear">Очистить</button></div>' +
     '<div class="debug-steps">' + (rows || empty) + '</div>';
   host.querySelector('#netRefresh').onclick = () => send('getNetwork', {});
@@ -369,7 +391,7 @@ export function renderStorage() {
   const host = $('#storagePanel'); if (!host) return;
   const d = state.storageData || {};
   const block = (title, obj) => `<div class="section"><h3>${title}</h3><div class="debug-steps">${Object.entries(obj || {}).map(([k, v]) => `<div class="kv"><span>${esc(k)}</span><b>${esc(String(v).slice(0, 60))}</b></div>`).join('') || '<div class="dim">пусто</div>'}</div></div>`;
-  host.innerHTML = `<div class="insp-toolbar"><button class="mini-btn" id="stRefresh">↻ Обновить</button><span class="muted">изолировано в sandbox</span></div>` +
+  host.innerHTML = `<div class="insp-toolbar"><button class="mini-btn" id="stRefresh">${icon('refresh', 13)} Обновить</button><span class="muted">изолировано в sandbox</span></div>` +
     block('localStorage', d.local) + block('sessionStorage', d.session) +
     `<div class="section"><h3>Cookies</h3><div class="debug-steps"><div class="kv"><span>document.cookie</span><b>${esc(d.cookies || '—')}</b></div></div></div>`;
   host.querySelector('#stRefresh').onclick = () => send('getStorage', {});
@@ -379,7 +401,7 @@ export function renderPerf() {
   const p = state.perf || {}, r = state.report;
   const size = Object.values(state.files).reduce((n, f) => n + (f.content?.length || 0), 0);
   const lighthouse = r?.score ?? Math.max(0, 100 - Math.round(size / 2000));
-  host.innerHTML = `<div class="insp-toolbar"><button class="mini-btn" id="perfRefresh">↻ Замеры</button>
+  host.innerHTML = `<div class="insp-toolbar"><button class="mini-btn" id="perfRefresh">${icon('refresh', 13)} Замеры</button>
     <button class="mini-btn" id="perfTips">Советы</button><span class="spacer"></span>
     <span class="muted">Lighthouse-подобная оценка: <b style="color:${lighthouse > 75 ? 'var(--ok)' : 'var(--warn)'}">${lighthouse}</b></span></div>
     <div class="grade-bars" style="padding-top:12px">

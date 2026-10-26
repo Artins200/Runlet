@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="ru" data-theme="dark" data-density="comfy">
+<html lang="ru" data-theme="dark" data-density="comfy" data-anim="on">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -28,7 +28,7 @@
       <span id="dirtyDot" class="dirty-dot" title="Есть несохранённые изменения"></span>
     </div>
     <button class="btn btn-ghost palette-trigger" data-cmd="palette">
-      <span id="paletteIcon"></span><span>Команды</span><kbd>Ctrl ⇧ P</kbd>
+      <span id="paletteIcon"></span><span>Команды</span><kbd>Ctrl + Shift + P</kbd>
     </button>
     <div class="title-spacer"></div>
     <div class="title-meta"><span id="readyIndicator" class="ready"><i></i>готов</span></div>
@@ -38,19 +38,24 @@
   <div id="toolbar" class="toolbar">
     <div class="tool-group" id="toolbarPrimary"></div>
     <div class="tool-sep"></div>
-    <div class="tool-group layout-group" role="group" aria-label="Раскладка">
-      <button class="btn btn-icon" data-cmd="layoutColumns" title="Три колонки"><span data-icon="columns"></span></button>
-      <button class="btn btn-icon" data-cmd="layoutRows" title="Три строки"><span data-icon="rows"></span></button>
-      <button class="btn btn-icon" data-cmd="layoutTabs" title="Вкладки"><span data-icon="tabs"></span></button>
-    </div>
-    <div class="tool-sep"></div>
-    <div class="tool-group">
-      <button class="btn btn-icon" data-cmd="theme" title="Тема"><span data-icon="theme"></span></button>
-      <button class="btn btn-icon" data-cmd="density" title="Плотность"><span data-icon="density"></span></button>
-      <button class="btn btn-icon" data-cmd="settings" title="Настройки"><span data-icon="settings"></span></button>
+    <div class="tool-group menu-group">
+      <button class="btn btn-ghost" data-menu="file" title="Файл и проект">
+        <span data-icon="folder"></span><span>Файл</span><span class="menu-caret" data-icon="chevronDown"></span>
+      </button>
+      <button class="btn btn-ghost" data-menu="more" title="Инструменты, вид и справка">
+        <span data-icon="more"></span><span>Ещё</span><span class="menu-caret" data-icon="chevronDown"></span>
+      </button>
     </div>
     <div class="tool-spacer"></div>
+    <div class="tool-group zoom-group" title="Масштаб кода (Ctrl + колесо мыши)">
+      <button class="btn btn-icon" data-cmd="fontZoomOut" title="Меньше"><span data-icon="minus"></span></button>
+      <span class="zoom-label" id="fontSizeLabel">16px</span>
+      <button class="btn btn-icon" data-cmd="fontZoomIn" title="Крупнее"><span data-icon="plus"></span></button>
+      <button class="btn btn-icon" data-cmd="toggleWrap" id="wrapToggle" title="Перенос длинных строк"><span data-icon="wrap"></span></button>
+    </div>
+    <div class="tool-sep"></div>
     <div class="tool-group" id="toolbarSecondary"></div>
+    <button class="btn btn-icon" data-cmd="settings" title="Настройки"><span data-icon="settings"></span></button>
   </div>
 
   <main id="workspace" class="workspace">
@@ -68,7 +73,6 @@
           <button class="nav-item" data-rail-tab="three"><span data-icon="cube"></span>3D</button>
           <button class="nav-item" data-rail-tab="learn"><span data-icon="book"></span>Уроки</button>
           <button class="nav-item" data-rail-tab="plugins"><span data-icon="puzzle"></span>Плагины</button>
-          <button class="nav-item" data-rail-tab="features"><span data-icon="list"></span>Идеи</button>
         </div>
       </nav>
       <div class="rail-main">
@@ -76,11 +80,15 @@
         <div class="rail-body" id="railBody">
           <div class="rail-panel active" data-rail="files">
             <div class="rail-actions">
-              <button class="mini-btn" data-cmd="newFile" title="Новый файл"><span data-icon="file"></span> Файл</button>
-              <button class="mini-btn" data-cmd="newFolder" title="Новая папка"><span data-icon="folder"></span> Папка</button>
-              <button class="mini-btn" data-cmd="upload" title="Загрузить"><span data-icon="upload"></span> Загрузить</button>
-              <button class="mini-btn" data-cmd="snapshot" title="Версия"><span data-icon="history"></span> Версия</button>
+              <button class="mini-btn primary-action" data-cmd="newFile" title="Создать файл или папку"><span data-icon="plus"></span> Создать</button>
+              <button class="mini-btn type-chip" data-cmd="quickNewHtml" title="Новый HTML">HTML</button>
+              <button class="mini-btn type-chip" data-cmd="quickNewCss" title="Новый CSS">CSS</button>
+              <button class="mini-btn type-chip" data-cmd="quickNewJs" title="Новый JS">JS</button>
+              <button class="mini-btn" data-cmd="newFolder" title="Новая папка"><span data-icon="folder"></span></button>
+              <button class="mini-btn" data-cmd="upload" title="Загрузить файлы"><span data-icon="upload"></span></button>
+              <button class="mini-btn" data-cmd="openOSFolder" title="Открыть папку с диска"><span data-icon="globe"></span></button>
             </div>
+            <div class="file-breadcrumb" id="fileBreadcrumb"><span data-icon="folder"></span> корень проекта</div>
             <div class="file-filter"><input id="fileFilter" placeholder="Фильтр по имени…" spellcheck="false"></div>
             <div class="file-tree" id="fileTree"></div>
             <div class="rail-foot" id="projectSize">0 КБ</div>
@@ -98,7 +106,6 @@
           <div class="rail-panel" data-rail="three"><div id="threePanel" class="panel-scroll" style="padding:0;height:100%"></div></div>
           <div class="rail-panel" data-rail="learn"><div id="learnPanel" class="panel-scroll"></div></div>
           <div class="rail-panel" data-rail="plugins"><div id="pluginsPanel" class="panel-scroll"></div></div>
-          <div class="rail-panel" data-rail="features"><div id="featuresPanel" class="panel-scroll"></div></div>
         </div>
       </div>
     </aside>
@@ -250,11 +257,16 @@
     <span class="status-item" id="statusScore">Анализ: —</span>
     <span class="status-item" id="statusSize">0 КБ</span>
     <span class="status-item" id="statusAutosave">автосохранение вкл</span>
-    <button class="status-btn" data-cmd="shortcuts"><span data-icon="keyboard"></span> Горячие клавиши</button>
+    <button class="status-btn" id="animToggle" data-cmd="toggleAnimations" title="Анимации"><span data-icon="spark"></span></button>
+    <button class="status-btn" data-cmd="shortcuts"><span data-icon="keyboard"></span> Бинды</button>
   </footer>
 </div>
 
 <div id="windowsLayer" class="windows-layer"></div>
+<div id="menuLayer" class="menu-layer"></div>
+<div id="threeStage" class="three-stage" role="dialog" aria-label="3D-редактор"></div>
+<div id="desktopBar" class="desktop-bar"></div>
+<div id="desktopClosed" class="desktop-closed"></div>
 <div id="toasts" class="toasts" aria-live="polite"></div>
 <div id="modalRoot" class="modal-root"></div>
 <div id="startScreen" class="start-screen"></div>

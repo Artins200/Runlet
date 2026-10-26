@@ -133,6 +133,37 @@ try {
   const secOut = (sec.stdout || '') + (sec.stderr || '');
   const secPass = secOut.split('\n').filter(l => l.includes('✅')).length;
   const secFail = secOut.split('\n').filter(l => l.includes('❌')).length;
+  // 11b. Readability / WCAG / 3D / filesystem / windowed shell
+  const css = fs.readFileSync(path.join(root, 'app/src/styles.css'), 'utf8');
+  const dark = (css.match(/html\[data-theme="dark"\]\s*\{([\s\S]*?)\}/) || [])[1] || '';
+  const light = (css.match(/html\[data-theme="light"\]\s*\{([\s\S]*?)\}/) || [])[1] || '';
+  const tok = (block, n) => (block.match(new RegExp('--' + n + ':\\s*(#[0-9a-f]{6})', 'i')) || [])[1] || '#000000';
+  const lum = h => {
+    const x = h.replace('#','');
+    if (!/^[0-9a-f]{6}$/i.test(x)) return 0;
+    const c = [0,2,4].map(i => { const v = parseInt(x.slice(i,i+2),16)/255; return v <= .03928 ? v/12.92 : Math.pow((v+.055)/1.055, 2.4); });
+    return .2126*c[0] + .7152*c[1] + .0722*c[2];
+  };
+  const ratio = (a,b) => { const l1=lum(a), l2=lum(b); return (Math.max(l1,l2)+.05)/(Math.min(l1,l2)+.05); };
+  const wcag = (block, label) => {
+    const pairs = [['text','card'],['muted','card'],['dim','code-bg'],['err','card'],['warn','card'],['ok','card']];
+    const vals = pairs.map(([a,b]) => [a, ratio(tok(block,a), tok(block,b))]);
+    const bad = vals.filter(([,r]) => r < 4.5);
+    ok(`WCAG ≥4.5:1 (${label})`, bad.length === 0, vals.map(([k,v]) => k+' '+v.toFixed(2)).join(', '));
+  };
+  wcag(dark, 'тёмная тема'); wcag(light, 'светлая тема');
+  ok('Код: 16px / 1.55 / перенос строк', /fontSize:\s*16/.test(fs.readFileSync(path.join(root,'app/src/core/core.js'),'utf8')) &&
+     /lineHeight:\s*1\.55/.test(fs.readFileSync(path.join(root,'app/src/core/core.js'),'utf8')) &&
+     /wrap:\s*true/.test(fs.readFileSync(path.join(root,'app/src/core/core.js'),'utf8')));
+  ok('3D-редактор: отдельная сцена + непрерывный рендер', /\.three-stage/.test(css) && /function loop\(\)[\s\S]*visible/.test(fs.readFileSync(path.join(root,'app/src/core/threeD.js'),'utf8')) && /openThreeStage/.test(fs.readFileSync(path.join(root,'app/src/main.js'),'utf8')));
+  ok('Файловая система: дерево папок + типы файлов + диск', /drawNode/.test(fs.readFileSync(path.join(root,'app/src/core/files.js'),'utf8')) &&
+     /quickCreate/.test(fs.readFileSync(path.join(root,'app/src/core/files.js'),'utf8')) &&
+     /fs:openFolder/.test(fs.readFileSync(path.join(root,'electron/main.cjs'),'utf8')));
+  ok('Оконный режим приложения: свернуть/развернуть', /windowControl/.test(fs.readFileSync(path.join(root,'app/src/core/shellui.js'),'utf8')) &&
+     /app-min/.test(css) && /desktopBar/.test(fs.readFileSync(path.join(root,'app/index.html'),'utf8')));
+  ok('Вкладка «Идеи» удалена из интерфейса', !/data-rail-tab="features"/.test(fs.readFileSync(path.join(root,'app/index.html'),'utf8')));
+  ok('Анимации + reduced-motion', /@keyframes rlFadeIn/.test(css) && /prefers-reduced-motion/.test(css));
+
   // 12. Live Server smoke
   const live = await (async () => {
     try {

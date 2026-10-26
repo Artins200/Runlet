@@ -74,7 +74,7 @@ export function initPreview() {
     const dx = Math.abs(e.offsetX - measureStart.x), dy = Math.abs(e.offsetY - measureStart.y);
     $('#guideV').style.left = Math.min(e.offsetX, measureStart.x) + 'px';
     $('#guideH').style.top = Math.min(e.offsetY, measureStart.y) + 'px';
-    $('#previewHint').textContent = `↔ ${dx}px  ↕ ${dy}px  (diag ${Math.round(Math.hypot(dx, dy))}px)`;
+    $('#previewHint').textContent = `Ш ${dx}px · В ${dy}px · диагональ ${Math.round(Math.hypot(dx, dy))}px`;
   });
   wrap?.addEventListener('mouseup', () => { measureStart = null; });
 
