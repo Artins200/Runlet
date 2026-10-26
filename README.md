@@ -1,76 +1,247 @@
-# Runlet
+# ⚡ Runlet Studio
 
-> Write code. Run it instantly. See the result.
+> Редактор **HTML / CSS / JS** на Electron с **Python-движком анализа кода**.
+> Пишешь код → видишь результат → понимаешь, что код делает и где в нём ошибки.
 
-**Runlet** is a browser-based HTML/CSS/JS editor and playground with live preview, console, virtual file system, CDN libraries, snippets, and AI assistance. Write code, see the result immediately, debug it, and share your project — no installation, no build step, no setup.
-
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
-[![Made with JavaScript](https://img.shields.io/badge/Made%20with-JavaScript-f7df1e.svg)](https://developer.mozilla.org/en-US/docs/Web/JavaScript)
-[![Status](https://img.shields.io/badge/status-alpha-orange.svg)]()
-
-
-## ✨ Why Runlet?
-
-Setting up a local dev environment for a quick experiment is overkill. Runlet removes the friction between "I want to try some code" and "I see the result in my browser."
-
-- **Zero setup.** Open the page and start coding.
-- **Instant feedback.** Live preview updates as you type.
-- **Everything in one window.** Editor, preview, console, files — no tab-switching.
-- **Built for learning and prototyping.** Great for beginners, teachers, students, and developers who need a fast scratchpad.
-- **Extensible.** Plugin system and API for custom workflows.
+Сделано по списку из **500 идей**: интерфейс с закруглёнными углами, три панели с вкладками,
+живой предпросмотр, консоль, виртуальная файловая система, генераторы, уроки, плагины —
+и, как основная «добивка», **панель анализа**: объяснение простым языком, что скорее всего
+будет делать ваш код, какие в нём ошибки, что сломается в рантайме и как это починить.
 
 ---
 
-## 🚀 Features
+## 🚀 Быстрый старт
 
-### Editor
-- Split panels for HTML, CSS, and JavaScript
-- Syntax highlighting and autocompletion for all three languages
-- Emmet support (`.container` → `<div class="container">`)
-- Auto-close brackets, quotes, and HTML tags
-- Multi-cursor editing, block selection, and line manipulation
-- Format on demand (HTML / CSS / JS / JSON)
-- Code folding, minimap, and breadcrumbs
-- Customizable font, size, tab width, and theme
+```bash
+npm install           # поставит Electron, CodeMirror 6, esbuild, fflate, jsdom
+npm start             # собрать рендерер + запустить десктопное приложение
+```
 
-### Live Preview
-- Real-time iframe preview with debounced auto-update
-- Manual "Run" button
-- CSS hot swap and JS hot reload
-- Device emulation (mobile, tablet, desktop)
-- Fullscreen and pop-out preview modes
-- Overlay grid, rulers, and guides
-- Click-to-inspect element, code ⇄ preview highlighting
-- Sandboxed iframe with configurable permissions
+Нужен **Python 3.8+** (только стандартная библиотека, ничего не надо доустанавливать) —
+это «мозг» анализа. Если Python недоступен, редактор автоматически переключится
+на встроенный JS-анализатор (в шапке появится бейдж `JS-анализ`).
 
-### Console & Debugging
-- Console with log levels, filtering, and search
-- `console.log`, `warn`, `error`, `table`, `group`, `time` support
-- Interactive REPL input with history and autocomplete
-- Error stack traces with source mapping
-- Network request inspector
-- Storage inspector (`localStorage`, `sessionStorage`, cookies)
+Веб-версия (для браузера / предпросмотра):
 
-### Virtual File System
-- Create, rename, move, and delete files and folders
-- Drag-and-drop upload from your computer
-- Asset support (images, fonts, audio, video)
-- Project export to ZIP or single HTML file
-- Import from ZIP, GitHub, or URL
-- Save to IndexedDB with version snapshots
+```bash
+npm run build && npm run web      # http://localhost:4173
+npm run dev                       # то же + пересборка
+```
 
-### Libraries & Build
-- One-click CDN import (Tailwind, Bootstrap, React, Vue, Three.js, D3, etc.)
-- ES module resolution via `import`
-- Optional in-browser transpilation (TypeScript, JSX, Sass, Less, Pug)
-- Minification on demand
-- Custom snippet library with placeholders
+Сборка дистрибутива:
 
-### Sharing & Collaboration
-- Generate shareable read-only links
-- Embed projects via iframe with URL parameters
-- Export to CodePen, JSFiddle, StackBlitz, GitHub Gist
-- Real-time collaborative editing (CRDT-based)
-- Comments on lines of code
+```bash
+npx electron-builder             # config уже лежит в package.json (build)
+```
 
+Тесты (19 проверок: синтаксис, Python-движок, esbuild, jsdom-запуск UI, 93 команды, iframe-мост):
+
+```bash
+npm test
+```
+
+---
+
+## 🧠 Анализ кода — главная фишка
+
+Кнопка **«Анализ кода»** (`Ctrl+Shift+A`) или вкладка **«Анализ»** справа.
+Развёрнутый отчёт — кнопка **«⛶ Развернуть»**.
+
+Движок получает **весь проект** (все HTML/CSS/JS/JSON файлы) и возвращает:
+
+* **Оценку 0–100** и 6 подоценок: корректность, доступность, SEO, перфоманс, безопасность, стиль.
+* **«Что делает этот код»** — заголовок, описание структуры и пошаговый сценарий:
+  «браузер загрузит …», «скрипт найдёт `#btn`», «при клике …», «будет запрос к API»,
+  «сохранится в localStorage», «а вот здесь, скорее всего, будет TypeError».
+* **Вероятные ошибки**: каждая с файлом, строкой, объяснением *почему*, советом и
+  кнопкой **«Исправить»** (автозамена в редакторе).
+* **Поведение**: события, сетевые запросы, таймеры, хранилище, DOM-изменения, цвета.
+* **Метрики**: теги, CSS-правила, функции, цикломатическая сложность, битые ссылки.
+* **Объяснение для новичка** + глоссарий (`querySelector`, `addEventListener`, `fetch`, `null` …).
+* Экспорт отчёта в **Markdown / JSON**, копирование, «исправить всё безопасное».
+
+### Что именно он умеет находить
+
+| Область | Примеры |
+| --- | --- |
+| HTML | незакрытые/перепутанные теги, дубли `id`, нет `alt` / `lang` / `viewport` / `title`, устаревшие теги, инлайн `on*`, `javascript:`, `target=_blank` без `noopener`, ARIA-роли, порядок заголовков, битые локальные ссылки |
+| CSS | незакрытые `{`, неизвестные свойства, число без единиц (`padding: 12`), `!important`, дубли селекторов/свойств, контраст текста и фона по WCAG, неиспользуемые селекторы, специфичность, `@import`, `transition: all`, современные цвета без fallback |
+| JavaScript | незакрытые скобки/строки, `await` вне `async`, присваивание в `if`, `i <= arr.length`, `==` вместо `===`, `var`, `eval`, `document.write`, `innerHTML` (XSS), `fetch`/`JSON.parse` без обработки ошибок, `while(true)`, `debugger`, необъявленные переменные, дубли `const`, сложные функции без JSDoc |
+| Кросс-файловое | **`querySelector('#missing')` сверяется с реальной разметкой** — движок заранее предупреждает о будущем `Cannot read properties of null`; скрипт в `<head>` без `defer`; локальные `import` / `@import` / `url()` / `fetch()` / `src` / `href` проверяются по виртуальной ФС |
+| Рантайм | перехват `console.*`, `window.onerror`, `unhandledrejection`, стек ошибок, трейс выполненных строк, сеть, `localStorage`, DOM-дерево, computed styles, LCP/CLS/FID |
+
+### Как устроен движок
+
+```
+Electron main / dev-server  ──spawn──▶  python3 analysis/engine.py --server
+        ▲                                     │
+        │ JSON-lines (stdin/stdout)           ├─ HTMLParser: дерево тегов, id, class, атрибуты
+        └─────────────────────────────────────┼─ свой CSS-парсер: правила, цвета, контраст, специфичность
+                                              ├─ свой JS-лексер: строки, шаблоны, regex, комментарии, скобки
+                                              ├─ инвентарь поведения: события, fetch, таймеры, storage, DOM
+                                              └─ генерация повествования, оценок и Markdown-отчёта
+```
+
+* Никаких зависимостей, сети и записи на диск — безопасно запускать из Electron.
+* Протокол: одна строка JSON на вход, одна строка JSON на выход (`--server`),
+  либо один документ через stdin/stdout (обычный режим).
+* Можно использовать отдельно от редактора:
+
+```bash
+node cli/runlet.mjs analyze . --md > report.md
+node cli/runlet.mjs analyze my-project --json
+python3 analysis/engine.py --selftest
+```
+
+**Почему Python, а не C#/C++:** для статического анализа нужны быстрый HTML-парсер,
+регулярки, работа с текстом и нулевые зависимости у пользователя. Стандартная библиотека
+Python даёт это из коробки (`html.parser`, `re`, `json`), движок запускается как лёгкий
+sidecar-процесс и не требует компиляции. Electron остаётся «лицом», Python — «мозгом».
+
+---
+
+## 🖥 Интерфейс
+
+```
+┌──────────────────────────────────────────────────────────────────────────────┐
+│ ⚡ Runlet  [имя проекта]  [поиск команд]                    🐍 Python-движок │
+├──────────────────────────────────────────────────────────────────────────────┤
+│ ▶Запустить  ⌘Формат  💾  ⬇  │ ▥ ☰ ▤ │ 🌓 🎨 ↕ ⚙ │ Тур Обучение ✦Ассистент 🧠Анализ│
+├───────────────┬───────────────────────────────────────┬─────────────────────┤
+│ Файлы/Поиск  │  HTML          │  CSS        │  JS     │  🖥 Предпросмотр   │
+│ Библиотеки   │  ┌──────────┐  │  ┌────────┐ │ ┌─────┐ │  iPhone / fit / ▦  │
+│ Ассеты       │  │ CodeMirror│  │  │        │ │ │     │ ├─────────────────────┤
+│ Плагины      │  │ + мини-   │  │  │        │ │ │     │ │ 🧠 Анализ | Консоль│
+│ Уроки        │  │   карта   │  │  │        │ │ │     │ │ Отладка | DOM | Сеть│
+│ 500 идей     │  └──────────┘  │  └────────┘ │ └─────┘ │ │ Хранилище | Перф  │
+├───────────────┴───────────────────────────────────────┴─────────────────────┤
+│ ◉ Python-движок · index.html · Стр 1, Стл 1 · HTML · Анализ: 98/100 · 12 КБ │
+└──────────────────────────────────────────────────────────────────────────────┘
+```
+
+Всё в «карточках» с радиусами 12–28 px, мягкими тенями, градиентным акцентом и
+**явно заметной** панелью анализа (кольцо оценки, вердикт, шаги, список ошибок).
+
+* **Темы:** тёмная / светлая / контрастная / авто (`prefers-color-scheme`), любой акцентный цвет.
+* **Раскладки:** 3 колонки, 3 строки, вкладки; разделители перетаскиваются; любая панель
+  сворачивается и разворачивается на весь экран.
+* **Редактор (CodeMirror 6):** подсветка HTML/CSS/JS/JSON/Markdown, автодополнение,
+  Emmet, сниппеты с плейсхолдерами, автозакрытие, мультикурсор, мини-карта, хлебные
+  крошки, цветовые свотчи с color picker, hover-документация со ссылками на MDN,
+  линтер (acorn + отчёт Python), форматирование/минификация/сортировка CSS.
+* **Предпросмотр:** `srcdoc` в `sandbox`-iframe, CSS hot swap, JS hot reload, сохранение
+  значений форм, устройства (iPhone/iPad/Android), зум fit/50/100%, сетка, линейки,
+  направляющие, пипетка, клик по элементу → переход к коду, эмуляция темы/движения/RTL.
+* **Консоль и отладка:** уровни, фильтры, regex-поиск, `console.table/time/group`,
+  REPL с историей, DOM-дерево, computed styles, event listeners, localStorage/cookies,
+  сеть, трассировочный отладчик (точки останова, step into/over/out, scope, watch).
+* **Файлы:** виртуальная ФС в памяти, дерево, drag-and-drop из ОС, ZIP туда-обратно,
+  импорт одиночного HTML (делится на 3 панели), IndexedDB + автосохранение, снапшоты с diff.
+* **Генераторы:** CSS-лаборатория (градиенты, тени, grid/flex, анимации, палитры, контраст),
+  HTML-генераторы (формы, hero, карточки, модалки, Schema.org, OG), JS-инструменты
+  (JSON, мок-данные, сниппеты observers/fetch/debounce), CDN-библиотеки, ассеты.
+* **Обучение:** 9 уроков с проверкой решения, квизы, рецепты, достижения,
+  визуализации event loop / async-await / CSS-каскада / DOM.
+* **Плагины:** свой API (`window.Runlet.pluginAPI`), 8 встроенных плагинов
+  (терминал, калькулятор, regex, единицы, заметки, помодоро, темы, диаграммы), установка по URL.
+* **Экосистема:** CLI, REST API (порт 7788), вебхуки, GitHub Actions / GitLab CI,
+  embed-код, ссылки-шаринга, PWA/Service Worker, экспорт статического сайта.
+
+---
+
+## ⌨ Горячие клавиши
+
+| Клавиши | Действие |
+| --- | --- |
+| `Ctrl+Enter` | запустить предпросмотр |
+| `Ctrl+Shift+A` | анализ кода |
+| `Ctrl+Shift+P` | палитра команд |
+| `Ctrl+S` / `Ctrl+Shift+S` | сохранить / скачать ZIP |
+| `Ctrl+Shift+F` | форматировать |
+| `Ctrl+Shift+K` | сниппеты |
+| `Ctrl+Shift+I` | ассистент |
+| `Ctrl+D` | мультикурсор |
+| `Ctrl+/` | комментировать |
+| `Ctrl+Shift+D` / `Alt+↑↓` | дублировать / двигать строку |
+| `Alt+1/2/3` | раскладки |
+| `F1` | горячие клавиши |
+
+Все биндинги меняются в **Настройки → Горячие клавиши** (клик по полю + сочетание).
+
+---
+
+## 📊 Карта 500 идей
+
+Вкладка **«Идеи»** слева показывает все 500 пунктов из вашего списка с цветовым статусом:
+🟢 **408 реализовано**, 🟡 **74 частично**, ⚪ **18 в планах** (в основном то, чему нужен сервер).
+
+> Что важно понимать про статусы: «реализовано» = у функции есть рабочий код в этом
+> репозитории, но часть сделана в **упрощённом виде**: генераторы — это готовые сниппеты,
+> отладчик — трассировочный (запись выполненных строк), а не полноценный V8-debugger,
+> «AI» — локальные эвристики и шаблоны без обращения к облачной LLM,
+> Sass/Pug/TS/JSX — минимальные встроенные компиляторы, а не полные реализации.
+
+Не реализовано (честно): настоящее CRDT-редактирование между разными компьютерами,
+Figma/Discord/Telegram-интеграции, публикация на поддомен/кастомный домен, аналитика
+просмотров с сервера, HTML по скриншоту, Lottie, Stylus, Svelte-компилятор,
+A/B-вариации, проверка инклюзивной лексики, полифиллы для старых браузеров.
+Частично: совместная работа через `BroadcastChannel` (работает между вкладками одного
+браузера), password-protected ссылки, watchpoint, «Lighthouse»-метрики.
+
+---
+
+## 📁 Структура
+
+```
+Runlet/
+├── electron/
+│   ├── main.cjs            # окно, меню, IPC, Python-sidecar, REST API :7788
+│   └── preload.cjs         # contextBridge (без nodeIntegration в рендерере)
+├── analysis/
+│   └── engine.py           # 🐍 движок анализа (stdlib only, JSON-lines)
+├── app/
+│   ├── index.html          # оболочка UI
+│   ├── dist/               # собранный bundle.js + styles.css (уже включены)
+│   └── src/
+│       ├── main.js         # загрузка, REST/PWA/коллаборация, window.Runlet API
+│       ├── styles.css      # темы, карточки, закругления, анимации
+│       ├── bridge.js       # код, который внедряется в iframe предпросмотра
+│       └── core/           # state, editor, preview, analyzer, panels, files,
+│                           # tools, assistant, extras, ui, commands, data
+├── cli/runlet.mjs          # analyze / build / new / snapshot / serve
+├── scripts/                # build (esbuild), serve (static + /api/analyze), тесты
+└── public/                 # manifest, service worker, иконка
+```
+
+---
+
+## 🔐 Изоляция предпросмотра
+
+* iframe с `sandbox` **без `allow-same-origin`** → у кода opaque origin: нет доступа к
+  `localStorage`/cookies родителя; вместо этого мост даёт изолированный in-memory shim.
+* `window.fetch`, XHR, `console.*`, `alert/confirm`, `window.onerror`,
+  `unhandledrejection` перехватываются мостом и попадают в панели редактора.
+* Опции: отключить JS, заблокировать внешние ресурсы через CSP, `alert → тост`,
+  лимит времени выполнения (предупреждение о долгих задачах).
+* ES-модули, `@import`, `url()`, `fetch()` локальных файлов разрешаются внутри виртуальной ФС.
+
+---
+
+## 🧪 Тесты
+
+`npm test` проверяет 19 вещей, включая:
+
+* компиляцию Python-движка и его selftest-отчёт (нахождение `JS060` — обращение к
+  несуществующему селектору);
+* esbuild-сборку и синтаксис всех 26 JS-файлов;
+* то, что все 500 идей на месте, а все кнопки `data-cmd` имеют зарегистрированные команды;
+* запуск всего UI в jsdom (3 редактора, дерево файлов, палитра, Python-отчёт);
+* выполнение 93 команд и диалогов подряд без исключений;
+* валидность всех `<script>` внутри собранного `srcdoc` (инструментация не ломает JS);
+* выполнение моста предпросмотра: `console.log`, REPL `eval`, DOM, storage, tracer.
+
+---
+
+## 📄 Лицензия
+
+Apache-2.0 (см. `LICENSE`).
