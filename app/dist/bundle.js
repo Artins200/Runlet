@@ -319,8 +319,10 @@
     for (const [sel, enText] of map) {
       const node = $(sel);
       if (!node) continue;
-      if (!node.dataset.ru) node.dataset.ru = node.textContent.trim();
-      node.textContent = en ? enText : node.dataset.ru;
+      const textNode = [...node.childNodes].find((n) => n.nodeType === 3 && n.textContent.trim());
+      if (!textNode) continue;
+      if (!node.dataset.ru) node.dataset.ru = textNode.textContent.trim();
+      textNode.textContent = en ? enText : node.dataset.ru;
     }
     document.documentElement.lang = state.settings.locale === "ar" ? "ar" : state.settings.locale;
   }
@@ -496,7 +498,8 @@
         // code into a third of the window.
         focusMode: true,
         focusSidebar: true,
-        focusPanel: false,
+        focusPanel: true,
+        nativeUI: true,
         fontSizeMin: 12,
         fontSizeMax: 28,
         // Customisable quick-action toolbar. Commands come from the registry;
@@ -48315,7 +48318,12 @@ ${get("form")}
             { class: "mini-select", title: "\u0412\u0435\u0440\u0441\u0438\u044F" },
             ...lib.versions.map((v) => el("option", { value: v, selected: typeof dep === "object" && dep.version === v ? "selected" : null, text: v }))
           ),
-          el("button", { class: "mini-btn " + (dep ? "active" : ""), text: dep ? "" : "+" })
+          el("button", {
+            class: "mini-btn icon-btn " + (dep ? "active" : ""),
+            html: icon(dep ? "check" : "plus", 13),
+            title: dep ? "\u041E\u0442\u043A\u043B\u044E\u0447\u0438\u0442\u044C \u0431\u0438\u0431\u043B\u0438\u043E\u0442\u0435\u043A\u0443" : "\u041F\u043E\u0434\u043A\u043B\u044E\u0447\u0438\u0442\u044C \u0431\u0438\u0431\u043B\u0438\u043E\u0442\u0435\u043A\u0443",
+            "aria-label": dep ? "\u041E\u0442\u043A\u043B\u044E\u0447\u0438\u0442\u044C \u0431\u0438\u0431\u043B\u0438\u043E\u0442\u0435\u043A\u0443" : "\u041F\u043E\u0434\u043A\u043B\u044E\u0447\u0438\u0442\u044C \u0431\u0438\u0431\u043B\u0438\u043E\u0442\u0435\u043A\u0443"
+          })
         );
         const sel = row.querySelector("select"), btn = row.querySelector("button");
         btn.classList.toggle("active", !!dep);
@@ -48355,7 +48363,7 @@ ${get("form")}
     const actions = el(
       "div",
       { class: "rowflex mb8" },
-      el("button", { class: "mini-btn", text: "\uFF0B placeholder", onclick: () => {
+      el("button", { class: "mini-btn", html: icon("image", 13) + "<span>Placeholder</span>", title: "\u0421\u043E\u0437\u0434\u0430\u0442\u044C \u043A\u0430\u0440\u0442\u0438\u043D\u043A\u0443-\u0437\u0430\u0433\u043B\u0443\u0448\u043A\u0443", onclick: () => {
         const url = placeholderImage(640, 360, randomAccent(), "Runlet placeholder");
         const p = `assets/placeholder-${Date.now().toString(36)}.png`;
         write(p, url);
@@ -48363,13 +48371,13 @@ ${get("form")}
         renderAssets();
         toast("Placeholder \u0441\u043E\u0437\u0434\u0430\u043D: " + p, "ok");
       } }),
-      el("button", { class: "mini-btn", text: "\uFF0B SVG", onclick: () => {
+      el("button", { class: "mini-btn", html: icon("plus", 13) + "<span>SVG</span>", title: "\u0414\u043E\u0431\u0430\u0432\u0438\u0442\u044C SVG-\u0438\u043A\u043E\u043D\u043A\u0443", onclick: () => {
         const p = `assets/icon-${Date.now().toString(36)}.svg`;
         write(p, SVG_ICONS.star.replace("currentColor", "#7c6cf6"));
         renderTree();
         renderAssets();
       } }),
-      el("button", { class: "mini-btn", text: "\uFF0B favicon", onclick: () => {
+      el("button", { class: "mini-btn", html: icon("plus", 13) + "<span>Favicon</span>", title: "\u0421\u043E\u0437\u0434\u0430\u0442\u044C \u0438 \u043F\u043E\u0434\u043A\u043B\u044E\u0447\u0438\u0442\u044C favicon", onclick: () => {
         const p = "favicon.png";
         write(p, faviconFrom(state.settings.accent));
         const html2 = read(state.entry).replace("</head>", `<link rel="icon" href="${p}">
@@ -48379,8 +48387,8 @@ ${get("form")}
         renderAssets();
         toast("Favicon \u0441\u043E\u0437\u0434\u0430\u043D \u0438 \u043F\u043E\u0434\u043A\u043B\u044E\u0447\u0451\u043D", "ok");
       } }),
-      el("button", { class: "mini-btn", text: "ZIP \u0430\u0441\u0441\u0435\u0442\u043E\u0432", onclick: () => exportZip({ assetsOnly: true }) }),
-      el("button", { class: "mini-btn", text: "\u041E\u0447\u0438\u0441\u0442\u0438\u0442\u044C \u043B\u0438\u0448\u043D\u0438\u0435", onclick: cleanupAssets })
+      el("button", { class: "mini-btn", html: icon("archive", 13) + "<span>ZIP \u0430\u0441\u0441\u0435\u0442\u043E\u0432</span>", title: "\u0421\u043A\u0430\u0447\u0430\u0442\u044C \u0430\u0441\u0441\u0435\u0442\u044B ZIP", onclick: () => exportZip({ assetsOnly: true }) }),
+      el("button", { class: "mini-btn", html: icon("trash", 13) + "<span>\u041E\u0447\u0438\u0441\u0442\u0438\u0442\u044C \u043B\u0438\u0448\u043D\u0438\u0435</span>", title: "\u0423\u0434\u0430\u043B\u0438\u0442\u044C \u043D\u0435\u0438\u0441\u043F\u043E\u043B\u044C\u0437\u0443\u0435\u043C\u044B\u0435 \u0430\u0441\u0441\u0435\u0442\u044B", onclick: cleanupAssets })
     );
     host2.appendChild(actions);
     if (!assets.length) host2.appendChild(el("div", { class: "empty-note", text: "\u0410\u0441\u0441\u0435\u0442\u043E\u0432 \u043F\u043E\u043A\u0430 \u043D\u0435\u0442. \u041F\u0435\u0440\u0435\u0442\u0430\u0449\u0438\u0442\u0435 \u0444\u0430\u0439\u043B\u044B \u0432 \u043E\u043A\u043D\u043E \u0440\u0435\u0434\u0430\u043A\u0442\u043E\u0440\u0430." }));
@@ -48395,8 +48403,14 @@ ${get("form")}
       const row = el(
         "div",
         { class: "rowflex mt8" },
-        el("button", { class: "mini-btn", text: "\u0412\u0441\u0442\u0430\u0432\u0438\u0442\u044C", onclick: () => insertAsset(p) }),
-        el("button", { class: "mini-btn", text: "\u22EE", onclick: (ev) => contextMenu(ev, p, false) })
+        el("button", { class: "mini-btn", html: icon("code", 13) + "<span>\u0412\u0441\u0442\u0430\u0432\u0438\u0442\u044C</span>", title: "\u0412\u0441\u0442\u0430\u0432\u0438\u0442\u044C \u0441\u0441\u044B\u043B\u043A\u0443 \u043D\u0430 \u0430\u0441\u0441\u0435\u0442", onclick: () => insertAsset(p) }),
+        el("button", {
+          class: "mini-btn icon-btn",
+          html: icon("more", 13),
+          title: "\u0414\u0435\u0439\u0441\u0442\u0432\u0438\u044F \u0441 \u0444\u0430\u0439\u043B\u043E\u043C",
+          "aria-label": "\u0414\u0435\u0439\u0441\u0442\u0432\u0438\u044F \u0441 \u0444\u0430\u0439\u043B\u043E\u043C",
+          onclick: (ev) => contextMenu(ev, p, false)
+        })
       );
       tile.appendChild(row);
       grid.appendChild(tile);
@@ -48498,11 +48512,11 @@ ${get("form")}
     <div class="grow"><b>${esc(s.label)}</b><small>${new Date(s.at).toLocaleString("ru-RU")} \xB7 ${Object.keys(s.files).length} \u0444\u0430\u0439\u043B\u043E\u0432</small></div>
     <button class="mini-btn" data-restore="${s.id}">\u0412\u043E\u0441\u0441\u0442\u0430\u043D\u043E\u0432\u0438\u0442\u044C</button>
     <button class="mini-btn" data-diff="${s.id}">Diff</button>
-    <button class="mini-btn" data-del="${s.id}"></button></div>`).join("");
+    <button class="mini-btn icon-btn" data-del="${s.id}" title="\u0423\u0434\u0430\u043B\u0438\u0442\u044C \u0432\u0435\u0440\u0441\u0438\u044E" aria-label="\u0423\u0434\u0430\u043B\u0438\u0442\u044C \u0432\u0435\u0440\u0441\u0438\u044E">${icon("trash", 13)}</button></div>`).join("");
     ctx.modal({
       title: "\u0418\u0441\u0442\u043E\u0440\u0438\u044F \u0432\u0435\u0440\u0441\u0438\u0439",
       wide: true,
-      body: `<div class="rowflex mb8"><button class="mini-btn" id="makeSnap">\uFF0B \u0421\u043E\u0437\u0434\u0430\u0442\u044C \u0441\u043D\u0430\u043F\u0448\u043E\u0442</button>
+      body: `<div class="rowflex mb8"><button class="mini-btn" id="makeSnap">${icon("plus", 13)} \u0421\u043E\u0437\u0434\u0430\u0442\u044C \u0441\u043D\u0430\u043F\u0448\u043E\u0442</button>
       <span class="muted" style="font-size:11px">\u0425\u0440\u0430\u043D\u0438\u0442\u0441\u044F \u0434\u043E 25 \u043F\u043E\u0441\u043B\u0435\u0434\u043D\u0438\u0445 \u0432\u0435\u0440\u0441\u0438\u0439</span></div><div class="list-rows">${rows || '<div class="empty-note">\u0421\u043D\u0430\u043F\u0448\u043E\u0442\u043E\u0432 \u043F\u043E\u043A\u0430 \u043D\u0435\u0442</div>'}</div>
       <div id="diffBox" class="mt8"></div>`,
       okText: "\u0417\u0430\u043A\u0440\u044B\u0442\u044C",
@@ -49235,7 +49249,7 @@ ${summary.steps.map((s) => "- " + s.text).join("\n")}
       <select id="logLevel" class="mini-select"><option value="all">\u0432\u0441\u0435</option><option value="log">log</option><option value="info">info</option><option value="warn">warn</option><option value="error">error</option></select>
       <input id="logSearch" placeholder="\u041F\u043E\u0438\u0441\u043A / regex\u2026" style="flex:1;min-width:70px;height:25px;border-radius:8px;border:1px solid var(--border);background:var(--code-bg);padding:0 8px;font-size:11px">
       <label class="chk"><input type="checkbox" id="logGroup" ${state.consoleGroup ? "checked" : ""}> \u0433\u0440\u0443\u043F\u043F\u0438\u0440\u043E\u0432\u0430\u0442\u044C</label>
-      <button class="mini-btn" id="logClear">\u041E\u0447\u0438\u0441\u0442\u0438\u0442\u044C</button><button class="mini-btn" id="logSave"></button>
+      <button class="mini-btn" id="logClear">${icon("trash", 13)} \u041E\u0447\u0438\u0441\u0442\u0438\u0442\u044C</button><button class="mini-btn icon-btn" id="logSave" title="\u0421\u043E\u0445\u0440\u0430\u043D\u0438\u0442\u044C \u0436\u0443\u0440\u043D\u0430\u043B" aria-label="\u0421\u043E\u0445\u0440\u0430\u043D\u0438\u0442\u044C \u0436\u0443\u0440\u043D\u0430\u043B">${icon("download", 13)}</button>
       <button class="mini-btn" id="logJson">JSON</button></div>
       <div class="console-list" id="logList" style="flex:1;overflow:auto"></div>
       <div class="repl-bar"><span class="repl-prompt">\u203A</span><input id="replInput" placeholder="\u0412\u0432\u0435\u0434\u0438\u0442\u0435 JS-\u0432\u044B\u0440\u0430\u0436\u0435\u043D\u0438\u0435 (Enter \u2014 \u0432\u044B\u043F\u043E\u043B\u043D\u0438\u0442\u044C)" autocomplete="off">
@@ -49334,17 +49348,17 @@ ${summary.steps.map((s) => "- " + s.text).join("\n")}
       <button class="mini-btn" id="dbgStepOver">${icon("arrowRight", 13)} Step over</button>
       <button class="mini-btn" id="dbgStepOut">${icon("arrowUp", 13)} Step out</button>
       <button class="mini-btn" id="dbgResume">${icon("play", 13)} Resume</button>
-      <button class="mini-btn" id="dbgAddBp">\uFF0B \u0422\u043E\u0447\u043A\u0430</button></div>
+      <button class="mini-btn" id="dbgAddBp">${icon("plus", 13)} \u0422\u043E\u0447\u043A\u0430</button></div>
     <div class="section"><h3>\u0422\u043E\u0447\u043A\u0438 \u043E\u0441\u0442\u0430\u043D\u043E\u0432\u0430 <span class="count">${bps.length}</span></h3>
       <div class="debug-steps">${bps.length ? bps.map((b) => `<div class="kv"><span>${esc(b.file)}:${b.line}</span>
         <span>${b.condition ? " " + esc(b.condition) : "\u043E\u0431\u044B\u0447\u043D\u0430\u044F"}</span>
-        <button class="mini-btn" data-bpdel="${esc(b.file)}:${b.line}"></button></div>`).join("") : '<div class="empty-note">\u041A\u043B\u0438\u043A \xAB\uFF0B \u0422\u043E\u0447\u043A\u0430\xBB \u0438 \u0443\u043A\u0430\u0436\u0438\u0442\u0435 \u0441\u0442\u0440\u043E\u043A\u0443</div>'}</div></div>
+        <button class="mini-btn icon-btn" data-bpdel="${esc(b.file)}:${b.line}" title="\u0423\u0434\u0430\u043B\u0438\u0442\u044C \u0442\u043E\u0447\u043A\u0443 \u043E\u0441\u0442\u0430\u043D\u043E\u0432\u0430" aria-label="\u0423\u0434\u0430\u043B\u0438\u0442\u044C \u0442\u043E\u0447\u043A\u0443 \u043E\u0441\u0442\u0430\u043D\u043E\u0432\u0430">${icon("trash", 13)}</button></div>`).join("") : '<div class="empty-note">\u041A\u043B\u0438\u043A \xAB\u0422\u043E\u0447\u043A\u0430\xBB \u0438 \u0443\u043A\u0430\u0436\u0438\u0442\u0435 \u0441\u0442\u0440\u043E\u043A\u0443</div>'}</div></div>
     <div class="section"><h3>\u0412\u044B\u043F\u043E\u043B\u043D\u0435\u043D\u043D\u044B\u0435 \u0441\u0442\u0440\u043E\u043A\u0438 <span class="count">${trace.length}</span></h3>
       <div class="debug-steps" id="timeline" style="max-height:150px;overflow:auto">${trace.slice(-120).map((t2, i4) => `<div class="timeline-row ${i4 === state.traceIndex ? "active" : ""}" data-ti="${i4}">
         <span>${t2.t}ms</span><b>${esc(t2.file)}:${t2.line}</b><span>${esc(Object.keys(t2.vars || {}).slice(0, 5).join(", "))}</span></div>`).join("") || '<div class="empty-note">\u0417\u0430\u043F\u0443\u0441\u0442\u0438\u0442\u0435 \u043A\u043E\u0434 \u2014 \u0442\u0440\u0430\u0441\u0441\u0438\u0440\u043E\u0432\u0449\u0438\u043A \u0437\u0430\u043F\u0438\u0448\u0435\u0442 executed lines</div>'}</div></div>
     <div class="section"><h3>Scope / Watch</h3>
       <div class="debug-steps" id="scopeBox">${scopeHtml()}</div>
-      <div class="rowflex" style="padding:0 10px 10px"><input id="watchInput" placeholder="watch: \u0432\u044B\u0440\u0430\u0436\u0435\u043D\u0438\u0435" style="flex:1;height:26px;border-radius:8px;border:1px solid var(--border);background:var(--code-bg);padding:0 8px;font-size:11px"><button class="mini-btn" id="watchAdd">\uFF0B</button></div></div>
+      <div class="rowflex" style="padding:0 10px 10px"><input id="watchInput" placeholder="watch: \u0432\u044B\u0440\u0430\u0436\u0435\u043D\u0438\u0435" style="flex:1;height:26px;border-radius:8px;border:1px solid var(--border);background:var(--code-bg);padding:0 8px;font-size:11px"><button class="mini-btn icon-btn" id="watchAdd" title="\u0414\u043E\u0431\u0430\u0432\u0438\u0442\u044C watch-\u0432\u044B\u0440\u0430\u0436\u0435\u043D\u0438\u0435" aria-label="\u0414\u043E\u0431\u0430\u0432\u0438\u0442\u044C watch-\u0432\u044B\u0440\u0430\u0436\u0435\u043D\u0438\u0435">${icon("plus", 13)}</button></div></div>
     <div class="section"><h3>Call stack</h3><div class="stack-list">${stackHtml()}</div></div>`;
     host2.querySelector("#dbgRefresh").onclick = () => {
       send("getTrace", {});
@@ -49564,7 +49578,7 @@ ${summary.steps.map((s) => "- " + s.text).join("\n")}
     const host2 = $("#learnPanel");
     if (!host2) return;
     const done = Object.keys(state.progress).filter((k) => state.progress[k]).length;
-    host2.innerHTML = `<div class="rowflex mb8"><span class="pill pill-accent"> ${done}/${LESSONS.length} \u0443\u0440\u043E\u043A\u043E\u0432</span>
+    host2.innerHTML = `<div class="rowflex mb8"><span class="pill pill-accent">${icon("book", 12)} ${done}/${LESSONS.length} \u0443\u0440\u043E\u043A\u043E\u0432</span>
     <div class="progress" style="flex:1"><i style="width:${Math.round(done / LESSONS.length * 100)}%"></i></div></div>
     <div class="tabs-line" id="learnTabs"><button class="active" data-lt="lessons">\u0423\u0440\u043E\u043A\u0438</button>
       <button data-lt="quiz">\u041A\u0432\u0438\u0437\u044B</button><button data-lt="recipes">\u0420\u0435\u0446\u0435\u043F\u0442\u044B</button>
@@ -49591,10 +49605,10 @@ ${summary.steps.map((s) => "- " + s.text).join("\n")}
           el(
             "div",
             { class: "grow" },
-            el("b", { text: (done ? " " : " ") + l.title }),
+            el("b", { html: icon(done ? "check" : "book", 13) + " " + esc(l.title) }),
             el("small", { text: l.lang + " \xB7 " + l.task.slice(0, 60) + "\u2026" })
           ),
-          el("button", { class: "mini-btn", text: done ? "\u041F\u043E\u0432\u0442\u043E\u0440\u0438\u0442\u044C" : "\u041D\u0430\u0447\u0430\u0442\u044C" })
+          el("button", { class: "mini-btn", html: icon(done ? "refresh" : "play", 12) + "<span>" + (done ? "\u041F\u043E\u0432\u0442\u043E\u0440\u0438\u0442\u044C" : "\u041D\u0430\u0447\u0430\u0442\u044C") + "</span>" })
         );
         row.querySelector("button").onclick = () => openLesson(l);
         list2.appendChild(row);
@@ -49609,7 +49623,7 @@ ${summary.steps.map((s) => "- " + s.text).join("\n")}
         group.forEach((x2) => x2.classList.remove("correct", "wrong"));
         b.classList.add(oi === q.a ? "correct" : "wrong");
         group[q.a].classList.add("correct");
-        box.querySelector("#qr" + qi).innerHTML = `<div class="beginner mt8">${oi === q.a ? " \u0412\u0435\u0440\u043D\u043E! " : " \u041D\u0435 \u0441\u043E\u0432\u0441\u0435\u043C. "}${esc(q.why)}</div>`;
+        box.querySelector("#qr" + qi).innerHTML = `<div class="beginner mt8">${icon(oi === q.a ? "check" : "close", 13)} ${oi === q.a ? "\u0412\u0435\u0440\u043D\u043E!" : "\u041D\u0435 \u0441\u043E\u0432\u0441\u0435\u043C."} ${esc(q.why)}</div>`;
         if (oi === q.a) {
           state.progress["quiz" + qi] = true;
           toast("\u0414\u043E\u0441\u0442\u0438\u0436\u0435\u043D\u0438\u0435: \u0432\u0435\u0440\u043D\u044B\u0439 \u043E\u0442\u0432\u0435\u0442", "ok");
@@ -49622,9 +49636,9 @@ ${summary.steps.map((s) => "- " + s.text).join("\n")}
         const row = el(
           "div",
           { class: "list-row", style: { flexDirection: "column", alignItems: "stretch" } },
-          el("b", { text: " " + r.t }),
+          el("b", { html: icon("wand", 13) + " " + esc(r.t) }),
           el("code", { class: "inline", text: r.a, style: { marginTop: "6px", whiteSpace: "pre-wrap" } }),
-          el("button", { class: "mini-btn mt8", text: "\u0412\u0441\u0442\u0430\u0432\u0438\u0442\u044C", style: { alignSelf: "flex-start" } })
+          el("button", { class: "mini-btn mt8", html: icon("code", 12) + "<span>\u0412\u0441\u0442\u0430\u0432\u0438\u0442\u044C</span>", style: { alignSelf: "flex-start" } })
         );
         row.querySelector("button").onclick = () => {
           insertText(r.a, /\{|:|;/.test(r.a) && !/\(\)/.test(r.a) ? "css" : "js");
@@ -49782,8 +49796,8 @@ ${summary.steps.map((s) => "- " + s.text).join("\n")}
   function renderPlugins() {
     const host2 = $("#pluginsPanel");
     if (!host2) return;
-    host2.innerHTML = `<div class="rowflex mb8"><span class="pill pill-accent"> ${state.plugins.length} \u0430\u043A\u0442\u0438\u0432\u043D\u043E</span>
-    <button class="mini-btn" id="plugUrl">\u041F\u043E \u0441\u0441\u044B\u043B\u043A\u0435</button></div><div class="list-rows" id="plugList"></div>
+    host2.innerHTML = `<div class="rowflex mb8"><span class="pill pill-accent">${icon("puzzle", 12)} ${state.plugins.length} \u0430\u043A\u0442\u0438\u0432\u043D\u043E</span>
+    <button class="mini-btn" id="plugUrl">${icon("link", 12)} \u041F\u043E \u0441\u0441\u044B\u043B\u043A\u0435</button></div><div class="list-rows" id="plugList"></div>
     <div class="beginner mt8"><b>API \u0434\u043B\u044F \u043F\u043B\u0430\u0433\u0438\u043D\u043E\u0432:</b> window.Runlet.pluginAPI \u2014 state, toast, emit, on, insertText, setDoc, getDoc, analyze(). \u041F\u043B\u0430\u0433\u0438\u043D\u044B \u0437\u0430\u043F\u0443\u0441\u043A\u0430\u044E\u0442\u0441\u044F \u0432 \u043F\u0435\u0441\u043E\u0447\u043D\u0438\u0446\u0435 \u0431\u0435\u0437 \u0434\u043E\u0441\u0442\u0443\u043F\u0430 \u043A \u0444\u0430\u0439\u043B\u0430\u043C \u041E\u0421.</div>`;
     const list2 = host2.querySelector("#plugList");
     for (const p of PLUGIN_CATALOG) {
@@ -50299,6 +50313,103 @@ ${p.map((x2, i4) => `  --brand-${i4 + 1}: ${x2};`).join("\n")}
         ] }
       ]
     },
+    edit: {
+      title: "\u041F\u0440\u0430\u0432\u043A\u0430",
+      icon: "edit",
+      sections: [
+        { label: "\u041A\u043E\u0434", items: [
+          ["format", "\u0424\u043E\u0440\u043C\u0430\u0442\u0438\u0440\u043E\u0432\u0430\u0442\u044C"],
+          ["toggleComment", "\u0417\u0430\u043A\u043E\u043C\u043C\u0435\u043D\u0442\u0438\u0440\u043E\u0432\u0430\u0442\u044C"],
+          ["emmet", "\u0420\u0430\u0437\u0432\u0435\u0440\u043D\u0443\u0442\u044C Emmet"],
+          ["snippets", "\u0412\u0441\u0442\u0430\u0432\u0438\u0442\u044C \u0441\u043D\u0438\u043F\u043F\u0435\u0442"],
+          ["foldAll", "\u0421\u0432\u0435\u0440\u043D\u0443\u0442\u044C/\u0440\u0430\u0437\u0432\u0435\u0440\u043D\u0443\u0442\u044C \u043A\u043E\u0434"],
+          ["unfoldAll", "\u0420\u0430\u0437\u0432\u0435\u0440\u043D\u0443\u0442\u044C \u0432\u0435\u0441\u044C \u043A\u043E\u0434"],
+          ["gotoLine", "\u041F\u0435\u0440\u0435\u0439\u0442\u0438 \u043A \u0441\u0442\u0440\u043E\u043A\u0435"]
+        ] },
+        { label: "\u041F\u043E\u0438\u0441\u043A", items: [
+          ["findInProject", "\u041D\u0430\u0439\u0442\u0438 \u0432 \u043F\u0440\u043E\u0435\u043A\u0442\u0435"],
+          ["replaceAll", "\u0417\u0430\u043C\u0435\u043D\u0438\u0442\u044C \u0432\u0441\u0451"]
+        ] }
+      ]
+    },
+    view: {
+      title: "\u0412\u0438\u0434",
+      icon: "columns",
+      sections: [
+        { label: "\u0420\u0430\u0431\u043E\u0447\u0435\u0435 \u043F\u0440\u043E\u0441\u0442\u0440\u0430\u043D\u0441\u0442\u0432\u043E", items: [
+          ["focusMode", "\u0420\u0435\u0436\u0438\u043C \u0440\u0435\u0434\u0430\u043A\u0442\u043E\u0440\u0430 / \u043A\u043B\u0430\u0441\u0441\u0438\u0447\u0435\u0441\u043A\u0438\u0439 \u0432\u0438\u0434"],
+          ["previewSplit", "\u041F\u043E\u043A\u0430\u0437\u0430\u0442\u044C \u0441\u0430\u0439\u0442 \u0440\u044F\u0434\u043E\u043C \u0441 \u043A\u043E\u0434\u043E\u043C"],
+          ["toggleFocusPanel", "\u0421\u043A\u0440\u044B\u0442\u044C/\u043F\u043E\u043A\u0430\u0437\u0430\u0442\u044C \u0441\u0430\u0439\u0442"],
+          ["toggleSidebar", "\u041F\u043E\u043A\u0430\u0437\u0430\u0442\u044C/\u0441\u043A\u0440\u044B\u0442\u044C \u043F\u0440\u043E\u0432\u043E\u0434\u043D\u0438\u043A"],
+          ["restorePanes", "\u0420\u0430\u0437\u0432\u0435\u0440\u043D\u0443\u0442\u044C \u0432\u0441\u0435 \u043F\u0430\u043D\u0435\u043B\u0438"],
+          ["nativeUI", "\u041D\u0430\u0442\u0438\u0432\u043D\u044B\u0439 \u0432\u0438\u0434 \u0438\u043D\u0442\u0435\u0440\u0444\u0435\u0439\u0441\u0430"]
+        ] },
+        { label: "\u0420\u0430\u0441\u043A\u043B\u0430\u0434\u043A\u0430", items: [
+          ["layoutColumns", "\u0422\u0440\u0438 \u043A\u043E\u043B\u043E\u043D\u043A\u0438"],
+          ["layoutRows", "\u0422\u0440\u0438 \u0441\u0442\u0440\u043E\u043A\u0438"],
+          ["layoutTabs", "\u0412\u043A\u043B\u0430\u0434\u043A\u0438"]
+        ] },
+        { label: "\u041E\u0444\u043E\u0440\u043C\u043B\u0435\u043D\u0438\u0435", items: [
+          ["theme", "\u0421\u043C\u0435\u043D\u0438\u0442\u044C \u0442\u0435\u043C\u0443"],
+          ["density", "\u041F\u043B\u043E\u0442\u043D\u043E\u0441\u0442\u044C"],
+          ["fontZoomIn", "\u041A\u0440\u0443\u043F\u043D\u0435\u0435"],
+          ["fontZoomOut", "\u041C\u0435\u043B\u044C\u0447\u0435"],
+          ["toggleWrap", "\u041F\u0435\u0440\u0435\u043D\u043E\u0441 \u0441\u0442\u0440\u043E\u043A"]
+        ] }
+      ]
+    },
+    run: {
+      title: "\u0417\u0430\u043F\u0443\u0441\u043A",
+      icon: "play",
+      sections: [
+        { label: "\u0421\u0430\u0439\u0442", items: [
+          ["run", "\u0417\u0430\u043F\u0443\u0441\u0442\u0438\u0442\u044C / \u043E\u0431\u043D\u043E\u0432\u0438\u0442\u044C \u0441\u0442\u0440\u0430\u043D\u0438\u0446\u0443"],
+          ["previewSplit", "\u041F\u043E\u043A\u0430\u0437\u0430\u0442\u044C \u0441\u0430\u0439\u0442"],
+          ["openSite", "\u0421\u0430\u0439\u0442 \u0432 \u043E\u043A\u043D\u0435"],
+          ["openSiteExternal", "\u041E\u0442\u043A\u0440\u044B\u0442\u044C \u0432 \u0431\u0440\u0430\u0443\u0437\u0435\u0440\u0435"],
+          ["liveServer", "Live Server"],
+          ["previewFullscreen", "\u041F\u0440\u0435\u0434\u043F\u0440\u043E\u0441\u043C\u043E\u0442\u0440 \u043D\u0430 \u0432\u0435\u0441\u044C \u044D\u043A\u0440\u0430\u043D"]
+        ] },
+        { label: "\u041F\u0440\u043E\u0432\u0435\u0440\u043A\u0430", items: [
+          ["analyze", "\u0410\u043D\u0430\u043B\u0438\u0437 \u043A\u043E\u0434\u0430"],
+          ["analysisReport", "\u041F\u043E\u043B\u043D\u044B\u0439 \u043E\u0442\u0447\u0451\u0442"],
+          ["securityScan", "\u041F\u0440\u043E\u0432\u0435\u0440\u043A\u0430 \u0431\u0435\u0437\u043E\u043F\u0430\u0441\u043D\u043E\u0441\u0442\u0438"],
+          ["fixAll", "\u0418\u0441\u043F\u0440\u0430\u0432\u0438\u0442\u044C \u043E\u0448\u0438\u0431\u043A\u0438"]
+        ] }
+      ]
+    },
+    tools: {
+      title: "\u0418\u043D\u0441\u0442\u0440\u0443\u043C\u0435\u043D\u0442\u044B",
+      icon: "puzzle",
+      sections: [
+        { label: "\u0413\u0435\u043D\u0435\u0440\u0430\u0442\u043E\u0440\u044B", items: [
+          ["cssLab", "CSS-\u043B\u0430\u0431\u043E\u0440\u0430\u0442\u043E\u0440\u0438\u044F"],
+          ["jsTools", "JS-\u0438\u043D\u0441\u0442\u0440\u0443\u043C\u0435\u043D\u0442\u044B"],
+          ["htmlTools", "HTML-\u0433\u0435\u043D\u0435\u0440\u0430\u0442\u043E\u0440\u044B"],
+          ["openThreeD", "3D-\u0440\u0435\u0434\u0430\u043A\u0442\u043E\u0440"],
+          ["librarySearch", "\u0411\u0438\u0431\u043B\u0438\u043E\u0442\u0435\u043A\u0438 CDN"],
+          ["contrastCheck", "\u041F\u0440\u043E\u0432\u0435\u0440\u0438\u0442\u044C \u043A\u043E\u043D\u0442\u0440\u0430\u0441\u0442"]
+        ] },
+        { label: "\u0420\u0430\u0441\u0448\u0438\u0440\u0435\u043D\u0438\u044F", items: [
+          ["plugins", "\u041F\u043B\u0430\u0433\u0438\u043D\u044B"],
+          ["learn", "\u0423\u0440\u043E\u043A\u0438"],
+          ["settings", "\u041D\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0438"],
+          ["shortcuts", "\u0413\u043E\u0440\u044F\u0447\u0438\u0435 \u043A\u043B\u0430\u0432\u0438\u0448\u0438"]
+        ] }
+      ]
+    },
+    help: {
+      title: "\u0421\u043F\u0440\u0430\u0432\u043A\u0430",
+      icon: "help",
+      sections: [
+        { label: "\u041F\u043E\u043C\u043E\u0449\u044C", items: [
+          ["helpWelcome", "\u041A\u0430\u043A \u0440\u0430\u0431\u043E\u0442\u0430\u0442\u044C"],
+          ["tour", "\u0411\u044B\u0441\u0442\u0440\u044B\u0439 \u0442\u0443\u0440"],
+          ["shortcuts", "\u0413\u043E\u0440\u044F\u0447\u0438\u0435 \u043A\u043B\u0430\u0432\u0438\u0448\u0438"],
+          ["settings", "\u041E \u043F\u0440\u043E\u0433\u0440\u0430\u043C\u043C\u0435 \u0438 \u043D\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0438"]
+        ] }
+      ]
+    },
     more: {
       title: "\u0415\u0449\u0451",
       icon: "more",
@@ -50502,6 +50613,15 @@ ${p.map((x2, i4) => `  --brand-${i4 + 1}: ${x2};`).join("\n")}
       const min = $(".taskbar-hint");
       if (min) min.textContent = body.classList.contains("app-min") ? "\u041E\u043A\u043D\u043E \u0441\u0432\u0451\u0440\u043D\u0443\u0442\u043E" : "\u0420\u0430\u0431\u043E\u0447\u0438\u0439 \u0441\u0442\u043E\u043B";
     });
+    applyNativeUI();
+    on("settings:changed", applyNativeUI);
+    on("project:rename", applyNativeUI);
+    on("project:loaded", applyNativeUI);
+  }
+  function applyNativeUI() {
+    document.body.classList.toggle("native-ui", state.settings.nativeUI !== false);
+    const title = $("#menuBarProject");
+    if (title) title.textContent = state.projectName || "\u041F\u0440\u043E\u0435\u043A\u0442";
   }
   function setAppWindowed(v) {
     state.settings.appWindowed = !!v;
@@ -51454,7 +51574,7 @@ frame();
         const startX = e.clientX, startY = e.clientY;
         const ws = $("#workspace");
         const railW = parseFloat(getComputedStyle(ws).getPropertyValue("--rail-w")) || 236;
-        const dockW = parseFloat(getComputedStyle(ws).getPropertyValue("--dock-w")) || 440;
+        const dockW = parseFloat(getComputedStyle(ws).getPropertyValue("--dock-w")) || $("#dock")?.getBoundingClientRect().width || 440;
         const preview = $("#previewCard");
         const startPreviewH = preview.getBoundingClientRect().height;
         const totalH = $("#dock").getBoundingClientRect().height;
@@ -51645,6 +51765,20 @@ frame();
     persistFocus();
     return state.settings.focusPanel;
   }
+  function revealPreview() {
+    if (focusOn() && state.settings.focusPanel !== true) {
+      state.settings.focusPanel = true;
+      persistFocus();
+    }
+    ctx.applyDevice?.();
+    setTimeout(() => ctx.applyDevice?.(), 140);
+    return true;
+  }
+  function revealInspector(tab) {
+    revealPreview();
+    if (tab) selectInspTab(tab);
+    return true;
+  }
   function initFocusMode() {
     state.collapsed = { html: false, css: false, js: false };
     for (const p of FOCUS_PANES) {
@@ -51750,7 +51884,13 @@ frame();
         "div",
         { class: "modal-head" },
         el("h2", { text: title }),
-        el("button", { class: "close", text: "\xD7", onclick: () => closeModal() })
+        el("button", {
+          class: "close",
+          html: icon("close", 16),
+          title: "\u0417\u0430\u043A\u0440\u044B\u0442\u044C",
+          "aria-label": "\u0417\u0430\u043A\u0440\u044B\u0442\u044C",
+          onclick: () => closeModal()
+        })
       ),
       el("div", { class: "modal-body", html: body }),
       el(
@@ -51943,8 +52083,10 @@ frame();
         <button class="mini-btn" id="tbAddSecondaryBtn">\u0414\u043E\u0431\u0430\u0432\u0438\u0442\u044C</button>
         <button class="mini-btn" id="tbReset">\u0421\u0431\u0440\u043E\u0441\u0438\u0442\u044C \u043D\u0430\u0431\u043E\u0440</button></div>`,
       windows: `<div class="list-rows">
-        <div class="list-row"><div class="grow"><b>\u0420\u0435\u0436\u0438\u043C \u0440\u0435\u0434\u0430\u043A\u0442\u043E\u0440\u0430 (\u043A\u0430\u043A VS Code)</b><small>\u041E\u0442\u043A\u0440\u044B\u0442\u044B\u0439 \u0444\u0430\u0439\u043B \u0437\u0430\u043D\u0438\u043C\u0430\u0435\u0442 \u0432\u0435\u0441\u044C \u044D\u043A\u0440\u0430\u043D: \u0432\u043A\u043B\u0430\u0434\u043A\u0438, \u043F\u0440\u043E\u0432\u043E\u0434\u043D\u0438\u043A \u0438 \u043F\u0430\u043D\u0435\u043B\u044C \u043F\u0440\u0435\u0434\u043F\u0440\u043E\u0441\u043C\u043E\u0442\u0440\u0430 \u043F\u043E \u0437\u0430\u043F\u0440\u043E\u0441\u0443. F11 \u2014 \u043F\u0435\u0440\u0435\u043A\u043B\u044E\u0447\u0438\u0442\u044C, Ctrl+B \u2014 \u043F\u0440\u043E\u0432\u043E\u0434\u043D\u0438\u043A, Ctrl+J \u2014 \u043F\u0440\u0435\u0434\u043F\u0440\u043E\u0441\u043C\u043E\u0442\u0440</small></div>
+        <div class="list-row"><div class="grow"><b>\u0420\u0435\u0436\u0438\u043C \u0440\u0435\u0434\u0430\u043A\u0442\u043E\u0440\u0430 (\u043A\u0430\u043A VS Code)</b><small>\u041E\u0442\u043A\u0440\u044B\u0442\u044B\u0439 \u0444\u0430\u0439\u043B \u0437\u0430\u043D\u0438\u043C\u0430\u0435\u0442 \u0432\u0435\u0441\u044C \u044D\u043A\u0440\u0430\u043D: \u0432\u043A\u043B\u0430\u0434\u043A\u0438, \u043F\u0440\u043E\u0432\u043E\u0434\u043D\u0438\u043A \u0438 \u0441\u0430\u0439\u0442 \u0440\u044F\u0434\u043E\u043C \u0441 \u043A\u043E\u0434\u043E\u043C. F11 \u2014 \u043F\u0435\u0440\u0435\u043A\u043B\u044E\u0447\u0438\u0442\u044C, Ctrl+B \u2014 \u043F\u0440\u043E\u0432\u043E\u0434\u043D\u0438\u043A, Ctrl+J \u2014 \u0441\u0430\u0439\u0442</small></div>
           <label class="chk"><input type="checkbox" data-set="focusMode" ${s.focusMode !== false ? "checked" : ""}> \u0432\u043A\u043B\u044E\u0447\u0451\u043D</label></div>
+        <div class="list-row"><div class="grow"><b>\u041D\u0430\u0442\u0438\u0432\u043D\u044B\u0439 \u0432\u0438\u0434 \u0438\u043D\u0442\u0435\u0440\u0444\u0435\u0439\u0441\u0430</b><small>\u041F\u043B\u043E\u0441\u043A\u0438\u0435 \u043F\u0430\u043D\u0435\u043B\u0438 \u0431\u0435\u0437 \u0441\u043A\u0440\u0443\u0433\u043B\u0435\u043D\u0438\u0439, \u0441\u0438\u0441\u0442\u0435\u043C\u043D\u043E\u0435 \u043C\u0435\u043D\u044E \u0438 \u0440\u0430\u043C\u043A\u0430 \u043E\u043A\u043D\u0430 \u041E\u0421 \u2014 \u043A\u0430\u043A \u0443 \u0434\u0435\u0441\u043A\u0442\u043E\u043F\u043D\u043E\u0439 \u043F\u0440\u043E\u0433\u0440\u0430\u043C\u043C\u044B</small></div>
+          <label class="chk"><input type="checkbox" data-set="nativeUI" ${s.nativeUI !== false ? "checked" : ""}> \u0432\u043A\u043B\u044E\u0447\u0451\u043D</label></div>
         <div class="list-row"><div class="grow"><b>\u041E\u043A\u043E\u043D\u043D\u044B\u0439 \u0440\u0435\u0436\u0438\u043C \u043F\u0440\u0438\u043B\u043E\u0436\u0435\u043D\u0438\u044F</b><small>\u041E\u0431\u044B\u0447\u043D\u043E\u0435 \u043E\u043A\u043D\u043E: \u0441\u0432\u0435\u0440\u043D\u0443\u0442\u044C, \u0440\u0430\u0437\u0432\u0435\u0440\u043D\u0443\u0442\u044C, \u0437\u0430\u043A\u0440\u044B\u0442\u044C \u2014 \u043D\u0435 \u043F\u043E\u043B\u043D\u043E\u044D\u043A\u0440\u0430\u043D\u043D\u044B\u0439 \u0440\u0435\u0436\u0438\u043C</small></div>
           <label class="chk"><input type="checkbox" data-set="appWindowed" ${s.appWindowed !== false ? "checked" : ""}> \u0432\u043A\u043B\u044E\u0447\u0451\u043D</label></div>
         <div class="list-row"><div class="grow"><b>\u0421\u0438\u0441\u0442\u0435\u043C\u043D\u0430\u044F \u0440\u0430\u043C\u043A\u0430 \u043E\u043A\u043D\u0430</b><small>Electron: \u0441\u0442\u0430\u043D\u0434\u0430\u0440\u0442\u043D\u044B\u0435 \u043A\u043D\u043E\u043F\u043A\u0438 \u043E\u043A\u043D\u0430 \u041E\u0421</small></div>
@@ -52414,7 +52556,7 @@ frame();
       wide: true,
       okText: "\u0417\u0430\u043A\u0440\u044B\u0442\u044C",
       body: `<div class="tabs-line" id="snipCats">${["html", "css", "js"].map((c) => `<button data-c="${c}" class="${c === cat ? "active" : ""}">${c.toUpperCase()}</button>`).join("")}
-      <button id="newSnippet">\uFF0B \u0421\u0432\u043E\u0439 \u0441\u043D\u0438\u043F\u043F\u0435\u0442</button></div>
+      <button id="newSnippet">${icon("plus", 13)} \u0421\u0432\u043E\u0439 \u0441\u043D\u0438\u043F\u043F\u0435\u0442</button></div>
       <div class="grid-cards" id="snipList">${list2.map((s, i4) => `<div class="tile" data-snip="${i4}"><b>${esc(s.name)}</b><small>${esc(s.desc)}</small>
         <pre style="font:10px var(--mono);max-height:70px;overflow:hidden;opacity:.6;margin-top:6px">${esc(s.code.slice(0, 140))}</pre></div>`).join("")}</div>`,
       onMount: (root) => {
@@ -52509,7 +52651,7 @@ frame();
       <div class="field-row" id="cssControls"></div>
       <div class="gen-preview" id="cssPreview" style="background:linear-gradient(135deg,#7c6cf6,#b06cf6)">\u041F\u0440\u0438\u043C\u0435\u0440</div>
       <div class="field"><label>CSS</label><textarea id="cssOut" rows="6" style="font:12px var(--mono)"></textarea></div>
-      <div class="rowflex"><button class="mini-btn" id="cssCopy">\u041A\u043E\u043F\u0438\u0440\u043E\u0432\u0430\u0442\u044C</button><button class="mini-btn" id="cssPrefix">\uFF0B \u0410\u0432\u0442\u043E\u043F\u0440\u0435\u0444\u0438\u043A\u0441\u044B</button>
+      <div class="rowflex"><button class="mini-btn" id="cssCopy">${icon("copy", 13)} \u041A\u043E\u043F\u0438\u0440\u043E\u0432\u0430\u0442\u044C</button><button class="mini-btn" id="cssPrefix">${icon("plus", 13)} \u0410\u0432\u0442\u043E\u043F\u0440\u0435\u0444\u0438\u043A\u0441\u044B</button>
         <button class="mini-btn" id="cssContrast">\u041A\u043E\u043D\u0442\u0440\u0430\u0441\u0442</button><button class="mini-btn" id="cssExtract">\u0418\u0437\u0432\u043B\u0435\u0447\u044C CSS \u0438\u0437 HTML</button>
         <button class="mini-btn" id="cssDark">\u0422\u0451\u043C\u043D\u0430\u044F \u0442\u0435\u043C\u0430 \u0438\u0437 \u0441\u0432\u0435\u0442\u043B\u043E\u0439</button></div>
       <div id="cssExtra" class="mt8"></div>`,
@@ -52693,7 +52835,12 @@ frame();
               "div",
               { class: "list-row" },
               el("div", { class: "grow" }, el("b", { text: l.name }), el("small", { text: l.desc + " \xB7 " + l.cat })),
-              el("button", { class: "mini-btn", text: state.deps.some((d) => (typeof d === "string" ? d : d.id) === l.id) ? "" : "+" })
+              el("button", {
+                class: "mini-btn icon-btn",
+                html: icon(state.deps.some((d) => (typeof d === "string" ? d : d.id) === l.id) ? "check" : "plus", 13),
+                title: "\u041F\u043E\u0434\u043A\u043B\u044E\u0447\u0438\u0442\u044C / \u043E\u0442\u043A\u043B\u044E\u0447\u0438\u0442\u044C \u0431\u0438\u0431\u043B\u0438\u043E\u0442\u0435\u043A\u0443",
+                "aria-label": "\u041F\u043E\u0434\u043A\u043B\u044E\u0447\u0438\u0442\u044C \u0438\u043B\u0438 \u043E\u0442\u043A\u043B\u044E\u0447\u0438\u0442\u044C \u0431\u0438\u0431\u043B\u0438\u043E\u0442\u0435\u043A\u0443"
+              })
             );
             row.querySelector("button").onclick = () => {
               state.deps.push({ id: l.id, version: l.versions[0], name: l.name, enabled: true });
@@ -52932,9 +53079,13 @@ frame();
   function initCommands() {
     cmd2("run", "\u0417\u0430\u043F\u0443\u0441\u0442\u0438\u0442\u044C \u043F\u0440\u0435\u0434\u043F\u0440\u043E\u0441\u043C\u043E\u0442\u0440", "\u041E\u0441\u043D\u043E\u0432\u043D\u043E\u0435", "play", () => {
       run("full");
-      toast("\u041F\u0440\u0435\u0434\u043F\u0440\u043E\u0441\u043C\u043E\u0442\u0440 \u043E\u0431\u043D\u043E\u0432\u043B\u0451\u043D", "ok");
+      revealPreview();
+      toast("\u0421\u0442\u0440\u0430\u043D\u0438\u0446\u0430 \u043E\u0431\u043D\u043E\u0432\u043B\u0435\u043D\u0430 \u2014 \u0441\u0430\u0439\u0442 \u043F\u043E\u043A\u0430\u0437\u0430\u043D \u0440\u044F\u0434\u043E\u043C \u0441 \u043A\u043E\u0434\u043E\u043C", "ok");
     });
-    cmd2("analyze", "\u041F\u0440\u043E\u0430\u043D\u0430\u043B\u0438\u0437\u0438\u0440\u043E\u0432\u0430\u0442\u044C \u043A\u043E\u0434", "\u041E\u0441\u043D\u043E\u0432\u043D\u043E\u0435", "chart", () => runAnalysis2());
+    cmd2("analyze", "\u041F\u0440\u043E\u0430\u043D\u0430\u043B\u0438\u0437\u0438\u0440\u043E\u0432\u0430\u0442\u044C \u043A\u043E\u0434", "\u041E\u0441\u043D\u043E\u0432\u043D\u043E\u0435", "chart", () => {
+      revealInspector("analysis");
+      return runAnalysis2();
+    });
     cmd2("analysisReport", "\u041F\u043E\u043B\u043D\u044B\u0439 \u043E\u0442\u0447\u0451\u0442 \u0430\u043D\u0430\u043B\u0438\u0437\u0430", "\u041E\u0441\u043D\u043E\u0432\u043D\u043E\u0435", "chart", () => fullAnalysisReport());
     cmd2("fixAll", "\u0418\u0441\u043F\u0440\u0430\u0432\u0438\u0442\u044C \u0431\u0435\u0437\u043E\u043F\u0430\u0441\u043D\u044B\u0435 \u043E\u0448\u0438\u0431\u043A\u0438", "\u041E\u0441\u043D\u043E\u0432\u043D\u043E\u0435", "wand", () => fixAllSafe());
     cmd2("palette", "\u041F\u0430\u043B\u0438\u0442\u0440\u0430 \u043A\u043E\u043C\u0430\u043D\u0434", "\u041E\u0441\u043D\u043E\u0432\u043D\u043E\u0435", "format", () => commandPalette());
@@ -52975,6 +53126,18 @@ frame();
     cmd2("setFocusMode", "\u0412\u043A\u043B\u044E\u0447\u0438\u0442\u044C \u0440\u0435\u0436\u0438\u043C \u0440\u0435\u0434\u0430\u043A\u0442\u043E\u0440\u0430", "\u0412\u0438\u0434", "code", () => setFocusMode(true), { hidden: true });
     cmd2("toggleSidebar", "\u041F\u043E\u043A\u0430\u0437\u0430\u0442\u044C/\u0441\u043A\u0440\u044B\u0442\u044C \u043F\u0440\u043E\u0432\u043E\u0434\u043D\u0438\u043A", "\u0412\u0438\u0434", "files", () => toggleSidebar());
     cmd2("toggleFocusPanel", "\u041F\u0430\u043D\u0435\u043B\u044C \u043F\u0440\u0435\u0434\u043F\u0440\u043E\u0441\u043C\u043E\u0442\u0440\u0430 \u0438 \u0430\u043D\u0430\u043B\u0438\u0437\u0430", "\u0412\u0438\u0434", "window", () => toggleFocusPanel());
+    cmd2("previewSplit", "\u041F\u043E\u043A\u0430\u0437\u0430\u0442\u044C \u0441\u0430\u0439\u0442 \u0440\u044F\u0434\u043E\u043C \u0441 \u043A\u043E\u0434\u043E\u043C", "\u0412\u0438\u0434", "monitor", () => {
+      setFocusPanel(true);
+      revealPreview();
+      toast("\u0421\u0430\u0439\u0442 \u043F\u043E\u043A\u0430\u0437\u0430\u043D \u0440\u044F\u0434\u043E\u043C \u0441 \u043A\u043E\u0434\u043E\u043C", "ok");
+    });
+    cmd2("nativeUI", "\u041D\u0430\u0442\u0438\u0432\u043D\u044B\u0439 \u0432\u0438\u0434 \u0438\u043D\u0442\u0435\u0440\u0444\u0435\u0439\u0441\u0430", "\u0412\u0438\u0434", "window", () => {
+      state.settings.nativeUI = state.settings.nativeUI === false;
+      applySettings();
+      applyNativeUI();
+      toast(state.settings.nativeUI ? "\u041D\u0430\u0442\u0438\u0432\u043D\u044B\u0439 \u0432\u0438\u0434 \u0432\u043A\u043B\u044E\u0447\u0451\u043D" : "\u041E\u0431\u044B\u0447\u043D\u044B\u0439 \u0432\u0438\u0434 \u0438\u043D\u0442\u0435\u0440\u0444\u0435\u0439\u0441\u0430", "info");
+      return state.settings.nativeUI;
+    });
     cmd2("formatHtml", "\u0424\u043E\u0440\u043C\u0430\u0442\u0438\u0440\u043E\u0432\u0430\u0442\u044C HTML", "\u0420\u0435\u0434\u0430\u043A\u0442\u0438\u0440\u043E\u0432\u0430\u043D\u0438\u0435", "format", () => formatDoc("html"));
     cmd2("formatCss", "\u0424\u043E\u0440\u043C\u0430\u0442\u0438\u0440\u043E\u0432\u0430\u0442\u044C CSS", "\u0420\u0435\u0434\u0430\u043A\u0442\u0438\u0440\u043E\u0432\u0430\u043D\u0438\u0435", "format", () => formatDoc("css"));
     cmd2("formatJs", "\u0424\u043E\u0440\u043C\u0430\u0442\u0438\u0440\u043E\u0432\u0430\u0442\u044C JS", "\u0420\u0435\u0434\u0430\u043A\u0442\u0438\u0440\u043E\u0432\u0430\u043D\u0438\u0435", "format", () => formatDoc("js"));
@@ -53497,6 +53660,7 @@ POST /api/run</pre>`,
       }
     }
     state.settings.windowedMode = false;
+    state.settings.focusPanel = true;
     initProjects();
     initEditors();
     initPreview();

@@ -828,7 +828,9 @@ body.focus-mode .editors > .editor-pane { display: none; }
 body.focus-mode .editors > .editor-pane.focus-active { display: flex; }
 body.focus-mode .editors > .editor-pane { border-radius: 0 0 var(--r-xl) var(--r-xl); border-top: 0; }
 body.focus-mode .editor-pane .pane-head { height: 33px; flex: 0 0 33px; background: var(--code-bg); border-bottom-color: transparent; }
-body.focus-mode .editor-pane .pane-btn:not([data-cmd="collapsePane"]):not([data-cmd="fullscreenPane"]) { display: none; }
+/* Editor actions stay available in focus mode (they were hidden before). */
+body.focus-mode .editor-pane .pane-tools { gap: 0; }
+body.focus-mode .editor-pane .pane-btn { min-width: 24px; height: 24px; }
 body.focus-mode .editor-pane .pane-tab { font-size: 13px; }
 body.focus-mode .editor-pane .pane-tab strong { font-size: 11px; }
 body.focus-mode .editor-pane .pane-file { font-size: 12px; max-width: 300px; color: var(--muted); }
@@ -840,12 +842,16 @@ body.focus-mode.sidebar-hidden .workspace { grid-template-columns: minmax(280px,
 body.focus-mode.sidebar-hidden #rail,
 body.focus-mode.sidebar-hidden .splitter[data-splitter="rail"] { display: none; }
 
-/* Ctrl+J: preview/analysis slides in only when asked */
-body.focus-mode.focus-panel .dock { display: flex; position: absolute; z-index: 45;
-  top: 0; right: 0; bottom: 0; width: min(46vw, 620px); padding-left: 7px;
-  box-shadow: -14px 0 34px rgba(0,0,0,.28); }
-body.focus-mode.focus-panel .dock .preview-card,
-body.focus-mode.focus-panel .dock .inspector { box-shadow: var(--shadow); }
+/* Ctrl+J: the site is DOCKED next to the code (not an overlay on top of it),
+   so you can always check how the page looks while editing. Resizable. */
+body.focus-mode.focus-panel .workspace {
+  grid-template-columns: var(--rail-w, 268px) 6px minmax(280px, 1fr) 6px var(--dock-w, clamp(320px, 38vw, 620px));
+}
+body.focus-mode.focus-panel .splitter[data-splitter="dock"] { display: block; }
+body.focus-mode.focus-panel .dock { display: flex; min-width: 0; }
+body.focus-mode.focus-panel.sidebar-hidden .workspace {
+  grid-template-columns: minmax(280px, 1fr) 6px var(--dock-w, clamp(320px, 38vw, 620px));
+}
 
 /* A collapsed pane keeps a big, always reachable expand button.
    Before, it became a 38px column whose header buttons were clipped away,
@@ -865,7 +871,12 @@ body.focus-mode.focus-panel .dock .inspector { box-shadow: var(--shadow); }
 @media (max-width: 960px) {
   body.focus-mode .workspace { grid-template-columns: minmax(280px, 1fr); grid-template-rows: none; }
   body.focus-mode #rail, body.focus-mode .splitter[data-splitter="rail"] { display: none; }
-  body.focus-mode.focus-panel .dock { width: min(80vw, 520px); }
+  /* narrow windows: site under the code, still visible */
+  body.focus-mode.focus-panel .workspace {
+    grid-template-columns: minmax(280px, 1fr);
+    grid-template-rows: minmax(260px, 1fr) 6px minmax(220px, 42%);
+  }
+  body.focus-mode.focus-panel .dock { grid-column: 1; }
 }
 @media (prefers-reduced-motion: no-preference) {
   .editor-tab, .tab-action, .expand-chip { transition: background .15s, color .15s, border-color .15s; }
@@ -877,3 +888,60 @@ body.focus-mode.focus-panel .dock .inspector { box-shadow: var(--shadow); }
   .statusbar { gap: 7px; }
   .editor-tab { padding: 0 9px; max-width: 170px; }
 }
+
+/* ══════════════════════════════════════════════════════════════════════
+   Native look: edge-to-edge flat chrome like a desktop IDE. Electron still
+   supplies the real OS window frame, native application menu and native
+   file dialogs — this only removes the "website in a window" decoration.
+   ══════════════════════════════════════════════════════════════════════ */
+.menu-bar { display: flex; align-items: center; gap: 2px; height: 30px; flex: 0 0 30px;
+  padding: 0 8px; background: var(--head); border-bottom: 1px solid var(--border); }
+.menu-bar-item { height: 24px; padding: 0 10px; border: 0; border-radius: 4px;
+  background: transparent; color: var(--muted); font-size: 12.5px; white-space: nowrap; }
+.menu-bar-item:hover { background: var(--card-2); color: var(--text); }
+.menu-bar-item.active { background: color-mix(in srgb, var(--accent) 18%, var(--card-2)); color: var(--accent); }
+.menu-bar-spacer { flex: 1; }
+.menu-bar-title { display: inline-flex; align-items: center; gap: 6px; color: var(--dim);
+  font-size: 11.5px; max-width: 42%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.menu-bar-title .ico { width: 13px; height: 13px; flex: 0 0 13px; }
+/* Electron's native menu replaces the web fallback; the OS draws the buttons. */
+body.native-frame .menu-bar { display: none; }
+body.native-frame #winControls { display: none; }
+.site-btn { gap: 6px; }
+.site-btn .ico { width: 14px; height: 14px; }
+
+body.native-ui { --r-xl: 4px; --r-lg: 4px; --r-md: 4px; --r-sm: 3px; }
+body.native-ui .app-shell { padding: 0; gap: 0; }
+body.native-ui .titlebar { height: 30px; flex: 0 0 30px; padding: 0 10px;
+  background: var(--head); border-radius: 0; }
+body.native-ui .brand-mark { width: 20px; height: 20px; border-radius: 4px; }
+body.native-ui .brand-sub, body.native-ui .titlebar .pill,
+body.native-ui .palette-trigger kbd { display: none; }
+body.native-ui .project-chip { background: transparent; border: 0; padding: 2px 6px; }
+body.native-ui .toolbar { border-radius: 0; border-left: 0; border-right: 0;
+  border-top: 0; min-height: 36px; padding: 3px 8px; }
+body.native-ui .btn, body.native-ui .mini-btn, body.native-ui .pane-btn,
+body.native-ui .tab-action, body.native-ui .dev-btn { border-radius: 4px; }
+body.native-ui .card, body.native-ui .editor-tabs, body.native-ui .statusbar { border-radius: 0; }
+body.native-ui .statusbar { border-left: 0; border-right: 0; border-bottom: 0; }
+body.native-ui .workspace .splitter::after { border-radius: 1px; }
+body.native-ui .editor-tab { border-radius: 0; }
+body.native-ui .pane-head { background: var(--head); }
+
+/* Labelled actions in the tab strip: Run / Analyze / Site are one click away. */
+.tab-action.labelled { width: auto; padding: 0 9px; gap: 5px; font-size: 11.5px;
+  font-weight: 600; color: var(--muted); }
+.tab-action.labelled .ico { width: 13px; height: 13px; flex: 0 0 13px; }
+.tab-action.labelled:hover { color: var(--text); }
+.tab-action.labelled.active { color: var(--accent); }
+@media (max-width: 1180px) {
+  .tab-action.labelled span:not(.ico) { display: none; }
+  .tab-action.labelled { width: 28px; padding: 0; justify-content: center; }
+  .menu-bar-title { display: none; }
+}
+
+/* Icon-only buttons must stay square and show their SVG clearly. */
+.mini-btn.icon-btn, .pane-btn.icon-btn { width: 27px; min-width: 27px; padding: 0;
+  display: inline-grid; place-items: center; }
+.mini-btn .ico, .pane-btn .ico, .btn .ico, .menu-bar-title .ico { vertical-align: middle; }
+.mini-btn, .btn, .tab-action.labelled, .menu-bar-item { font-family: var(--sans); }

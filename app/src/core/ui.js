@@ -200,7 +200,8 @@ function initSplitters() {
       const startX = e.clientX, startY = e.clientY;
       const ws = $('#workspace');
       const railW = parseFloat(getComputedStyle(ws).getPropertyValue('--rail-w')) || 236;
-      const dockW = parseFloat(getComputedStyle(ws).getPropertyValue('--dock-w')) || 440;
+      const dockW = parseFloat(getComputedStyle(ws).getPropertyValue('--dock-w')) ||
+                    $('#dock')?.getBoundingClientRect().width || 440;
       const preview = $('#previewCard');
       const startPreviewH = preview.getBoundingClientRect().height;
       const totalH = $('#dock').getBoundingClientRect().height;
@@ -380,6 +381,22 @@ export function setFocusPanel(v) {
   persistFocus();
   return state.settings.focusPanel;
 }
+/** Make the site visible and correctly scaled — used by Run and "Сайт". */
+export function revealPreview() {
+  if (focusOn() && state.settings.focusPanel !== true) {
+    state.settings.focusPanel = true;
+    persistFocus();
+  }
+  ctx.applyDevice?.();
+  setTimeout(() => ctx.applyDevice?.(), 140);
+  return true;
+}
+/** Open the bottom panel on a given tab — used by Analyze. */
+export function revealInspector(tab) {
+  revealPreview();
+  if (tab) selectInspTab(tab);
+  return true;
+}
 export function initFocusMode() {
   // A stale collapsed state from a previous session must never trap the user.
   state.collapsed = { html: false, css: false, js: false };
@@ -458,7 +475,8 @@ export function modal(opts = {}) {
   const root = el('div', { class: 'modal ' + (wide ? 'wide ' : '') + (narrow ? 'narrow ' : '') },
     el('div', { class: 'modal-head' },
       el('h2', { text: title }),
-      el('button', { class: 'close', text: '×', onclick: () => closeModal() })),
+      el('button', { class: 'close', html: icon('close', 16), title: 'Закрыть',
+                      'aria-label': 'Закрыть', onclick: () => closeModal() })),
     el('div', { class: 'modal-body', html: body }),
     el('div', { class: 'modal-foot' },
       cancelText ? el('button', { class: 'btn btn-ghost', text: cancelText, onclick: () => { closeModal(); onCancel?.(); } }) : null,
@@ -602,8 +620,10 @@ export function settingsModal(tab = 'editor') {
         <button class="mini-btn" id="tbAddSecondaryBtn">Добавить</button>
         <button class="mini-btn" id="tbReset">Сбросить набор</button></div>`,
     windows: `<div class="list-rows">
-        <div class="list-row"><div class="grow"><b>Режим редактора (как VS Code)</b><small>Открытый файл занимает весь экран: вкладки, проводник и панель предпросмотра по запросу. F11 — переключить, Ctrl+B — проводник, Ctrl+J — предпросмотр</small></div>
+        <div class="list-row"><div class="grow"><b>Режим редактора (как VS Code)</b><small>Открытый файл занимает весь экран: вкладки, проводник и сайт рядом с кодом. F11 — переключить, Ctrl+B — проводник, Ctrl+J — сайт</small></div>
           <label class="chk"><input type="checkbox" data-set="focusMode" ${s.focusMode !== false ? 'checked' : ''}> включён</label></div>
+        <div class="list-row"><div class="grow"><b>Нативный вид интерфейса</b><small>Плоские панели без скруглений, системное меню и рамка окна ОС — как у десктопной программы</small></div>
+          <label class="chk"><input type="checkbox" data-set="nativeUI" ${s.nativeUI !== false ? 'checked' : ''}> включён</label></div>
         <div class="list-row"><div class="grow"><b>Оконный режим приложения</b><small>Обычное окно: свернуть, развернуть, закрыть — не полноэкранный режим</small></div>
           <label class="chk"><input type="checkbox" data-set="appWindowed" ${s.appWindowed !== false ? 'checked' : ''}> включён</label></div>
         <div class="list-row"><div class="grow"><b>Системная рамка окна</b><small>Electron: стандартные кнопки окна ОС</small></div>
@@ -956,7 +976,7 @@ export function snippetsModal(cat = state.activePane) {
   const list = SNIPPETS.filter(s => s.cat === cat).concat(state.userSnippets.filter(s => s.cat === cat));
   modal({ title: `Сниппеты · ${cat.toUpperCase()}`, wide: true, okText: 'Закрыть',
     body: `<div class="tabs-line" id="snipCats">${['html', 'css', 'js'].map(c => `<button data-c="${c}" class="${c === cat ? 'active' : ''}">${c.toUpperCase()}</button>`).join('')}
-      <button id="newSnippet">＋ Свой сниппет</button></div>
+      <button id="newSnippet">${icon('plus', 13)} Свой сниппет</button></div>
       <div class="grid-cards" id="snipList">${list.map((s, i) => `<div class="tile" data-snip="${i}"><b>${esc(s.name)}</b><small>${esc(s.desc)}</small>
         <pre style="font:10px var(--mono);max-height:70px;overflow:hidden;opacity:.6;margin-top:6px">${esc(s.code.slice(0, 140))}</pre></div>`).join('')}</div>`,
     onMount: root => {
@@ -1027,7 +1047,7 @@ export function cssLabModal() {
       <div class="field-row" id="cssControls"></div>
       <div class="gen-preview" id="cssPreview" style="background:linear-gradient(135deg,#7c6cf6,#b06cf6)">Пример</div>
       <div class="field"><label>CSS</label><textarea id="cssOut" rows="6" style="font:12px var(--mono)"></textarea></div>
-      <div class="rowflex"><button class="mini-btn" id="cssCopy">Копировать</button><button class="mini-btn" id="cssPrefix">＋ Автопрефиксы</button>
+      <div class="rowflex"><button class="mini-btn" id="cssCopy">${icon('copy', 13)} Копировать</button><button class="mini-btn" id="cssPrefix">${icon('plus', 13)} Автопрефиксы</button>
         <button class="mini-btn" id="cssContrast">Контраст</button><button class="mini-btn" id="cssExtract">Извлечь CSS из HTML</button>
         <button class="mini-btn" id="cssDark">Тёмная тема из светлой</button></div>
       <div id="cssExtra" class="mt8"></div>`,
@@ -1164,7 +1184,10 @@ export function librarySearchDialog() {
         for (const l of CDN_LIBS.filter(x => (x.name + x.desc + x.cat).toLowerCase().includes(q.toLowerCase()))) {
           const row = el('div', { class: 'list-row' },
             el('div', { class: 'grow' }, el('b', { text: l.name }), el('small', { text: l.desc + ' · ' + l.cat })),
-            el('button', { class: 'mini-btn', text: state.deps.some(d => (typeof d === 'string' ? d : d.id) === l.id) ? '' : '+' }));
+            el('button', { class: 'mini-btn icon-btn',
+                            html: icon(state.deps.some(d => (typeof d === 'string' ? d : d.id) === l.id) ? 'check' : 'plus', 13),
+                            title: 'Подключить / отключить библиотеку',
+                            'aria-label': 'Подключить или отключить библиотеку' }));
           row.querySelector('button').onclick = () => {
             state.deps.push({ id: l.id, version: l.versions[0], name: l.name, enabled: true });
             emit('deps:changed'); toast('Подключено: ' + l.name, 'ok'); draw(q);

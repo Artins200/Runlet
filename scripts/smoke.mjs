@@ -76,7 +76,8 @@ check('Project launcher shown', !!w.document.querySelector('#startScreen .launch
 check('Launcher has project rows', w.document.querySelectorAll('#prjList .project-row').length >= 1);
 check('Toolbar simplified (only primary actions)', w.document.querySelectorAll('#toolbarPrimary [data-cmd]').length >= 2 && w.document.querySelectorAll('#toolbarPrimary [data-cmd]').length <= 4);
 check('Secondary toolbar rendered', w.document.querySelectorAll('#toolbarSecondary [data-cmd]').length >= 1);
-check('Grouped menus instead of 15+ buttons', w.document.querySelectorAll('[data-menu]').length === 2 &&
+check('Native-style menu bar instead of 15+ buttons', w.document.querySelectorAll('[data-menu]').length >= 6 &&
+  w.document.querySelectorAll('[data-menu]').length <= 8 &&
   w.document.querySelectorAll('#toolbar [data-cmd]').length <= 12);
 check('Readable code: font >= 16px, line-height >= 1.5', parseFloat(w.Runlet.settings.fontSize) >= 16 && parseFloat(w.Runlet.settings.lineHeight) >= 1.5,
   `${w.Runlet.settings.fontSize}px / ${w.Runlet.settings.lineHeight}`);

@@ -36,12 +36,12 @@ import {
   cycleDensity, snippetsModal, cssLabModal, jsToolsModal, htmlToolsModal,
   gotoLineDialog, colorToolDialog, librarySearchDialog, collaborationDialog,
   selectRailTab, selectInspTab, setFocusMode, toggleFocusMode, toggleSidebar,
-  toggleFocusPanel, restorePanes
+  toggleFocusPanel, restorePanes, setFocusPanel, revealPreview, revealInspector
 } from './ui.js';
 import { startLiveServer, stopLiveServer, toggleLiveServer, openSiteWindow, openSiteExternal, liveServerDialog, liveStatus } from './liveserver.js';
 import { toggleWindowedMode, detachEditor, openSiteWindow as openSiteWin, closeAllWindows, windowCount, isWindowed, movePanelWindow } from './windows.js';
 import { addObject, exportToProject, openThreeDWindow, getScene, setScene, openThreeStage, threeDStats, threeDRender } from './threeD.js';
-import { windowControl, setAppWindowed, refreshZoomLabel } from './shellui.js';
+import { windowControl, setAppWindowed, refreshZoomLabel, applyNativeUI } from './shellui.js';
 import { makeProject, openProject, exportProject, exportAllProjects, importProjectFile, listProjects } from './projects.js';
 import { icon, deEmoji } from './icons.js';
 import { initLearn, renderLearn, openLesson, initPlugins, renderPlugins, initFeatures, openPlugin } from './extras.js';
@@ -61,8 +61,14 @@ function cmd(id, title, group, icon, fn, opts = {}) {
 
 export function initCommands() {
   /* ── core / UI ──────────────────────────────────────────────── */
-  cmd('run', 'Запустить предпросмотр', 'Основное', 'play', () => { run('full'); toast('Предпросмотр обновлён', 'ok'); });
-  cmd('analyze', 'Проанализировать код', 'Основное', 'chart', () => runAnalysis());
+  cmd('run', 'Запустить предпросмотр', 'Основное', 'play', () => {
+    run('full'); revealPreview();
+    toast('Страница обновлена — сайт показан рядом с кодом', 'ok');
+  });
+  cmd('analyze', 'Проанализировать код', 'Основное', 'chart', () => {
+    revealInspector('analysis');
+    return runAnalysis();
+  });
   cmd('analysisReport', 'Полный отчёт анализа', 'Основное', 'chart', () => fullAnalysisReport());
   cmd('fixAll', 'Исправить безопасные ошибки', 'Основное', 'wand', () => fixAllSafe());
   cmd('palette', 'Палитра команд', 'Основное', 'format', () => commandPalette());
@@ -94,6 +100,16 @@ export function initCommands() {
   cmd('setFocusMode', 'Включить режим редактора', 'Вид', 'code', () => setFocusMode(true), { hidden: true });
   cmd('toggleSidebar', 'Показать/скрыть проводник', 'Вид', 'files', () => toggleSidebar());
   cmd('toggleFocusPanel', 'Панель предпросмотра и анализа', 'Вид', 'window', () => toggleFocusPanel());
+  cmd('previewSplit', 'Показать сайт рядом с кодом', 'Вид', 'monitor', () => {
+    setFocusPanel(true); revealPreview();
+    toast('Сайт показан рядом с кодом', 'ok');
+  });
+  cmd('nativeUI', 'Нативный вид интерфейса', 'Вид', 'window', () => {
+    state.settings.nativeUI = state.settings.nativeUI === false;
+    applySettings(); applyNativeUI();
+    toast(state.settings.nativeUI ? 'Нативный вид включён' : 'Обычный вид интерфейса', 'info');
+    return state.settings.nativeUI;
+  });
 
   /* ── editing ────────────────────────────────────────────────── */
   cmd('formatHtml', 'Форматировать HTML', 'Редактирование', 'format', () => formatDoc('html'));

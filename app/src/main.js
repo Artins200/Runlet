@@ -67,6 +67,9 @@ async function boot() {
     } catch (_) { /* keep default */ }
   }
   state.settings.windowedMode = false;
+  // Older builds hid the preview entirely. Always start with the site visible
+  // next to the code; Ctrl+J hides it for the current session.
+  state.settings.focusPanel = true;
 
   initProjects();
   initEditors();

@@ -14,6 +14,19 @@
 <body>
 <div id="app" class="app-shell">
 
+  <!-- Web fallback for the native OS menu. In Electron the real native menu is
+       built in electron/main.cjs (buildMenu), so this bar is hidden there. -->
+  <nav id="menuBar" class="menu-bar" aria-label="Главное меню">
+    <button class="menu-bar-item" data-menu="file">Файл</button>
+    <button class="menu-bar-item" data-menu="edit">Правка</button>
+    <button class="menu-bar-item" data-menu="view">Вид</button>
+    <button class="menu-bar-item" data-menu="run">Запуск</button>
+    <button class="menu-bar-item" data-menu="tools">Инструменты</button>
+    <button class="menu-bar-item" data-menu="help">Справка</button>
+    <span class="menu-bar-spacer"></span>
+    <span class="menu-bar-title"><span data-icon="code"></span> Runlet — <span id="menuBarProject">Проект</span></span>
+  </nav>
+
   <header id="titlebar" class="titlebar">
     <div class="brand">
       <div class="brand-mark" aria-hidden="true">
@@ -39,13 +52,13 @@
     <div class="tool-group" id="toolbarPrimary"></div>
     <div class="tool-sep"></div>
     <div class="tool-group menu-group">
-      <button class="btn btn-ghost" data-menu="file" title="Файл и проект">
-        <span data-icon="folder"></span><span>Файл</span><span class="menu-caret" data-icon="chevronDown"></span>
-      </button>
-      <button class="btn btn-ghost" data-menu="more" title="Инструменты, вид и справка">
+      <button class="btn btn-ghost" data-menu="more" title="Ещё инструменты, вид и справка">
         <span data-icon="more"></span><span>Ещё</span><span class="menu-caret" data-icon="chevronDown"></span>
       </button>
     </div>
+    <button class="btn btn-ghost site-btn" data-cmd="previewSplit" title="Показать сайт рядом с кодом (Ctrl+J)">
+      <span data-icon="monitor"></span><span>Сайт</span>
+    </button>
     <div class="tool-spacer"></div>
     <div class="tool-group zoom-group" title="Масштаб кода (Ctrl + колесо мыши)">
       <button class="btn btn-icon" data-cmd="fontZoomOut" title="Меньше"><span data-icon="minus"></span></button>
@@ -116,8 +129,10 @@
         <div id="editorTabList" class="editor-tab-list"></div>
         <div id="collapsedChips" class="collapsed-chips"></div>
         <div class="editor-tab-actions">
+          <button class="tab-action labelled" data-cmd="run" title="Обновить страницу (Ctrl+Enter)"><span data-icon="play"></span><span>Запустить</span></button>
+          <button class="tab-action labelled" data-cmd="analyze" title="Показать анализ кода (Ctrl+Shift+A)"><span data-icon="chart"></span><span>Анализ</span></button>
+          <button class="tab-action labelled" data-cmd="toggleFocusPanel" title="Показать/скрыть сайт рядом с кодом (Ctrl+J)"><span data-icon="monitor"></span><span>Сайт</span></button>
           <button class="tab-action" data-cmd="toggleSidebar" title="Проводник (Ctrl+B)"><span data-icon="files"></span></button>
-          <button class="tab-action" data-cmd="toggleFocusPanel" title="Предпросмотр и анализ (Ctrl+J)"><span data-icon="window"></span></button>
           <button class="tab-action" data-cmd="unfoldAll" title="Развернуть весь код (Alt+])"><span data-icon="chevronUp"></span></button>
           <button class="tab-action" data-cmd="restorePanes" title="Развернуть все панели (Alt+0)"><span data-icon="maximize"></span></button>
           <button class="tab-action" data-cmd="focusMode" title="Режим редактора / классический вид (F11)"><span data-icon="code"></span></button>

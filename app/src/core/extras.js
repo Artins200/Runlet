@@ -15,7 +15,7 @@ export function initLearn() {
 export function renderLearn() {
   const host = $('#learnPanel'); if (!host) return;
   const done = Object.keys(state.progress).filter(k => state.progress[k]).length;
-  host.innerHTML = `<div class="rowflex mb8"><span class="pill pill-accent"> ${done}/${LESSONS.length} уроков</span>
+  host.innerHTML = `<div class="rowflex mb8"><span class="pill pill-accent">${icon('book', 12)} ${done}/${LESSONS.length} уроков</span>
     <div class="progress" style="flex:1"><i style="width:${Math.round(done / LESSONS.length * 100)}%"></i></div></div>
     <div class="tabs-line" id="learnTabs"><button class="active" data-lt="lessons">Уроки</button>
       <button data-lt="quiz">Квизы</button><button data-lt="recipes">Рецепты</button>
@@ -35,9 +35,9 @@ function renderLearnTab(tab) {
     for (const l of LESSONS) {
       const done = state.progress[l.id];
       const row = el('div', { class: 'list-row' },
-        el('div', { class: 'grow' }, el('b', { text: (done ? ' ' : ' ') + l.title }),
+        el('div', { class: 'grow' }, el('b', { html: icon(done ? 'check' : 'book', 13) + ' ' + esc(l.title) }),
           el('small', { text: l.lang + ' · ' + l.task.slice(0, 60) + '…' })),
-        el('button', { class: 'mini-btn', text: done ? 'Повторить' : 'Начать' }));
+        el('button', { class: 'mini-btn', html: icon(done ? 'refresh' : 'play', 12) + '<span>' + (done ? 'Повторить' : 'Начать') + '</span>' }));
       row.querySelector('button').onclick = () => openLesson(l);
       list.appendChild(row);
     }
@@ -51,7 +51,7 @@ function renderLearnTab(tab) {
       group.forEach(x => x.classList.remove('correct', 'wrong'));
       b.classList.add(oi === q.a ? 'correct' : 'wrong');
       group[q.a].classList.add('correct');
-      box.querySelector('#qr' + qi).innerHTML = `<div class="beginner mt8">${oi === q.a ? ' Верно! ' : ' Не совсем. '}${esc(q.why)}</div>`;
+      box.querySelector('#qr' + qi).innerHTML = `<div class="beginner mt8">${icon(oi === q.a ? 'check' : 'close', 13)} ${oi === q.a ? 'Верно!' : 'Не совсем.'} ${esc(q.why)}</div>`;
       if (oi === q.a) { state.progress['quiz' + qi] = true; toast('Достижение: верный ответ', 'ok'); }
     });
   } else if (tab === 'recipes') {
@@ -59,8 +59,8 @@ function renderLearnTab(tab) {
     const list = box.querySelector('.list-rows');
     for (const r of RECIPES) {
       const row = el('div', { class: 'list-row', style: { flexDirection: 'column', alignItems: 'stretch' } },
-        el('b', { text: ' ' + r.t }), el('code', { class: 'inline', text: r.a, style: { marginTop: '6px', whiteSpace: 'pre-wrap' } }),
-        el('button', { class: 'mini-btn mt8', text: 'Вставить', style: { alignSelf: 'flex-start' } }));
+        el('b', { html: icon('wand', 13) + ' ' + esc(r.t) }), el('code', { class: 'inline', text: r.a, style: { marginTop: '6px', whiteSpace: 'pre-wrap' } }),
+        el('button', { class: 'mini-btn mt8', html: icon('code', 12) + '<span>Вставить</span>', style: { alignSelf: 'flex-start' } }));
       row.querySelector('button').onclick = () => { insertText(r.a, /\{|:|;/.test(r.a) && !/\(\)/.test(r.a) ? 'css' : 'js'); toast('Рецепт вставлен', 'ok'); };
       list.appendChild(row);
     }
@@ -186,8 +186,8 @@ export function initPlugins() {
 }
 export function renderPlugins() {
   const host = $('#pluginsPanel'); if (!host) return;
-  host.innerHTML = `<div class="rowflex mb8"><span class="pill pill-accent"> ${state.plugins.length} активно</span>
-    <button class="mini-btn" id="plugUrl">По ссылке</button></div><div class="list-rows" id="plugList"></div>
+  host.innerHTML = `<div class="rowflex mb8"><span class="pill pill-accent">${icon('puzzle', 12)} ${state.plugins.length} активно</span>
+    <button class="mini-btn" id="plugUrl">${icon('link', 12)} По ссылке</button></div><div class="list-rows" id="plugList"></div>
     <div class="beginner mt8"><b>API для плагинов:</b> window.Runlet.pluginAPI — state, toast, emit, on, insertText, setDoc, getDoc, analyze(). Плагины запускаются в песочнице без доступа к файлам ОС.</div>`;
   const list = host.querySelector('#plugList');
   for (const p of PLUGIN_CATALOG) {

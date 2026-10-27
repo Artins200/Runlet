@@ -70,7 +70,8 @@ ok('Вкладки открытых файлов отрисованы', $$('#edi
    $$('#editorTabList .editor-tab').map(t => t.textContent.trim()).join(', '));
 ok('Видна ровно одна полноэкранная панель кода', $$('#editors > .editor-pane.focus-active').length === 1,
    $('#editors > .editor-pane.focus-active')?.dataset.pane);
-ok('Панель предпросмотра по умолчанию скрыта', !w.document.body.classList.contains('focus-panel'));
+ok('Сайт виден рядом с кодом по умолчанию', w.document.body.classList.contains('focus-panel') &&
+   w.Runlet?.focusMode?.().panel === true);
 ok('В статус-баре показан режим редактора', /Режим редактора/.test($('#statusMode')?.textContent || ''));
 ok('Кодовая область — отдельная колонка рабочего пространства',
    $('#codeArea')?.parentElement?.id === 'workspace' && !!$('#codeArea #editors'));
@@ -96,9 +97,20 @@ ok('Кодовая область — отдельная колонка рабо
   cmd('toggleSidebar'); await tick(80);
   ok('Ctrl+B возвращает проводник', !w.document.body.classList.contains('sidebar-hidden'));
   cmd('toggleFocusPanel'); await tick(80);
-  ok('Ctrl+J открывает панель предпросмотра', w.document.body.classList.contains('focus-panel'));
+  ok('Ctrl+J скрывает сайт', !w.document.body.classList.contains('focus-panel'));
+  cmd('previewSplit'); await tick(80);
+  ok('Кнопка «Сайт» возвращает сайт рядом с кодом', w.document.body.classList.contains('focus-panel'));
   cmd('toggleFocusPanel'); await tick(80);
-  ok('Ctrl+J закрывает панель предпросмотра', !w.document.body.classList.contains('focus-panel'));
+  cmd('run'); await tick(140);
+  ok('«Запустить» сам показывает сайт', w.document.body.classList.contains('focus-panel'));
+  cmd('analyze'); await tick(200);
+  ok('«Анализ» открывает панель с отчётом',
+     w.document.body.classList.contains('focus-panel') &&
+     $('#inspectorTabs .insp-tab.active')?.dataset.inspTab === 'analysis');
+  cmd('nativeUI'); await tick(80);
+  ok('Нативный вид переключается', w.document.body.classList.contains('native-ui') === false);
+  cmd('nativeUI'); await tick(80);
+  ok('Нативный вид возвращается', w.document.body.classList.contains('native-ui'));
   cmd('layoutRows'); await tick(80);
   ok('Классическая раскладка выходит из режима редактора',
      !w.document.body.classList.contains('focus-mode') && $('#editors')?.dataset.layout === 'rows');
@@ -170,6 +182,43 @@ ok('Кодовая область — отдельная колонка рабо
   w.dispatchEvent(new w.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
   await tick(120);
   ok('Esc возвращает панель на место', !$('.editor-pane.maximized'));
+}
+
+/* ── 8. SVG icons everywhere in the left rail / panels ──────────── */
+{
+  for (const tab of ['files', 'search', 'libs', 'assets', 'learn', 'plugins']) {
+    click($(`#railNav [data-rail-tab="${tab}"]`)); await tick(40);
+  }
+  for (const tab of ['analysis', 'console', 'debug', 'inspector', 'log']) {
+    click($(`#inspectorTabs [data-insp-tab="${tab}"]`)); await tick(40);
+  }
+  const blank = $$('button').filter(b =>
+    !(b.textContent || '').replace(/\s/g, '') && !b.querySelector('svg') && !b.querySelector('img'));
+  ok('Нет пустых кнопок без SVG-иконки', blank.length === 0,
+     blank.slice(0, 4).map(b => b.outerHTML.slice(0, 80)).join(' | '));
+  const pseudo = $$('button, .pill, .empty-note').filter(b => /[＋⋮]/.test(b.textContent || ''));
+  ok('Нет текстовых псевдо-иконок (＋, ⋮)', pseudo.length === 0,
+     pseudo.slice(0, 3).map(b => (b.textContent || '').trim().slice(0, 30)).join(' | '));
+  ok('В левой панели есть SVG-иконки', $$('#rail svg').length >= 10, $$('#rail svg').length + ' svg');
+  ok('Каждый пункт левой навигации с иконкой',
+     $$('#railNav .nav-item').length >= 6 && $$('#railNav .nav-item').every(b => !!b.querySelector('svg')),
+     $$('#railNav .nav-item').filter(b => !b.querySelector('svg')).map(b => b.textContent.trim()).join(','));
+  ok('Кнопка «Настройки» сохранила SVG после локализации',
+     !!$('#toolbar [data-cmd="settings"] svg'));
+  ok('Счётчики вкладок инспектора не пропали', !!$('#analysisCount') && !!$('#consoleCount'));
+}
+
+/* ── 9. Native-looking shell + visible site ─────────────────────── */
+{
+  ok('Веб-меню как в десктопной программе', $$('#menuBar [data-menu]').length === 6 &&
+     $$('#menuBar svg').length >= 1);
+  ok('Плоский нативный вид включён', w.document.body.classList.contains('native-ui'));
+  ok('Кнопки «Запустить», «Анализ», «Сайт» в полосе вкладок',
+     ['run', 'analyze', 'toggleFocusPanel'].every(id => !!$(`#editorTabs [data-cmd="${id}"]`)));
+  ok('Сайт и код идут рядом (не поверх)', /focus-panel \.workspace/.test(
+     await (await fetch(ORIGIN + '/dist/styles.css')).text()) &&
+     !/focus-panel \.dock \{[^}]*position: absolute/.test(
+     await (await fetch(ORIGIN + '/dist/styles.css')).text()));
 }
 
 ok('Ошибок в консоли нет', errors.length === 0, errors.slice(0, 2).join(' | ').slice(0, 300));
