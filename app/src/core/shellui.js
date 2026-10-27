@@ -23,6 +23,62 @@ const MENUS = {
         ['exportSingleHtml', 'Собрать один HTML'], ['saveToDisk', 'Сохранить проект на диск'] ] }
     ]
   },
+  edit: {
+    title: 'Правка', icon: 'edit', sections: [
+      { label: 'Код', items: [
+        ['format', 'Форматировать'], ['toggleComment', 'Закомментировать'],
+        ['emmet', 'Развернуть Emmet'], ['snippets', 'Вставить сниппет'],
+        ['foldAll', 'Свернуть/развернуть код'], ['unfoldAll', 'Развернуть весь код'],
+        ['gotoLine', 'Перейти к строке'] ] },
+      { label: 'Поиск', items: [
+        ['findInProject', 'Найти в проекте'], ['replaceAll', 'Заменить всё'] ] }
+    ]
+  },
+  view: {
+    title: 'Вид', icon: 'columns', sections: [
+      { label: 'Рабочее пространство', items: [
+        ['focusMode', 'Режим редактора / классический вид'],
+        ['previewSplit', 'Показать сайт рядом с кодом'],
+        ['toggleFocusPanel', 'Скрыть/показать сайт'],
+        ['toggleSidebar', 'Показать/скрыть проводник'],
+        ['restorePanes', 'Развернуть все панели'],
+        ['nativeUI', 'Нативный вид интерфейса'] ] },
+      { label: 'Раскладка', items: [
+        ['layoutColumns', 'Три колонки'], ['layoutRows', 'Три строки'], ['layoutTabs', 'Вкладки'] ] },
+      { label: 'Оформление', items: [
+        ['theme', 'Сменить тему'], ['density', 'Плотность'],
+        ['fontZoomIn', 'Крупнее'], ['fontZoomOut', 'Мельче'], ['toggleWrap', 'Перенос строк'] ] }
+    ]
+  },
+  run: {
+    title: 'Запуск', icon: 'play', sections: [
+      { label: 'Сайт', items: [
+        ['run', 'Запустить / обновить страницу'], ['previewSplit', 'Показать сайт'],
+        ['openSite', 'Сайт в окне'], ['openSiteExternal', 'Открыть в браузере'],
+        ['liveServer', 'Live Server'], ['previewFullscreen', 'Предпросмотр на весь экран'] ] },
+      { label: 'Проверка', items: [
+        ['analyze', 'Анализ кода'], ['analysisReport', 'Полный отчёт'],
+        ['securityScan', 'Проверка безопасности'], ['fixAll', 'Исправить ошибки'] ] }
+    ]
+  },
+  tools: {
+    title: 'Инструменты', icon: 'puzzle', sections: [
+      { label: 'Генераторы', items: [
+        ['cssLab', 'CSS-лаборатория'], ['jsTools', 'JS-инструменты'],
+        ['htmlTools', 'HTML-генераторы'], ['openThreeD', '3D-редактор'],
+        ['librarySearch', 'Библиотеки CDN'], ['contrastCheck', 'Проверить контраст'] ] },
+      { label: 'Расширения', items: [
+        ['plugins', 'Плагины'], ['learn', 'Уроки'], ['settings', 'Настройки'],
+        ['shortcuts', 'Горячие клавиши'] ] }
+    ]
+  },
+  help: {
+    title: 'Справка', icon: 'help', sections: [
+      { label: 'Помощь', items: [
+        ['helpWelcome', 'Как работать'], ['tour', 'Быстрый тур'],
+        ['shortcuts', 'Горячие клавиши'], ['settings', 'О программе и настройки'] ] }
+    ]
+  },
   more: {
     title: 'Ещё', icon: 'more', sections: [
       { label: 'Редактор', items: [
@@ -181,6 +237,16 @@ export function initAppWindow() {
   on('appwindow:changed', () => {
     const min = $('.taskbar-hint'); if (min) min.textContent = body.classList.contains('app-min') ? 'Окно свёрнуто' : 'Рабочий стол';
   });
+  applyNativeUI();
+  on('settings:changed', applyNativeUI);
+  on('project:rename', applyNativeUI);
+  on('project:loaded', applyNativeUI);
+}
+/** Flat, edge-to-edge desktop chrome. The OS frame/menu/dialogs stay native. */
+export function applyNativeUI() {
+  document.body.classList.toggle('native-ui', state.settings.nativeUI !== false);
+  const title = $('#menuBarProject');
+  if (title) title.textContent = state.projectName || 'Проект';
 }
 export function setAppWindowed(v) {
   state.settings.appWindowed = !!v;

@@ -17,7 +17,7 @@ export const DEFAULT_SETTINGS = {
   // VS Code-like workspace: one open file fills the whole screen. Sidebar and
   // the preview/analysis panel are toggled on demand instead of squeezing the
   // code into a third of the window.
-  focusMode: true, focusSidebar: true, focusPanel: false,
+  focusMode: true, focusSidebar: true, focusPanel: true, nativeUI: true,
   fontSizeMin: 12, fontSizeMax: 28,
   // Customisable quick-action toolbar. Commands come from the registry;
   // users can replace any entry from a preset list in Settings -> Buttons.
@@ -330,8 +330,13 @@ export function applyLocale() {
   for (const [sel, enText] of map) {
     const node = $(sel);
     if (!node) continue;
-    if (!node.dataset.ru) node.dataset.ru = node.textContent.trim();
-    node.textContent = en ? enText : node.dataset.ru;
+    // Only replace the DIRECT text node. Assigning node.textContent used to
+    // wipe out every child element — SVG icons, tab counters, badges — which
+    // is why icons disappeared from the nav bar, inspector tabs and toolbar.
+    const textNode = [...node.childNodes].find(n => n.nodeType === 3 && n.textContent.trim());
+    if (!textNode) continue;                     // icon-only control: nothing to translate
+    if (!node.dataset.ru) node.dataset.ru = textNode.textContent.trim();
+    textNode.textContent = en ? enText : node.dataset.ru;
   }
   document.documentElement.lang = state.settings.locale === 'ar' ? 'ar' : state.settings.locale;
 }

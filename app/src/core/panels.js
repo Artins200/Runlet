@@ -213,7 +213,7 @@ export function renderConsole() {
       <select id="logLevel" class="mini-select"><option value="all">все</option><option value="log">log</option><option value="info">info</option><option value="warn">warn</option><option value="error">error</option></select>
       <input id="logSearch" placeholder="Поиск / regex…" style="flex:1;min-width:70px;height:25px;border-radius:8px;border:1px solid var(--border);background:var(--code-bg);padding:0 8px;font-size:11px">
       <label class="chk"><input type="checkbox" id="logGroup" ${state.consoleGroup ? 'checked' : ''}> группировать</label>
-      <button class="mini-btn" id="logClear">Очистить</button><button class="mini-btn" id="logSave"></button>
+      <button class="mini-btn" id="logClear">${icon('trash', 13)} Очистить</button><button class="mini-btn icon-btn" id="logSave" title="Сохранить журнал" aria-label="Сохранить журнал">${icon('download', 13)}</button>
       <button class="mini-btn" id="logJson">JSON</button></div>
       <div class="console-list" id="logList" style="flex:1;overflow:auto"></div>
       <div class="repl-bar"><span class="repl-prompt">›</span><input id="replInput" placeholder="Введите JS-выражение (Enter — выполнить)" autocomplete="off">
@@ -279,17 +279,17 @@ export function renderDebug() {
       <button class="mini-btn" id="dbgStepOver">${icon('arrowRight', 13)} Step over</button>
       <button class="mini-btn" id="dbgStepOut">${icon('arrowUp', 13)} Step out</button>
       <button class="mini-btn" id="dbgResume">${icon('play', 13)} Resume</button>
-      <button class="mini-btn" id="dbgAddBp">＋ Точка</button></div>
+      <button class="mini-btn" id="dbgAddBp">${icon('plus', 13)} Точка</button></div>
     <div class="section"><h3>Точки останова <span class="count">${bps.length}</span></h3>
       <div class="debug-steps">${bps.length ? bps.map(b => `<div class="kv"><span>${esc(b.file)}:${b.line}</span>
         <span>${b.condition ? ' ' + esc(b.condition) : 'обычная'}</span>
-        <button class="mini-btn" data-bpdel="${esc(b.file)}:${b.line}"></button></div>`).join('') : '<div class="empty-note">Клик «＋ Точка» и укажите строку</div>'}</div></div>
+        <button class="mini-btn icon-btn" data-bpdel="${esc(b.file)}:${b.line}" title="Удалить точку останова" aria-label="Удалить точку останова">${icon('trash', 13)}</button></div>`).join('') : '<div class="empty-note">Клик «Точка» и укажите строку</div>'}</div></div>
     <div class="section"><h3>Выполненные строки <span class="count">${trace.length}</span></h3>
       <div class="debug-steps" id="timeline" style="max-height:150px;overflow:auto">${trace.slice(-120).map((t, i) => `<div class="timeline-row ${i === state.traceIndex ? 'active' : ''}" data-ti="${i}">
         <span>${t.t}ms</span><b>${esc(t.file)}:${t.line}</b><span>${esc(Object.keys(t.vars || {}).slice(0, 5).join(', '))}</span></div>`).join('') || '<div class="empty-note">Запустите код — трассировщик запишет executed lines</div>'}</div></div>
     <div class="section"><h3>Scope / Watch</h3>
       <div class="debug-steps" id="scopeBox">${scopeHtml()}</div>
-      <div class="rowflex" style="padding:0 10px 10px"><input id="watchInput" placeholder="watch: выражение" style="flex:1;height:26px;border-radius:8px;border:1px solid var(--border);background:var(--code-bg);padding:0 8px;font-size:11px"><button class="mini-btn" id="watchAdd">＋</button></div></div>
+      <div class="rowflex" style="padding:0 10px 10px"><input id="watchInput" placeholder="watch: выражение" style="flex:1;height:26px;border-radius:8px;border:1px solid var(--border);background:var(--code-bg);padding:0 8px;font-size:11px"><button class="mini-btn icon-btn" id="watchAdd" title="Добавить watch-выражение" aria-label="Добавить watch-выражение">${icon('plus', 13)}</button></div></div>
     <div class="section"><h3>Call stack</h3><div class="stack-list">${stackHtml()}</div></div>`;
   host.querySelector('#dbgRefresh').onclick = () => { send('getTrace', {}); toast('Запрошена трассировка', 'info'); };
   host.querySelector('#dbgStepInto').onclick = () => step(1);

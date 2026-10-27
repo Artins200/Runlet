@@ -316,8 +316,11 @@ function buildMenu() {
   const tpl = [
     { label: 'Файл', submenu: [
       { label: 'Новый проект', accelerator: 'CmdOrCtrl+N', click: () => send('startScreen') },
+      { label: 'Новый HTML-файл', click: () => send('quickNewHtml') },
       { label: 'Открыть файл…', accelerator: 'CmdOrCtrl+O', click: () => send('upload') },
+      { label: 'Открыть папку с диска', click: () => send('openOSFolder') },
       { label: 'Сохранить', accelerator: 'CmdOrCtrl+S', click: () => send('save') },
+      { label: 'Сохранить проект на диск', click: () => send('saveToDisk') },
       { label: 'Экспорт ZIP', click: () => send('exportZip') },
       { label: 'Импорт ZIP', click: () => send('importZip') },
       { type: 'separator' }, { label: 'Выход', role: 'quit' } ] },
@@ -326,8 +329,18 @@ function buildMenu() {
       { label: 'Вырезать', role: 'cut' }, { label: 'Копировать', role: 'copy' },
       { label: 'Вставить', role: 'paste' }, { label: 'Выделить всё', role: 'selectAll' },
       { type: 'separator' },
+      { label: 'Свернуть/развернуть код', click: () => send('foldAll') },
+      { label: 'Развернуть весь код', click: () => send('unfoldAll') },
       { label: 'Палитра команд', accelerator: 'CmdOrCtrl+Shift+P', click: () => send('palette') } ] },
     { label: 'Вид', submenu: [
+      // No accelerators on toggles: the renderer already owns F11 / Ctrl+B and
+      // a native accelerator firing too would flip the state straight back.
+      { label: 'Режим редактора / классический вид', click: () => send('focusMode') },
+      { label: 'Показать сайт рядом с кодом', click: () => send('previewSplit') },
+      { label: 'Показать/скрыть проводник', click: () => send('toggleSidebar') },
+      { label: 'Развернуть все панели', click: () => send('restorePanes') },
+      { label: 'Нативный вид интерфейса', click: () => send('nativeUI') },
+      { type: 'separator' },
       { label: 'Три колонки', accelerator: 'Alt+1', click: () => send('layoutColumns') },
       { label: 'Три строки', accelerator: 'Alt+2', click: () => send('layoutRows') },
       { label: 'Вкладки', accelerator: 'Alt+3', click: () => send('layoutTabs') }, { type: 'separator' },
@@ -335,9 +348,14 @@ function buildMenu() {
       { label: 'Настройки', accelerator: 'CmdOrCtrl+,', click: () => send('settings') },
       { label: 'Полный экран', role: 'togglefullscreen' } ] },
     { label: 'Запуск', submenu: [
-      { label: 'Запустить', accelerator: 'CmdOrCtrl+Enter', click: () => send('run') },
+      { label: 'Запустить / обновить страницу', accelerator: 'CmdOrCtrl+Enter', click: () => send('run') },
       { label: 'Анализ кода', accelerator: 'CmdOrCtrl+Shift+A', click: () => send('analyze') },
       { label: 'Форматировать', accelerator: 'CmdOrCtrl+Shift+F', click: () => send('format') },
+      { type: 'separator' },
+      { label: 'Показать сайт рядом с кодом', click: () => send('previewSplit') },
+      { label: 'Открыть сайт в окне', click: () => send('openSite') },
+      { label: 'Открыть в браузере', click: () => send('openSiteExternal') },
+      { label: 'Live Server', click: () => send('liveServer') },
       { label: 'Открыть предпросмотр в окне', click: () => send('popout') } ] },
     { label: 'Инструменты', submenu: [
       { label: 'CSS-лаборатория', click: () => send('cssLab') },

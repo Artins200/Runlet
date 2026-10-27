@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Optional NATIVE SHELL (Windows). This is NOT used by `npm start`.
+       It replaces electron/main.cjs as the window/menu host; the whole app/
+       renderer is unchanged and is loaded through WebView2. -->
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <Nullable>enable</Nullable>
+    <AssemblyName>Runlet</AssemblyName>
+    <RootNamespace>Runlet.Native</RootNamespace>
+    <ApplicationIcon />
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.2739.15" />
+  </ItemGroup>
+
+</Project>

@@ -191,6 +191,20 @@ try {
   ok('Свёрнутые панели и код всегда разворачиваются обратно',
      /restorePanes/.test(uiSrc) && /expand-chip/.test(css) &&
      /foldedPanes/.test(fs.readFileSync(path.join(root, 'app/src/core/editor.js'), 'utf8')));
+  const coreSrc = fs.readFileSync(path.join(root, 'app/src/core/core.js'), 'utf8');
+  const electronSrc = fs.readFileSync(path.join(root, 'electron/main.cjs'), 'utf8');
+  const allCore = fs.readdirSync(path.join(root, 'app/src/core')).filter(f => f.endsWith('.js'))
+    .map(f => fs.readFileSync(path.join(root, 'app/src/core', f), 'utf8')).join('\n');
+  ok('Нативный вид: веб-меню, системное меню Electron, плоская оболочка',
+     /id="menuBar"/.test(indexSrc) && /body\.native-ui/.test(css) &&
+     /Menu\.setApplicationMenu/.test(electronSrc) && /nativeUI/.test(coreSrc));
+  ok('Сайт виден рядом с кодом, а не поверх него',
+     /focusPanel: true/.test(coreSrc) && /focus-panel \.workspace/.test(css) &&
+     !/focus-panel \.dock \{[^}]*position: absolute/.test(css) &&
+     /revealPreview/.test(uiSrc));
+  ok('SVG-иконки не теряются: локализация трогает только текст',
+     /nodeType === 3/.test(coreSrc) && !/\bnode\.textContent\s*=\s*en/.test(coreSrc) &&
+     !/[＋⋮]/.test(allCore) && /freeIndexedPath/.test(filesSrc));
 
   // 12. Live Server smoke
   const live = await (async () => {

@@ -524,7 +524,10 @@ export function renderLibs() {
         el('div', { class: 'grow' }, el('b', { text: lib.name }), el('small', { text: lib.desc })),
         el('select', { class: 'mini-select', title: 'Версия' },
           ...lib.versions.map(v => el('option', { value: v, selected: (typeof dep === 'object' && dep.version === v) ? 'selected' : null, text: v }))),
-        el('button', { class: 'mini-btn ' + (dep ? 'active' : ''), text: dep ? '' : '+' }));
+        el('button', { class: 'mini-btn icon-btn ' + (dep ? 'active' : ''),
+                        html: icon(dep ? 'check' : 'plus', 13),
+                        title: dep ? 'Отключить библиотеку' : 'Подключить библиотеку',
+                        'aria-label': dep ? 'Отключить библиотеку' : 'Подключить библиотеку' }));
       const sel = row.querySelector('select'), btn = row.querySelector('button');
       btn.classList.toggle('active', !!dep);
       btn.addEventListener('click', () => {
@@ -553,22 +556,22 @@ export function renderAssets() {
   host.innerHTML = '';
   const assets = listFiles().filter(p => /\.(png|jpe?g|gif|webp|svg|ico|woff2?|ttf|otf|mp3|wav|mp4|webm)$/i.test(p));
   const actions = el('div', { class: 'rowflex mb8' },
-    el('button', { class: 'mini-btn', text: '＋ placeholder', onclick: () => {
+    el('button', { class: 'mini-btn', html: icon('image', 13) + '<span>Placeholder</span>', title: 'Создать картинку-заглушку', onclick: () => {
       const url = placeholderImage(640, 360, randomAccent(), 'Runlet placeholder');
       const p = `assets/placeholder-${Date.now().toString(36)}.png`;
       write(p, url); renderTree(); renderAssets(); toast('Placeholder создан: ' + p, 'ok');
     } }),
-    el('button', { class: 'mini-btn', text: '＋ SVG', onclick: () => {
+    el('button', { class: 'mini-btn', html: icon('plus', 13) + '<span>SVG</span>', title: 'Добавить SVG-иконку', onclick: () => {
       const p = `assets/icon-${Date.now().toString(36)}.svg`;
       write(p, SVG_ICONS.star.replace('currentColor', '#7c6cf6')); renderTree(); renderAssets();
     } }),
-    el('button', { class: 'mini-btn', text: '＋ favicon', onclick: () => {
+    el('button', { class: 'mini-btn', html: icon('plus', 13) + '<span>Favicon</span>', title: 'Создать и подключить favicon', onclick: () => {
       const p = 'favicon.png'; write(p, faviconFrom(state.settings.accent));
       const html = read(state.entry).replace('</head>', `<link rel="icon" href="${p}">\n</head>`);
       write(state.entry, html); renderTree(); renderAssets(); toast('Favicon создан и подключён', 'ok');
     } }),
-    el('button', { class: 'mini-btn', text: 'ZIP ассетов', onclick: () => exportZip({ assetsOnly: true }) }),
-    el('button', { class: 'mini-btn', text: 'Очистить лишние', onclick: cleanupAssets }));
+    el('button', { class: 'mini-btn', html: icon('archive', 13) + '<span>ZIP ассетов</span>', title: 'Скачать ассеты ZIP', onclick: () => exportZip({ assetsOnly: true }) }),
+    el('button', { class: 'mini-btn', html: icon('trash', 13) + '<span>Очистить лишние</span>', title: 'Удалить неиспользуемые ассеты', onclick: cleanupAssets }));
   host.appendChild(actions);
   if (!assets.length) host.appendChild(el('div', { class: 'empty-note', text: 'Ассетов пока нет. Перетащите файлы в окно редактора.' }));
   const grid = el('div', { class: 'grid-cards' });
@@ -582,8 +585,9 @@ export function renderAssets() {
       (/\.mp3|wav/.test(p) ? '' : /\.mp4|webm/.test(p) ? '' : '')}</div>
       <b>${esc(p.split('/').pop())}</b><small>${fmtBytes(f.content.length)} · ${esc(mimeOf(p))}</small>`;
     const row = el('div', { class: 'rowflex mt8' },
-      el('button', { class: 'mini-btn', text: 'Вставить', onclick: () => insertAsset(p) }),
-      el('button', { class: 'mini-btn', text: '⋮', onclick: ev => contextMenu(ev, p, false) }));
+      el('button', { class: 'mini-btn', html: icon('code', 13) + '<span>Вставить</span>', title: 'Вставить ссылку на ассет', onclick: () => insertAsset(p) }),
+      el('button', { class: 'mini-btn icon-btn', html: icon('more', 13), title: 'Действия с файлом',
+                     'aria-label': 'Действия с файлом', onclick: ev => contextMenu(ev, p, false) }));
     tile.appendChild(row);
     grid.appendChild(tile);
   }
@@ -659,9 +663,9 @@ export function versionsDialog(selected = null) {
     <div class="grow"><b>${esc(s.label)}</b><small>${new Date(s.at).toLocaleString('ru-RU')} · ${Object.keys(s.files).length} файлов</small></div>
     <button class="mini-btn" data-restore="${s.id}">Восстановить</button>
     <button class="mini-btn" data-diff="${s.id}">Diff</button>
-    <button class="mini-btn" data-del="${s.id}"></button></div>`).join('');
+    <button class="mini-btn icon-btn" data-del="${s.id}" title="Удалить версию" aria-label="Удалить версию">${icon('trash', 13)}</button></div>`).join('');
   ctx.modal({ title: 'История версий', wide: true,
-    body: `<div class="rowflex mb8"><button class="mini-btn" id="makeSnap">＋ Создать снапшот</button>
+    body: `<div class="rowflex mb8"><button class="mini-btn" id="makeSnap">${icon('plus', 13)} Создать снапшот</button>
       <span class="muted" style="font-size:11px">Хранится до 25 последних версий</span></div><div class="list-rows">${rows || '<div class="empty-note">Снапшотов пока нет</div>'}</div>
       <div id="diffBox" class="mt8"></div>`,
     okText: 'Закрыть',
