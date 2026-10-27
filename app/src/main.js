@@ -2,14 +2,14 @@
 import { state, ctx, on, emit, $, $$, toast, debounce, registerCommand, DEFAULT_SETTINGS,
          runCommand, commands, contrastRatio, setFontZoom, toggleWrap } from './core/core.js';
 import { initStorage, startAutoSave, persistNow, projectJSON, listFiles, read, write, exists, sanitizeSettings, applySettings } from './core/state.js';
-import { initEditors, applyEditorSettings, setPaneFile, goto, getDoc, setDoc, focusPane } from './core/editor.js';
+import { initEditors, applyEditorSettings, setPaneFile, goto, getDoc, setDoc, focusPane, isPaneFolded } from './core/editor.js';
 import { initPreview, run, applyDevice, refreshInspectors, send } from './core/preview.js';
 import { initFiles, renderTree, openFile, renderLibs, renderAssets } from './core/files.js';
 import { initPanels, renderAnalysis, renderConsole, renderDebug } from './core/panels.js';
 import { initLearn, renderLearn, initPlugins, renderPlugins, initFeatures, pluginAPI } from './core/extras.js';
 import { initCommands } from './core/commands.js';
 import { initUI, applyLayout, modal, closeModal, selectInspTab, selectRailTab,
-         showStartScreen, showWelcome, hydrateIcons } from './core/ui.js';
+         showStartScreen, showWelcome, hydrateIcons, setFocusMode } from './core/ui.js';
 import { initProjects, openProject, listProjects } from './core/projects.js';
 import { initWindows, toggleWindowedMode, openSiteWindow, openWindow, movePanelWindow,
          detachEditor, windowCount } from './core/windows.js';
@@ -208,6 +208,12 @@ function publicAPI() {
     scene3d: () => import('./core/threeD.js').then(m => m.getScene()),
     threeD: () => threeDStats(), openThreeD: () => openThreeStage(),
     contrastRatio, setFontZoom, toggleWrap, windowControl,
+    focusMode: () => ({ enabled: state.settings.focusMode !== false,
+                        sidebar: state.settings.focusSidebar !== false,
+                        panel: state.settings.focusPanel === true,
+                        activePane: state.activePane,
+                        collapsed: { ...state.collapsed } }),
+    setFocusMode, folded: () => isPaneFolded(),
     console: {
       clear: () => { state.logs = []; renderConsole(); },
       logs: () => state.logs

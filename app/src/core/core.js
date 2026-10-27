@@ -14,6 +14,10 @@ export const DEFAULT_SETTINGS = {
   timeLimit: 4000, confirmDelete: true,
   showLauncher: true, windowedMode: false, nativeFrame: true, livePort: 5500,
   appWindowed: true, animations: true,
+  // VS Code-like workspace: one open file fills the whole screen. Sidebar and
+  // the preview/analysis panel are toggled on demand instead of squeezing the
+  // code into a third of the window.
+  focusMode: true, focusSidebar: true, focusPanel: false,
   fontSizeMin: 12, fontSizeMax: 28,
   // Customisable quick-action toolbar. Commands come from the registry;
   // users can replace any entry from a preset list in Settings -> Buttons.
@@ -32,7 +36,9 @@ export const DEFAULT_SETTINGS = {
     'moveLineUp': 'Alt+ArrowUp', 'moveLineDown': 'Alt+ArrowDown',
     'multiCursor': 'Ctrl+D', 'layoutColumns': 'Alt+1', 'layoutRows': 'Alt+2',
     'layoutTabs': 'Alt+3', 'previewFullscreen': 'Alt+Enter',
-    'liveServer': 'Ctrl+Shift+L', 'windowedMode': 'Ctrl+Shift+W'
+    'liveServer': 'Ctrl+Shift+L', 'windowedMode': 'Ctrl+Shift+W',
+    'focusMode': 'F11', 'toggleSidebar': 'Ctrl+B', 'toggleFocusPanel': 'Ctrl+J',
+    'foldAll': 'Alt+[', 'unfoldAll': 'Alt+]', 'restorePanes': 'Alt+0'
   }
 };
 

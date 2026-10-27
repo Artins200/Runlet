@@ -120,6 +120,14 @@ try {
   ok('Стабильность окна (нет самопроизвольных действий)', wstab.status === 0, `${wsPass} проверок` + (wsFail ? `, ${wsFail} упало` : ''));
   if (wstab.status !== 0) console.log(wsOut.split('\n').filter(l => l.includes('❌')).join('\n').slice(0, 1600));
 
+  // 7c. VS Code-like workspace, index.html defaults, reversible collapse
+  const wspace = run(process.execPath, ['scripts/workspace.mjs']);
+  const ws2Out = (wspace.stdout || '') + (wspace.stderr || '');
+  const ws2Pass = ws2Out.split('\n').filter(l => l.includes('✅')).length;
+  const ws2Fail = ws2Out.split('\n').filter(l => l.includes('❌')).length;
+  ok('Рабочее пространство как в VS Code', wspace.status === 0, `${ws2Pass} проверок` + (ws2Fail ? `, ${ws2Fail} упало` : ''));
+  if (wspace.status !== 0) console.log(ws2Out.split('\n').filter(l => l.includes('❌')).join('\n').slice(0, 2000));
+
   // 8. srcdoc scripts syntax
   const src = run(process.execPath, ['scripts/checksrcdoc.mjs']);
   const srcOut = (src.stdout || '') + (src.stderr || '');
@@ -171,6 +179,18 @@ try {
      /app-min/.test(css) && /desktopBar/.test(fs.readFileSync(path.join(root,'app/index.html'),'utf8')));
   ok('Вкладка «Идеи» удалена из интерфейса', !/data-rail-tab="features"/.test(fs.readFileSync(path.join(root,'app/index.html'),'utf8')));
   ok('Анимации + reduced-motion', /@keyframes rlFadeIn/.test(css) && /prefers-reduced-motion/.test(css));
+  const uiSrc = fs.readFileSync(path.join(root, 'app/src/core/ui.js'), 'utf8');
+  const filesSrc = fs.readFileSync(path.join(root, 'app/src/core/files.js'), 'utf8');
+  const indexSrc = fs.readFileSync(path.join(root, 'app/index.html'), 'utf8');
+  ok('Режим редактора: вкладки + одна панель на весь экран',
+     /id="editorTabs"/.test(indexSrc) && /id="codeArea"/.test(indexSrc) &&
+     /body\.focus-mode \.editors > \.editor-pane\.focus-active/.test(css) &&
+     /export function initFocusMode/.test(uiSrc));
+  ok('Имя нового файла по умолчанию — index.html',
+     /'index\.html'/.test(filesSrc) && /freeIndexedPath/.test(filesSrc) && !/untitled-/.test(filesSrc));
+  ok('Свёрнутые панели и код всегда разворачиваются обратно',
+     /restorePanes/.test(uiSrc) && /expand-chip/.test(css) &&
+     /foldedPanes/.test(fs.readFileSync(path.join(root, 'app/src/core/editor.js'), 'utf8')));
 
   // 12. Live Server smoke
   const live = await (async () => {

@@ -647,8 +647,19 @@ export function sortCssProps(pane = 'css') {
   });
   setDoc(out, pane); toast('CSS-свойства сгруппированы и отсортированы', 'ok');
 }
-export function toggleFoldAll(pane = state.activePane) { foldAll(editors[pane]); }
-export function unfoldAllPane(pane = state.activePane) { unfoldAll(editors[pane]); }
+/* Folding must be reversible from the same command: previously "Свернуть всё"
+   only ever folded and there was no obvious way back for a collapsed block. */
+const foldedPanes = new Set();
+export function toggleFoldAll(pane = state.activePane) {
+  const view = editors[pane]; if (!view) return false;
+  if (foldedPanes.has(pane)) { unfoldAll(view); foldedPanes.delete(pane); return false; }
+  foldAll(view); foldedPanes.add(pane); return true;
+}
+export function unfoldAllPane(pane = state.activePane) {
+  const view = editors[pane]; if (!view) return;
+  unfoldAll(view); foldedPanes.delete(pane);
+}
+export function isPaneFolded(pane = state.activePane) { return foldedPanes.has(pane); }
 export function cmCommand(name) {
   const v = getActiveEditor(); if (!v) return;
   const map = {

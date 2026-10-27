@@ -142,14 +142,33 @@ export function renderTree() {
   }
   updateSize();
 }
+/** Base name for every new file is "index": index.html, index.css, index.js.
+    If it is taken, use index-2.html and so on — never silently overwrite. */
+export function freeIndexedPath(ext = 'html', folder = '') {
+  const base = folder ? folder.replace(/^\/+|\/+$/g, '') + '/' : '';
+  const first = `${base}index.${ext}`;
+  if (!exists(first)) return first;
+  let n = 2;
+  while (exists(`${base}index-${n}.${ext}`)) n++;
+  return `${base}index-${n}.${ext}`;
+}
 export function quickCreate(ext = 'html', folder = '') {
-  const base = folder ? folder + '/' : '';
-  let n = 1, path;
-  do { path = `${base}untitled-${n++}.${ext}`; } while (exists(path));
+  const path = freeIndexedPath(ext, folder);
   write(path, starterContent(ext, path));
   renderTree(); openFile(path);
   toast(`Создан файл ${path}`, 'ok');
   return path;
+}
+/** Same rule for explicit names: index.html -> index-2.html on collision. */
+function resolveNameCollision(dir, rel, ext, isFolder = false) {
+  const path = [dir, rel].filter(Boolean).join('/');
+  if (!exists(path)) return { path, renamed: false };
+  const dot = !isFolder && rel.lastIndexOf('.') > 0 ? rel.lastIndexOf('.') : -1;
+  const stem = dot > 0 ? rel.slice(0, dot) : rel;
+  const suffix = dot > 0 ? rel.slice(dot) : (isFolder ? '' : '.' + ext);
+  let n = 2, candidate;
+  do { candidate = [dir, `${stem}-${n++}${suffix}`].filter(Boolean).join('/'); } while (exists(candidate));
+  return { path: candidate, renamed: true };
 }
 function starterContent(ext, path) {
   const name = path.split('/').pop();
@@ -229,7 +248,7 @@ export function newFileDialog(folder = false, basePath = '') {
     body: `${folder ? '' : `<div class="field"><label>Тип файла</label>
         <select id="dlgType">${types.map(([v, l]) => `<option value="${v}">${l}</option>`).join('')}</select></div>`}
       <div class="field"><label>Имя ${folder ? 'папки' : 'файла'}</label>
-        <input id="dlgName" value="${folder ? 'new-folder' : 'page'}" autofocus></div>
+        <input id="dlgName" value="${folder ? 'new-folder' : 'index.html'}" autofocus></div>
       <div class="field"><label>Папка (необязательно)</label>
         <input id="dlgFolder" value="${esc(basePath)}" placeholder="components"></div>
       ${folder ? '' : `<div class="field"><label>Шаблон</label>
@@ -241,7 +260,9 @@ export function newFileDialog(folder = false, basePath = '') {
       const sync = () => {
         const name = root.querySelector('#dlgName');
         if (!name || !type) return;
-        if (/^(page|untitled|new-file)(\.|$)/.test(name.value)) name.value = 'page.' + type.value;
+        // Keep the "index" base name when the user switches file type.
+        if (/^(page|untitled|new-file|index)(-?\d+)?(\.\w+)?$/i.test(name.value.trim()))
+          name.value = 'index.' + type.value;
       };
       type?.addEventListener('change', sync);
     },
@@ -254,14 +275,13 @@ export function newFileDialog(folder = false, basePath = '') {
       let rel = raw;
       if (folder) rel = raw.replace(/^\/+|\/+$/g, '');
       else if (!/\.[a-z0-9]+$/i.test(rel)) rel += '.' + ext;
-      const path = [dir, rel].filter(Boolean).join('/');
+      const { path, renamed } = resolveNameCollision(dir, rel, ext, folder);
       if (!safePathKey(path)) { toast('Недопустимое имя файла', 'err'); return false; }
-      if (exists(path)) { toast('Такой файл уже есть', 'err'); return false; }
       const content = folder ? `# ${rel}\n` : templateContent(tpl, ext, rel);
       if (!write(path, content)) return false;
       renderTree();
       if (!folder) openFile(path);
-      toast(`Создано: ${path}`, 'ok');
+      toast(renamed ? `Имя занято — создано: ${path}` : `Создано: ${path}`, renamed ? 'info' : 'ok');
     }
   });
 }
