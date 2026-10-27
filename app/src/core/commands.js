@@ -35,7 +35,8 @@ import {
   startTour, startTemplate, applyLayout, collapsePane, fullscreenPane, cycleTheme,
   cycleDensity, snippetsModal, cssLabModal, jsToolsModal, htmlToolsModal,
   gotoLineDialog, colorToolDialog, librarySearchDialog, collaborationDialog,
-  selectRailTab, selectInspTab
+  selectRailTab, selectInspTab, setFocusMode, toggleFocusMode, toggleSidebar,
+  toggleFocusPanel, restorePanes, refreshFocusUI
 } from './ui.js';
 import { startLiveServer, stopLiveServer, toggleLiveServer, openSiteWindow, openSiteExternal, liveServerDialog, liveStatus } from './liveserver.js';
 import { toggleWindowedMode, detachEditor, openSiteWindow as openSiteWin, closeAllWindows, windowCount, isWindowed, movePanelWindow } from './windows.js';
@@ -79,11 +80,20 @@ export function initCommands() {
   cmd('applySettings', 'Применить настройки', 'Основное', 'refresh', () => { applySettings(); applyEditorSettings(); }, { hidden: true });
 
   /* ── layouts ────────────────────────────────────────────────── */
-  cmd('layoutColumns', 'Раскладка: три колонки', 'Раскладка', 'columns', () => applyLayout('columns'));
-  cmd('layoutRows', 'Раскладка: три строки', 'Раскладка', 'rows', () => applyLayout('rows'));
-  cmd('layoutTabs', 'Раскладка: вкладки', 'Раскладка', 'tabs', () => applyLayout('tabs'));
+  // Picking a classic three-pane layout is an explicit exit from focus mode.
+  const classic = layout => () => { setFocusMode(false); applyLayout(layout); };
+  cmd('layoutColumns', 'Раскладка: три колонки', 'Раскладка', 'columns', classic('columns'));
+  cmd('layoutRows', 'Раскладка: три строки', 'Раскладка', 'rows', classic('rows'));
+  cmd('layoutTabs', 'Раскладка: вкладки', 'Раскладка', 'tabs', classic('tabs'));
   cmd('collapsePane', 'Свернуть панель', 'Раскладка', 'minus', p => collapsePane(typeof p === 'string' ? p : state.activePane));
   cmd('fullscreenPane', 'Панель на весь экран', 'Раскладка', 'maximize', p => fullscreenPane(typeof p === 'string' ? p : state.activePane));
+  cmd('restorePanes', 'Развернуть все панели', 'Раскладка', 'maximize', () => restorePanes());
+
+  /* ── focus workspace (VS Code-like single-file editor) ───────── */
+  cmd('focusMode', 'Режим редактора / классический вид', 'Вид', 'code', () => toggleFocusMode());
+  cmd('setFocusMode', 'Включить режим редактора', 'Вид', 'code', () => setFocusMode(true), { hidden: true });
+  cmd('toggleSidebar', 'Показать/скрыть проводник', 'Вид', 'files', () => toggleSidebar());
+  cmd('toggleFocusPanel', 'Панель предпросмотра и анализа', 'Вид', 'window', () => toggleFocusPanel());
 
   /* ── editing ────────────────────────────────────────────────── */
   cmd('formatHtml', 'Форматировать HTML', 'Редактирование', 'format', () => formatDoc('html'));

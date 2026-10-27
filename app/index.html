@@ -111,6 +111,18 @@
     </aside>
     <div class="splitter v-splitter" data-splitter="rail"></div>
 
+    <section id="codeArea" class="code-area">
+      <div id="editorTabs" class="editor-tabs" role="tablist" aria-label="Открытые файлы">
+        <div id="editorTabList" class="editor-tab-list"></div>
+        <div id="collapsedChips" class="collapsed-chips"></div>
+        <div class="editor-tab-actions">
+          <button class="tab-action" data-cmd="toggleSidebar" title="Проводник (Ctrl+B)"><span data-icon="files"></span></button>
+          <button class="tab-action" data-cmd="toggleFocusPanel" title="Предпросмотр и анализ (Ctrl+J)"><span data-icon="window"></span></button>
+          <button class="tab-action" data-cmd="unfoldAll" title="Развернуть весь код (Alt+])"><span data-icon="chevronUp"></span></button>
+          <button class="tab-action" data-cmd="restorePanes" title="Развернуть все панели (Alt+0)"><span data-icon="maximize"></span></button>
+          <button class="tab-action" data-cmd="focusMode" title="Режим редактора / классический вид (F11)"><span data-icon="code"></span></button>
+        </div>
+      </div>
     <section id="editors" class="editors layout-columns" data-layout="columns">
       <div class="editor-pane card" data-pane="html">
         <div class="pane-head">
@@ -160,6 +172,7 @@
         <div class="pane-editor"><div class="cm-host" data-cm="js"></div><div class="minimap" data-minimap="js"></div></div>
         <div class="pane-foot"><span class="crumbs" data-crumbs="js">script.js</span><span class="pane-pos" data-pos="js">1:1</span></div>
       </div>
+    </section>
     </section>
     <div class="splitter v-splitter" data-splitter="dock"></div>
 
@@ -254,6 +267,9 @@
     <span class="status-item" id="statusPos">Стр 1, Стл 1</span>
     <span class="status-item" id="statusLang">HTML</span>
     <span class="status-spacer"></span>
+    <button class="status-btn status-mode" id="statusMode" data-cmd="focusMode" title="Режим редактора / классический вид (F11)"><span data-icon="code"></span> Режим редактора</button>
+    <span class="status-item" id="statusIndent">Пробелы: 2</span>
+    <span class="status-item" id="statusEncoding">UTF-8</span>
     <span class="status-item" id="statusScore">Анализ: —</span>
     <span class="status-item" id="statusSize">0 КБ</span>
     <span class="status-item" id="statusAutosave">автосохранение вкл</span>

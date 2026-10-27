@@ -106,7 +106,7 @@ export function initUI() {
   hydrateIcons();
   const pIcon = $('#projectIcon'); if (pIcon) pIcon.innerHTML = icon('folder', 14);
   const palIcon = $('#paletteIcon'); if (palIcon) palIcon.innerHTML = icon('search', 14);
-  initTabs(); initSplitters(); initHotkeys(); initWindowControls(); renderToolbar();
+  initTabs(); initSplitters(); initHotkeys(); initWindowControls(); renderToolbar(); initFocusMode();
   document.addEventListener('click', e => {
     const btn = e.target.closest('[data-cmd]');
     if (!btn) return;
@@ -252,18 +252,192 @@ export function applyLayout(layout, active = null) {
     else p.classList.remove('tab-active');
   });
   if (layout === 'tabs') focusPane(active || state.activePane);
-  setTimeout(() => { for (const v of Object.values(editors)) v.requestMeasure(); ctx.applyDevice?.(); }, 60);
+  renderEditorTabs();
+  setTimeout(() => { for (const v of Object.values(editors)) v.requestMeasure?.(); ctx.applyDevice?.(); }, 60);
+}
+
+/* ── focus workspace (VS Code-like: one file, whole screen) ────────── */
+const FOCUS_PANES = ['html', 'css', 'js'];
+const FOCUS_LANG = { html: 'HTML', css: 'CSS', js: 'JavaScript' };
+let focusRefreshQueued = false;
+
+function focusOn() { return state.settings.focusMode !== false; }
+function fileName(pane) {
+  return (state.panes[pane] || FOCUS_LANG[pane]).split('/').pop();
+}
+/** The collapse button is the ONLY control left on a collapsed pane. */
+function syncCollapseButton(pane) {
+  const btn = $(`.editor-pane[data-pane="${pane}"] [data-cmd="collapsePane"]`);
+  if (!btn) return;
+  const collapsed = !!state.collapsed[pane];
+  btn.innerHTML = icon(collapsed ? 'plus' : 'minus', 15);
+  btn.title = collapsed ? 'Развернуть панель' : 'Свернуть панель';
+  btn.setAttribute('aria-label', btn.title);
+  btn.classList.toggle('is-collapsed', collapsed);
+}
+function syncFullscreenButton(pane) {
+  const btn = $(`.editor-pane[data-pane="${pane}"] [data-cmd="fullscreenPane"]`);
+  if (!btn) return;
+  const maxed = !!$(`.editor-pane[data-pane="${pane}"]`)?.classList.contains('maximized');
+  btn.title = maxed ? 'Вернуть панель на место (Esc)' : 'Панель на весь экран';
+  btn.classList.toggle('active', maxed);
+}
+function renderEditorTabs() {
+  const host = $('#editorTabList');
+  if (host) {
+    host.innerHTML = '';
+    for (const p of FOCUS_PANES) {
+      if (state.collapsed[p]) continue;
+      const tab = el('button', { class: 'editor-tab' + (p === state.activePane ? ' active' : ''),
+                                 'data-focus-tab': p, role: 'tab',
+                                 title: state.panes[p] || FOCUS_LANG[p] });
+      tab.innerHTML = `<span class="lang-dot ${p}"></span><span class="tab-name">${esc(fileName(p))}</span>`;
+      host.appendChild(tab);
+    }
+  }
+  const chips = $('#collapsedChips');
+  if (chips) {
+    chips.innerHTML = '';
+    for (const p of FOCUS_PANES) {
+      if (!state.collapsed[p]) continue;
+      const chip = el('button', { class: 'expand-chip', 'data-expand-pane': p,
+                                  title: `Развернуть ${FOCUS_LANG[p]}` });
+      chip.innerHTML = icon('plus', 12) + `<span>${esc(fileName(p))}</span>`;
+      chips.appendChild(chip);
+    }
+  }
+  const act = (id, on) => $(`#editorTabs [data-cmd="${id}"]`)?.classList.toggle('active', !!on);
+  act('toggleSidebar', state.settings.focusSidebar !== false);
+  act('toggleFocusPanel', state.settings.focusPanel === true);
+  act('focusMode', focusOn());
+  const mode = $('#statusMode');
+  if (mode) {
+    mode.innerHTML = icon(focusOn() ? 'code' : 'columns', 12) +
+      `<span>${focusOn() ? 'Режим редактора' : 'Классический вид'}</span>`;
+    mode.classList.toggle('active', focusOn());
+    mode.title = focusOn() ? 'Один файл на весь экран (F11)' : 'Три панели и предпросмотр (F11)';
+  }
+  const indent = $('#statusIndent');
+  if (indent) indent.textContent = `Пробелы: ${state.settings.tabSize || 2}`;
+}
+/** Single source of truth for the focus workspace DOM state. */
+export function refreshFocusUI() {
+  if (focusRefreshQueued) return;
+  focusRefreshQueued = true;
+  // batch: pane:active + settings:changed often arrive in the same tick
+  setTimeout(() => {
+    focusRefreshQueued = false;
+    const body = document.body;
+    const on = focusOn();
+    body.classList.toggle('focus-mode', on);
+    body.classList.toggle('sidebar-hidden', on && state.settings.focusSidebar === false);
+    body.classList.toggle('focus-panel', on && state.settings.focusPanel === true);
+    // Never leave the user with zero editors on screen (persisted/stale state).
+    if (FOCUS_PANES.every(p => state.collapsed[p])) {
+      for (const p of FOCUS_PANES) {
+        state.collapsed[p] = false;
+        $(`.editor-pane[data-pane="${p}"]`)?.classList.remove('collapsed');
+        syncCollapseButton(p);
+      }
+    }
+    const active = FOCUS_PANES.includes(state.activePane) && !state.collapsed[state.activePane]
+      ? state.activePane : (FOCUS_PANES.find(p => !state.collapsed[p]) || state.activePane);
+    if (active !== state.activePane) { state.activePane = active; state.activeFile = state.panes[active]; }
+    $$('#editors > .editor-pane').forEach(p => p.classList.toggle('focus-active', p.dataset.pane === active));
+    renderEditorTabs();
+    setTimeout(() => { for (const p of FOCUS_PANES) editors[p]?.requestMeasure?.(); }, 40);
+  }, 0);
+}
+function persistFocus() {
+  applySettings();                 // persists + emits settings:changed (one path only)
+  refreshFocusUI();
+  setTimeout(() => ctx.applyDevice?.(), 140);
+}
+export function setFocusMode(v) {
+  const next = !!v;
+  if (state.settings.focusMode === next) { refreshFocusUI(); return next; }
+  state.settings.focusMode = next;
+  persistFocus();
+  return next;
+}
+export function toggleFocusMode() {
+  const v = setFocusMode(!focusOn());
+  toast(v ? 'Режим редактора: открытый файл занимает весь экран' : 'Классический вид: три панели и предпросмотр', 'info');
+  return v;
+}
+export function toggleSidebar() {
+  state.settings.focusSidebar = state.settings.focusSidebar === false;
+  persistFocus();
+  return state.settings.focusSidebar;
+}
+export function toggleFocusPanel() {
+  state.settings.focusPanel = state.settings.focusPanel !== true;
+  persistFocus();
+  return state.settings.focusPanel;
+}
+export function setFocusPanel(v) {
+  state.settings.focusPanel = !!v;
+  persistFocus();
+  return state.settings.focusPanel;
+}
+export function initFocusMode() {
+  // A stale collapsed state from a previous session must never trap the user.
+  state.collapsed = { html: false, css: false, js: false };
+  for (const p of FOCUS_PANES) { syncCollapseButton(p); syncFullscreenButton(p); }
+  $('#editorTabList')?.addEventListener('click', e => {
+    const t = e.target.closest('[data-focus-tab]');
+    if (t) { focusPane(t.dataset.focusTab); refreshFocusUI(); }
+  });
+  $('#collapsedChips')?.addEventListener('click', e => {
+    const c = e.target.closest('[data-expand-pane]');
+    if (c) collapsePane(c.dataset.expandPane);
+  });
+  on('pane:active', refreshFocusUI);
+  on('file:open', refreshFocusUI);
+  on('project:restoreEditors', refreshFocusUI);
+  on('files:changed', renderEditorTabs);
+  on('settings:changed', refreshFocusUI);
+  refreshFocusUI();
+}
+/** Expand every collapsed pane and drop any maximized overlay. */
+export function restorePanes() {
+  let changed = false;
+  for (const p of FOCUS_PANES) {
+    if (state.collapsed[p]) changed = true;
+    state.collapsed[p] = false;
+    $(`.editor-pane[data-pane="${p}"]`)?.classList.remove('collapsed');
+    syncCollapseButton(p);
+  }
+  $$('.editor-pane.maximized').forEach(x => { x.classList.remove('maximized'); changed = true; });
+  for (const p of FOCUS_PANES) syncFullscreenButton(p);
+  refreshFocusUI();
+  if (changed) toast('Все панели развёрнуты', 'ok');
+  return changed;
 }
 export function collapsePane(pane) {
   const el = $(`.editor-pane[data-pane="${pane}"]`); if (!el) return;
   state.collapsed[pane] = !state.collapsed[pane];
+  if (FOCUS_PANES.every(p => state.collapsed[p])) {
+    state.collapsed[pane] = false;                 // last visible pane stays
+    toast('Последнюю панель свернуть нельзя', 'info');
+  }
   el.classList.toggle('collapsed', state.collapsed[pane]);
-  setTimeout(() => editors[pane]?.requestMeasure(), 80);
+  syncCollapseButton(pane);
+  refreshFocusUI();
+  if (state.collapsed[pane]) toast('Панель свёрнута — нажмите + рядом с вкладками', 'info');
+  setTimeout(() => editors[pane]?.requestMeasure?.(), 80);
 }
 export function fullscreenPane(pane) {
   const el = $(`.editor-pane[data-pane="${pane}"]`); if (!el) return;
-  el.classList.toggle('maximized');
-  setTimeout(() => editors[pane]?.requestMeasure(), 80);
+  const was = el.classList.contains('maximized');
+  $$('.editor-pane.maximized').forEach(x => x.classList.remove('maximized'));
+  if (!was) {
+    el.classList.add('maximized');
+    state.activePane = pane; state.activeFile = state.panes[pane];
+  }
+  for (const p of FOCUS_PANES) syncFullscreenButton(p);
+  refreshFocusUI();
+  setTimeout(() => { for (const p of FOCUS_PANES) editors[p]?.requestMeasure?.(); }, 80);
 }
 export function cycleTheme() {
   const cur = state.settings.theme;
@@ -428,6 +602,8 @@ export function settingsModal(tab = 'editor') {
         <button class="mini-btn" id="tbAddSecondaryBtn">Добавить</button>
         <button class="mini-btn" id="tbReset">Сбросить набор</button></div>`,
     windows: `<div class="list-rows">
+        <div class="list-row"><div class="grow"><b>Режим редактора (как VS Code)</b><small>Открытый файл занимает весь экран: вкладки, проводник и панель предпросмотра по запросу. F11 — переключить, Ctrl+B — проводник, Ctrl+J — предпросмотр</small></div>
+          <label class="chk"><input type="checkbox" data-set="focusMode" ${s.focusMode !== false ? 'checked' : ''}> включён</label></div>
         <div class="list-row"><div class="grow"><b>Оконный режим приложения</b><small>Обычное окно: свернуть, развернуть, закрыть — не полноэкранный режим</small></div>
           <label class="chk"><input type="checkbox" data-set="appWindowed" ${s.appWindowed !== false ? 'checked' : ''}> включён</label></div>
         <div class="list-row"><div class="grow"><b>Системная рамка окна</b><small>Electron: стандартные кнопки окна ОС</small></div>
@@ -605,8 +781,12 @@ function initHotkeys() {
     if (e.key === 'Escape') {
       if (isModalOpen()) { closeModal(); return; }
       if ($('#tourLayer')?.classList.contains('show')) { endTour(); return; }
-      if ($('.editor-pane.maximized')) { $('.editor-pane.maximized').classList.remove('maximized'); return; }
+      if ($('.editor-pane.maximized')) {
+        $$('.editor-pane.maximized').forEach(x => x.classList.remove('maximized'));
+        restorePanes(); return;
+      }
       if ($('#previewCard')?.classList.contains('preview-max')) { $('#previewCard').classList.remove('preview-max'); return; }
+      if (document.body.classList.contains('focus-panel')) { setFocusPanel(false); return; }
     }
     for (const [id, combo] of Object.entries(state.settings.keybindings)) {
       if (!combo) continue;

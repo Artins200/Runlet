@@ -491,6 +491,12 @@
         livePort: 5500,
         appWindowed: true,
         animations: true,
+        // VS Code-like workspace: one open file fills the whole screen. Sidebar and
+        // the preview/analysis panel are toggled on demand instead of squeezing the
+        // code into a third of the window.
+        focusMode: true,
+        focusSidebar: true,
+        focusPanel: false,
         fontSizeMin: 12,
         fontSizeMax: 28,
         // Customisable quick-action toolbar. Commands come from the registry;
@@ -528,7 +534,13 @@
           "layoutTabs": "Alt+3",
           "previewFullscreen": "Alt+Enter",
           "liveServer": "Ctrl+Shift+L",
-          "windowedMode": "Ctrl+Shift+W"
+          "windowedMode": "Ctrl+Shift+W",
+          "focusMode": "F11",
+          "toggleSidebar": "Ctrl+B",
+          "toggleFocusPanel": "Ctrl+J",
+          "foldAll": "Alt+[",
+          "unfoldAll": "Alt+]",
+          "restorePanes": "Alt+0"
         }
       };
       DEFAULT_FILES = {
@@ -45422,11 +45434,27 @@ assert(add(2, 3) === 5, '2 + 3 = 5');` }
     setDoc(out, pane);
     toast("CSS-\u0441\u0432\u043E\u0439\u0441\u0442\u0432\u0430 \u0441\u0433\u0440\u0443\u043F\u043F\u0438\u0440\u043E\u0432\u0430\u043D\u044B \u0438 \u043E\u0442\u0441\u043E\u0440\u0442\u0438\u0440\u043E\u0432\u0430\u043D\u044B", "ok");
   }
+  var foldedPanes = /* @__PURE__ */ new Set();
   function toggleFoldAll(pane = state.activePane) {
-    foldAll(editors[pane]);
+    const view = editors[pane];
+    if (!view) return false;
+    if (foldedPanes.has(pane)) {
+      unfoldAll(view);
+      foldedPanes.delete(pane);
+      return false;
+    }
+    foldAll(view);
+    foldedPanes.add(pane);
+    return true;
   }
   function unfoldAllPane(pane = state.activePane) {
-    unfoldAll(editors[pane]);
+    const view = editors[pane];
+    if (!view) return;
+    unfoldAll(view);
+    foldedPanes.delete(pane);
+  }
+  function isPaneFolded(pane = state.activePane) {
+    return foldedPanes.has(pane);
   }
   function cmCommand(name2) {
     const v = getActiveEditor();
@@ -47778,17 +47806,33 @@ ${f.content}
     }
     updateSize();
   }
+  function freeIndexedPath(ext = "html", folder = "") {
+    const base2 = folder ? folder.replace(/^\/+|\/+$/g, "") + "/" : "";
+    const first = `${base2}index.${ext}`;
+    if (!exists(first)) return first;
+    let n = 2;
+    while (exists(`${base2}index-${n}.${ext}`)) n++;
+    return `${base2}index-${n}.${ext}`;
+  }
   function quickCreate(ext = "html", folder = "") {
-    const base2 = folder ? folder + "/" : "";
-    let n = 1, path;
-    do {
-      path = `${base2}untitled-${n++}.${ext}`;
-    } while (exists(path));
+    const path = freeIndexedPath(ext, folder);
     write(path, starterContent(ext, path));
     renderTree();
     openFile(path);
     toast(`\u0421\u043E\u0437\u0434\u0430\u043D \u0444\u0430\u0439\u043B ${path}`, "ok");
     return path;
+  }
+  function resolveNameCollision(dir, rel, ext, isFolder = false) {
+    const path = [dir, rel].filter(Boolean).join("/");
+    if (!exists(path)) return { path, renamed: false };
+    const dot2 = !isFolder && rel.lastIndexOf(".") > 0 ? rel.lastIndexOf(".") : -1;
+    const stem = dot2 > 0 ? rel.slice(0, dot2) : rel;
+    const suffix = dot2 > 0 ? rel.slice(dot2) : isFolder ? "" : "." + ext;
+    let n = 2, candidate;
+    do {
+      candidate = [dir, `${stem}-${n++}${suffix}`].filter(Boolean).join("/");
+    } while (exists(candidate));
+    return { path: candidate, renamed: true };
   }
   function starterContent(ext, path) {
     const name2 = path.split("/").pop();
@@ -47910,7 +47954,7 @@ console.log('${esc(name2)} \u0437\u0430\u0433\u0440\u0443\u0436\u0435\u043D');
       body: `${folder ? "" : `<div class="field"><label>\u0422\u0438\u043F \u0444\u0430\u0439\u043B\u0430</label>
         <select id="dlgType">${types3.map(([v, l]) => `<option value="${v}">${l}</option>`).join("")}</select></div>`}
       <div class="field"><label>\u0418\u043C\u044F ${folder ? "\u043F\u0430\u043F\u043A\u0438" : "\u0444\u0430\u0439\u043B\u0430"}</label>
-        <input id="dlgName" value="${folder ? "new-folder" : "page"}" autofocus></div>
+        <input id="dlgName" value="${folder ? "new-folder" : "index.html"}" autofocus></div>
       <div class="field"><label>\u041F\u0430\u043F\u043A\u0430 (\u043D\u0435\u043E\u0431\u044F\u0437\u0430\u0442\u0435\u043B\u044C\u043D\u043E)</label>
         <input id="dlgFolder" value="${esc(basePath)}" placeholder="components"></div>
       ${folder ? "" : `<div class="field"><label>\u0428\u0430\u0431\u043B\u043E\u043D</label>
@@ -47922,7 +47966,8 @@ console.log('${esc(name2)} \u0437\u0430\u0433\u0440\u0443\u0436\u0435\u043D');
         const sync = () => {
           const name2 = root.querySelector("#dlgName");
           if (!name2 || !type) return;
-          if (/^(page|untitled|new-file)(\.|$)/.test(name2.value)) name2.value = "page." + type.value;
+          if (/^(page|untitled|new-file|index)(-?\d+)?(\.\w+)?$/i.test(name2.value.trim()))
+            name2.value = "index." + type.value;
         };
         type?.addEventListener("change", sync);
       },
@@ -47935,13 +47980,9 @@ console.log('${esc(name2)} \u0437\u0430\u0433\u0440\u0443\u0436\u0435\u043D');
         let rel = raw;
         if (folder) rel = raw.replace(/^\/+|\/+$/g, "");
         else if (!/\.[a-z0-9]+$/i.test(rel)) rel += "." + ext;
-        const path = [dir, rel].filter(Boolean).join("/");
+        const { path, renamed } = resolveNameCollision(dir, rel, ext, folder);
         if (!safePathKey(path)) {
           toast("\u041D\u0435\u0434\u043E\u043F\u0443\u0441\u0442\u0438\u043C\u043E\u0435 \u0438\u043C\u044F \u0444\u0430\u0439\u043B\u0430", "err");
-          return false;
-        }
-        if (exists(path)) {
-          toast("\u0422\u0430\u043A\u043E\u0439 \u0444\u0430\u0439\u043B \u0443\u0436\u0435 \u0435\u0441\u0442\u044C", "err");
           return false;
         }
         const content2 = folder ? `# ${rel}
@@ -47949,7 +47990,7 @@ console.log('${esc(name2)} \u0437\u0430\u0433\u0440\u0443\u0436\u0435\u043D');
         if (!write(path, content2)) return false;
         renderTree();
         if (!folder) openFile(path);
-        toast(`\u0421\u043E\u0437\u0434\u0430\u043D\u043E: ${path}`, "ok");
+        toast(renamed ? `\u0418\u043C\u044F \u0437\u0430\u043D\u044F\u0442\u043E \u2014 \u0441\u043E\u0437\u0434\u0430\u043D\u043E: ${path}` : `\u0421\u043E\u0437\u0434\u0430\u043D\u043E: ${path}`, renamed ? "info" : "ok");
       }
     });
   }
@@ -50268,6 +50309,8 @@ ${p.map((x2, i4) => `  --brand-${i4 + 1}: ${x2};`).join("\n")}
           ["emmet", "\u0420\u0430\u0437\u0432\u0435\u0440\u043D\u0443\u0442\u044C Emmet"],
           ["gotoLine", "\u041F\u0435\u0440\u0435\u0439\u0442\u0438 \u043A \u0441\u0442\u0440\u043E\u043A\u0435"],
           ["toggleWrap", "\u041F\u0435\u0440\u0435\u043D\u043E\u0441 \u0441\u0442\u0440\u043E\u043A"],
+          ["foldAll", "\u0421\u0432\u0435\u0440\u043D\u0443\u0442\u044C/\u0440\u0430\u0437\u0432\u0435\u0440\u043D\u0443\u0442\u044C \u043A\u043E\u0434"],
+          ["unfoldAll", "\u0420\u0430\u0437\u0432\u0435\u0440\u043D\u0443\u0442\u044C \u0432\u0435\u0441\u044C \u043A\u043E\u0434"],
           ["fontZoomIn", "\u041A\u0440\u0443\u043F\u043D\u0435\u0435"],
           ["fontZoomOut", "\u041C\u0435\u043B\u044C\u0447\u0435"]
         ] },
@@ -50282,6 +50325,10 @@ ${p.map((x2, i4) => `  --brand-${i4 + 1}: ${x2};`).join("\n")}
           ["securityScan", "\u041F\u0440\u043E\u0432\u0435\u0440\u043A\u0430 \u0431\u0435\u0437\u043E\u043F\u0430\u0441\u043D\u043E\u0441\u0442\u0438"]
         ] },
         { label: "\u0412\u0438\u0434", items: [
+          ["focusMode", "\u0420\u0435\u0436\u0438\u043C \u0440\u0435\u0434\u0430\u043A\u0442\u043E\u0440\u0430 (\u043A\u0430\u043A VS Code)"],
+          ["toggleSidebar", "\u041F\u043E\u043A\u0430\u0437\u0430\u0442\u044C/\u0441\u043A\u0440\u044B\u0442\u044C \u043F\u0440\u043E\u0432\u043E\u0434\u043D\u0438\u043A"],
+          ["toggleFocusPanel", "\u041F\u0430\u043D\u0435\u043B\u044C \u043F\u0440\u0435\u0434\u043F\u0440\u043E\u0441\u043C\u043E\u0442\u0440\u0430"],
+          ["restorePanes", "\u0420\u0430\u0437\u0432\u0435\u0440\u043D\u0443\u0442\u044C \u0432\u0441\u0435 \u043F\u0430\u043D\u0435\u043B\u0438"],
           ["theme", "\u0421\u043C\u0435\u043D\u0438\u0442\u044C \u0442\u0435\u043C\u0443"],
           ["density", "\u041F\u043B\u043E\u0442\u043D\u043E\u0441\u0442\u044C"],
           ["layoutColumns", "\u0422\u0440\u0438 \u043A\u043E\u043B\u043E\u043D\u043A\u0438"],
@@ -51301,6 +51348,7 @@ frame();
     initHotkeys();
     initWindowControls();
     renderToolbar();
+    initFocusMode();
     document.addEventListener("click", (e) => {
       const btn = e.target.closest("[data-cmd]");
       if (!btn) return;
@@ -51459,23 +51507,214 @@ frame();
       else p.classList.remove("tab-active");
     });
     if (layout === "tabs") focusPane(active || state.activePane);
+    renderEditorTabs();
     setTimeout(() => {
-      for (const v of Object.values(editors)) v.requestMeasure();
+      for (const v of Object.values(editors)) v.requestMeasure?.();
       ctx.applyDevice?.();
     }, 60);
+  }
+  var FOCUS_PANES = ["html", "css", "js"];
+  var FOCUS_LANG = { html: "HTML", css: "CSS", js: "JavaScript" };
+  var focusRefreshQueued = false;
+  function focusOn() {
+    return state.settings.focusMode !== false;
+  }
+  function fileName(pane) {
+    return (state.panes[pane] || FOCUS_LANG[pane]).split("/").pop();
+  }
+  function syncCollapseButton(pane) {
+    const btn = $(`.editor-pane[data-pane="${pane}"] [data-cmd="collapsePane"]`);
+    if (!btn) return;
+    const collapsed = !!state.collapsed[pane];
+    btn.innerHTML = icon(collapsed ? "plus" : "minus", 15);
+    btn.title = collapsed ? "\u0420\u0430\u0437\u0432\u0435\u0440\u043D\u0443\u0442\u044C \u043F\u0430\u043D\u0435\u043B\u044C" : "\u0421\u0432\u0435\u0440\u043D\u0443\u0442\u044C \u043F\u0430\u043D\u0435\u043B\u044C";
+    btn.setAttribute("aria-label", btn.title);
+    btn.classList.toggle("is-collapsed", collapsed);
+  }
+  function syncFullscreenButton(pane) {
+    const btn = $(`.editor-pane[data-pane="${pane}"] [data-cmd="fullscreenPane"]`);
+    if (!btn) return;
+    const maxed = !!$(`.editor-pane[data-pane="${pane}"]`)?.classList.contains("maximized");
+    btn.title = maxed ? "\u0412\u0435\u0440\u043D\u0443\u0442\u044C \u043F\u0430\u043D\u0435\u043B\u044C \u043D\u0430 \u043C\u0435\u0441\u0442\u043E (Esc)" : "\u041F\u0430\u043D\u0435\u043B\u044C \u043D\u0430 \u0432\u0435\u0441\u044C \u044D\u043A\u0440\u0430\u043D";
+    btn.classList.toggle("active", maxed);
+  }
+  function renderEditorTabs() {
+    const host2 = $("#editorTabList");
+    if (host2) {
+      host2.innerHTML = "";
+      for (const p of FOCUS_PANES) {
+        if (state.collapsed[p]) continue;
+        const tab = el("button", {
+          class: "editor-tab" + (p === state.activePane ? " active" : ""),
+          "data-focus-tab": p,
+          role: "tab",
+          title: state.panes[p] || FOCUS_LANG[p]
+        });
+        tab.innerHTML = `<span class="lang-dot ${p}"></span><span class="tab-name">${esc(fileName(p))}</span>`;
+        host2.appendChild(tab);
+      }
+    }
+    const chips = $("#collapsedChips");
+    if (chips) {
+      chips.innerHTML = "";
+      for (const p of FOCUS_PANES) {
+        if (!state.collapsed[p]) continue;
+        const chip = el("button", {
+          class: "expand-chip",
+          "data-expand-pane": p,
+          title: `\u0420\u0430\u0437\u0432\u0435\u0440\u043D\u0443\u0442\u044C ${FOCUS_LANG[p]}`
+        });
+        chip.innerHTML = icon("plus", 12) + `<span>${esc(fileName(p))}</span>`;
+        chips.appendChild(chip);
+      }
+    }
+    const act = (id2, on2) => $(`#editorTabs [data-cmd="${id2}"]`)?.classList.toggle("active", !!on2);
+    act("toggleSidebar", state.settings.focusSidebar !== false);
+    act("toggleFocusPanel", state.settings.focusPanel === true);
+    act("focusMode", focusOn());
+    const mode = $("#statusMode");
+    if (mode) {
+      mode.innerHTML = icon(focusOn() ? "code" : "columns", 12) + `<span>${focusOn() ? "\u0420\u0435\u0436\u0438\u043C \u0440\u0435\u0434\u0430\u043A\u0442\u043E\u0440\u0430" : "\u041A\u043B\u0430\u0441\u0441\u0438\u0447\u0435\u0441\u043A\u0438\u0439 \u0432\u0438\u0434"}</span>`;
+      mode.classList.toggle("active", focusOn());
+      mode.title = focusOn() ? "\u041E\u0434\u0438\u043D \u0444\u0430\u0439\u043B \u043D\u0430 \u0432\u0435\u0441\u044C \u044D\u043A\u0440\u0430\u043D (F11)" : "\u0422\u0440\u0438 \u043F\u0430\u043D\u0435\u043B\u0438 \u0438 \u043F\u0440\u0435\u0434\u043F\u0440\u043E\u0441\u043C\u043E\u0442\u0440 (F11)";
+    }
+    const indent = $("#statusIndent");
+    if (indent) indent.textContent = `\u041F\u0440\u043E\u0431\u0435\u043B\u044B: ${state.settings.tabSize || 2}`;
+  }
+  function refreshFocusUI() {
+    if (focusRefreshQueued) return;
+    focusRefreshQueued = true;
+    setTimeout(() => {
+      focusRefreshQueued = false;
+      const body = document.body;
+      const on2 = focusOn();
+      body.classList.toggle("focus-mode", on2);
+      body.classList.toggle("sidebar-hidden", on2 && state.settings.focusSidebar === false);
+      body.classList.toggle("focus-panel", on2 && state.settings.focusPanel === true);
+      if (FOCUS_PANES.every((p) => state.collapsed[p])) {
+        for (const p of FOCUS_PANES) {
+          state.collapsed[p] = false;
+          $(`.editor-pane[data-pane="${p}"]`)?.classList.remove("collapsed");
+          syncCollapseButton(p);
+        }
+      }
+      const active = FOCUS_PANES.includes(state.activePane) && !state.collapsed[state.activePane] ? state.activePane : FOCUS_PANES.find((p) => !state.collapsed[p]) || state.activePane;
+      if (active !== state.activePane) {
+        state.activePane = active;
+        state.activeFile = state.panes[active];
+      }
+      $$("#editors > .editor-pane").forEach((p) => p.classList.toggle("focus-active", p.dataset.pane === active));
+      renderEditorTabs();
+      setTimeout(() => {
+        for (const p of FOCUS_PANES) editors[p]?.requestMeasure?.();
+      }, 40);
+    }, 0);
+  }
+  function persistFocus() {
+    applySettings();
+    refreshFocusUI();
+    setTimeout(() => ctx.applyDevice?.(), 140);
+  }
+  function setFocusMode(v) {
+    const next = !!v;
+    if (state.settings.focusMode === next) {
+      refreshFocusUI();
+      return next;
+    }
+    state.settings.focusMode = next;
+    persistFocus();
+    return next;
+  }
+  function toggleFocusMode() {
+    const v = setFocusMode(!focusOn());
+    toast(v ? "\u0420\u0435\u0436\u0438\u043C \u0440\u0435\u0434\u0430\u043A\u0442\u043E\u0440\u0430: \u043E\u0442\u043A\u0440\u044B\u0442\u044B\u0439 \u0444\u0430\u0439\u043B \u0437\u0430\u043D\u0438\u043C\u0430\u0435\u0442 \u0432\u0435\u0441\u044C \u044D\u043A\u0440\u0430\u043D" : "\u041A\u043B\u0430\u0441\u0441\u0438\u0447\u0435\u0441\u043A\u0438\u0439 \u0432\u0438\u0434: \u0442\u0440\u0438 \u043F\u0430\u043D\u0435\u043B\u0438 \u0438 \u043F\u0440\u0435\u0434\u043F\u0440\u043E\u0441\u043C\u043E\u0442\u0440", "info");
+    return v;
+  }
+  function toggleSidebar() {
+    state.settings.focusSidebar = state.settings.focusSidebar === false;
+    persistFocus();
+    return state.settings.focusSidebar;
+  }
+  function toggleFocusPanel() {
+    state.settings.focusPanel = state.settings.focusPanel !== true;
+    persistFocus();
+    return state.settings.focusPanel;
+  }
+  function setFocusPanel(v) {
+    state.settings.focusPanel = !!v;
+    persistFocus();
+    return state.settings.focusPanel;
+  }
+  function initFocusMode() {
+    state.collapsed = { html: false, css: false, js: false };
+    for (const p of FOCUS_PANES) {
+      syncCollapseButton(p);
+      syncFullscreenButton(p);
+    }
+    $("#editorTabList")?.addEventListener("click", (e) => {
+      const t2 = e.target.closest("[data-focus-tab]");
+      if (t2) {
+        focusPane(t2.dataset.focusTab);
+        refreshFocusUI();
+      }
+    });
+    $("#collapsedChips")?.addEventListener("click", (e) => {
+      const c = e.target.closest("[data-expand-pane]");
+      if (c) collapsePane(c.dataset.expandPane);
+    });
+    on("pane:active", refreshFocusUI);
+    on("file:open", refreshFocusUI);
+    on("project:restoreEditors", refreshFocusUI);
+    on("files:changed", renderEditorTabs);
+    on("settings:changed", refreshFocusUI);
+    refreshFocusUI();
+  }
+  function restorePanes() {
+    let changed = false;
+    for (const p of FOCUS_PANES) {
+      if (state.collapsed[p]) changed = true;
+      state.collapsed[p] = false;
+      $(`.editor-pane[data-pane="${p}"]`)?.classList.remove("collapsed");
+      syncCollapseButton(p);
+    }
+    $$(".editor-pane.maximized").forEach((x2) => {
+      x2.classList.remove("maximized");
+      changed = true;
+    });
+    for (const p of FOCUS_PANES) syncFullscreenButton(p);
+    refreshFocusUI();
+    if (changed) toast("\u0412\u0441\u0435 \u043F\u0430\u043D\u0435\u043B\u0438 \u0440\u0430\u0437\u0432\u0451\u0440\u043D\u0443\u0442\u044B", "ok");
+    return changed;
   }
   function collapsePane(pane) {
     const el2 = $(`.editor-pane[data-pane="${pane}"]`);
     if (!el2) return;
     state.collapsed[pane] = !state.collapsed[pane];
+    if (FOCUS_PANES.every((p) => state.collapsed[p])) {
+      state.collapsed[pane] = false;
+      toast("\u041F\u043E\u0441\u043B\u0435\u0434\u043D\u044E\u044E \u043F\u0430\u043D\u0435\u043B\u044C \u0441\u0432\u0435\u0440\u043D\u0443\u0442\u044C \u043D\u0435\u043B\u044C\u0437\u044F", "info");
+    }
     el2.classList.toggle("collapsed", state.collapsed[pane]);
-    setTimeout(() => editors[pane]?.requestMeasure(), 80);
+    syncCollapseButton(pane);
+    refreshFocusUI();
+    if (state.collapsed[pane]) toast("\u041F\u0430\u043D\u0435\u043B\u044C \u0441\u0432\u0451\u0440\u043D\u0443\u0442\u0430 \u2014 \u043D\u0430\u0436\u043C\u0438\u0442\u0435 + \u0440\u044F\u0434\u043E\u043C \u0441 \u0432\u043A\u043B\u0430\u0434\u043A\u0430\u043C\u0438", "info");
+    setTimeout(() => editors[pane]?.requestMeasure?.(), 80);
   }
   function fullscreenPane(pane) {
     const el2 = $(`.editor-pane[data-pane="${pane}"]`);
     if (!el2) return;
-    el2.classList.toggle("maximized");
-    setTimeout(() => editors[pane]?.requestMeasure(), 80);
+    const was = el2.classList.contains("maximized");
+    $$(".editor-pane.maximized").forEach((x2) => x2.classList.remove("maximized"));
+    if (!was) {
+      el2.classList.add("maximized");
+      state.activePane = pane;
+      state.activeFile = state.panes[pane];
+    }
+    for (const p of FOCUS_PANES) syncFullscreenButton(p);
+    refreshFocusUI();
+    setTimeout(() => {
+      for (const p of FOCUS_PANES) editors[p]?.requestMeasure?.();
+    }, 80);
   }
   function cycleTheme() {
     const cur2 = state.settings.theme;
@@ -51704,6 +51943,8 @@ frame();
         <button class="mini-btn" id="tbAddSecondaryBtn">\u0414\u043E\u0431\u0430\u0432\u0438\u0442\u044C</button>
         <button class="mini-btn" id="tbReset">\u0421\u0431\u0440\u043E\u0441\u0438\u0442\u044C \u043D\u0430\u0431\u043E\u0440</button></div>`,
       windows: `<div class="list-rows">
+        <div class="list-row"><div class="grow"><b>\u0420\u0435\u0436\u0438\u043C \u0440\u0435\u0434\u0430\u043A\u0442\u043E\u0440\u0430 (\u043A\u0430\u043A VS Code)</b><small>\u041E\u0442\u043A\u0440\u044B\u0442\u044B\u0439 \u0444\u0430\u0439\u043B \u0437\u0430\u043D\u0438\u043C\u0430\u0435\u0442 \u0432\u0435\u0441\u044C \u044D\u043A\u0440\u0430\u043D: \u0432\u043A\u043B\u0430\u0434\u043A\u0438, \u043F\u0440\u043E\u0432\u043E\u0434\u043D\u0438\u043A \u0438 \u043F\u0430\u043D\u0435\u043B\u044C \u043F\u0440\u0435\u0434\u043F\u0440\u043E\u0441\u043C\u043E\u0442\u0440\u0430 \u043F\u043E \u0437\u0430\u043F\u0440\u043E\u0441\u0443. F11 \u2014 \u043F\u0435\u0440\u0435\u043A\u043B\u044E\u0447\u0438\u0442\u044C, Ctrl+B \u2014 \u043F\u0440\u043E\u0432\u043E\u0434\u043D\u0438\u043A, Ctrl+J \u2014 \u043F\u0440\u0435\u0434\u043F\u0440\u043E\u0441\u043C\u043E\u0442\u0440</small></div>
+          <label class="chk"><input type="checkbox" data-set="focusMode" ${s.focusMode !== false ? "checked" : ""}> \u0432\u043A\u043B\u044E\u0447\u0451\u043D</label></div>
         <div class="list-row"><div class="grow"><b>\u041E\u043A\u043E\u043D\u043D\u044B\u0439 \u0440\u0435\u0436\u0438\u043C \u043F\u0440\u0438\u043B\u043E\u0436\u0435\u043D\u0438\u044F</b><small>\u041E\u0431\u044B\u0447\u043D\u043E\u0435 \u043E\u043A\u043D\u043E: \u0441\u0432\u0435\u0440\u043D\u0443\u0442\u044C, \u0440\u0430\u0437\u0432\u0435\u0440\u043D\u0443\u0442\u044C, \u0437\u0430\u043A\u0440\u044B\u0442\u044C \u2014 \u043D\u0435 \u043F\u043E\u043B\u043D\u043E\u044D\u043A\u0440\u0430\u043D\u043D\u044B\u0439 \u0440\u0435\u0436\u0438\u043C</small></div>
           <label class="chk"><input type="checkbox" data-set="appWindowed" ${s.appWindowed !== false ? "checked" : ""}> \u0432\u043A\u043B\u044E\u0447\u0451\u043D</label></div>
         <div class="list-row"><div class="grow"><b>\u0421\u0438\u0441\u0442\u0435\u043C\u043D\u0430\u044F \u0440\u0430\u043C\u043A\u0430 \u043E\u043A\u043D\u0430</b><small>Electron: \u0441\u0442\u0430\u043D\u0434\u0430\u0440\u0442\u043D\u044B\u0435 \u043A\u043D\u043E\u043F\u043A\u0438 \u043E\u043A\u043D\u0430 \u041E\u0421</small></div>
@@ -51956,11 +52197,16 @@ frame();
           return;
         }
         if ($(".editor-pane.maximized")) {
-          $(".editor-pane.maximized").classList.remove("maximized");
+          $$(".editor-pane.maximized").forEach((x2) => x2.classList.remove("maximized"));
+          restorePanes();
           return;
         }
         if ($("#previewCard")?.classList.contains("preview-max")) {
           $("#previewCard").classList.remove("preview-max");
+          return;
+        }
+        if (document.body.classList.contains("focus-panel")) {
+          setFocusPanel(false);
           return;
         }
       }
@@ -52715,11 +52961,20 @@ frame();
       applySettings();
       applyEditorSettings();
     }, { hidden: true });
-    cmd2("layoutColumns", "\u0420\u0430\u0441\u043A\u043B\u0430\u0434\u043A\u0430: \u0442\u0440\u0438 \u043A\u043E\u043B\u043E\u043D\u043A\u0438", "\u0420\u0430\u0441\u043A\u043B\u0430\u0434\u043A\u0430", "columns", () => applyLayout("columns"));
-    cmd2("layoutRows", "\u0420\u0430\u0441\u043A\u043B\u0430\u0434\u043A\u0430: \u0442\u0440\u0438 \u0441\u0442\u0440\u043E\u043A\u0438", "\u0420\u0430\u0441\u043A\u043B\u0430\u0434\u043A\u0430", "rows", () => applyLayout("rows"));
-    cmd2("layoutTabs", "\u0420\u0430\u0441\u043A\u043B\u0430\u0434\u043A\u0430: \u0432\u043A\u043B\u0430\u0434\u043A\u0438", "\u0420\u0430\u0441\u043A\u043B\u0430\u0434\u043A\u0430", "tabs", () => applyLayout("tabs"));
+    const classic = (layout) => () => {
+      setFocusMode(false);
+      applyLayout(layout);
+    };
+    cmd2("layoutColumns", "\u0420\u0430\u0441\u043A\u043B\u0430\u0434\u043A\u0430: \u0442\u0440\u0438 \u043A\u043E\u043B\u043E\u043D\u043A\u0438", "\u0420\u0430\u0441\u043A\u043B\u0430\u0434\u043A\u0430", "columns", classic("columns"));
+    cmd2("layoutRows", "\u0420\u0430\u0441\u043A\u043B\u0430\u0434\u043A\u0430: \u0442\u0440\u0438 \u0441\u0442\u0440\u043E\u043A\u0438", "\u0420\u0430\u0441\u043A\u043B\u0430\u0434\u043A\u0430", "rows", classic("rows"));
+    cmd2("layoutTabs", "\u0420\u0430\u0441\u043A\u043B\u0430\u0434\u043A\u0430: \u0432\u043A\u043B\u0430\u0434\u043A\u0438", "\u0420\u0430\u0441\u043A\u043B\u0430\u0434\u043A\u0430", "tabs", classic("tabs"));
     cmd2("collapsePane", "\u0421\u0432\u0435\u0440\u043D\u0443\u0442\u044C \u043F\u0430\u043D\u0435\u043B\u044C", "\u0420\u0430\u0441\u043A\u043B\u0430\u0434\u043A\u0430", "minus", (p) => collapsePane(typeof p === "string" ? p : state.activePane));
     cmd2("fullscreenPane", "\u041F\u0430\u043D\u0435\u043B\u044C \u043D\u0430 \u0432\u0435\u0441\u044C \u044D\u043A\u0440\u0430\u043D", "\u0420\u0430\u0441\u043A\u043B\u0430\u0434\u043A\u0430", "maximize", (p) => fullscreenPane(typeof p === "string" ? p : state.activePane));
+    cmd2("restorePanes", "\u0420\u0430\u0437\u0432\u0435\u0440\u043D\u0443\u0442\u044C \u0432\u0441\u0435 \u043F\u0430\u043D\u0435\u043B\u0438", "\u0420\u0430\u0441\u043A\u043B\u0430\u0434\u043A\u0430", "maximize", () => restorePanes());
+    cmd2("focusMode", "\u0420\u0435\u0436\u0438\u043C \u0440\u0435\u0434\u0430\u043A\u0442\u043E\u0440\u0430 / \u043A\u043B\u0430\u0441\u0441\u0438\u0447\u0435\u0441\u043A\u0438\u0439 \u0432\u0438\u0434", "\u0412\u0438\u0434", "code", () => toggleFocusMode());
+    cmd2("setFocusMode", "\u0412\u043A\u043B\u044E\u0447\u0438\u0442\u044C \u0440\u0435\u0436\u0438\u043C \u0440\u0435\u0434\u0430\u043A\u0442\u043E\u0440\u0430", "\u0412\u0438\u0434", "code", () => setFocusMode(true), { hidden: true });
+    cmd2("toggleSidebar", "\u041F\u043E\u043A\u0430\u0437\u0430\u0442\u044C/\u0441\u043A\u0440\u044B\u0442\u044C \u043F\u0440\u043E\u0432\u043E\u0434\u043D\u0438\u043A", "\u0412\u0438\u0434", "files", () => toggleSidebar());
+    cmd2("toggleFocusPanel", "\u041F\u0430\u043D\u0435\u043B\u044C \u043F\u0440\u0435\u0434\u043F\u0440\u043E\u0441\u043C\u043E\u0442\u0440\u0430 \u0438 \u0430\u043D\u0430\u043B\u0438\u0437\u0430", "\u0412\u0438\u0434", "window", () => toggleFocusPanel());
     cmd2("formatHtml", "\u0424\u043E\u0440\u043C\u0430\u0442\u0438\u0440\u043E\u0432\u0430\u0442\u044C HTML", "\u0420\u0435\u0434\u0430\u043A\u0442\u0438\u0440\u043E\u0432\u0430\u043D\u0438\u0435", "format", () => formatDoc("html"));
     cmd2("formatCss", "\u0424\u043E\u0440\u043C\u0430\u0442\u0438\u0440\u043E\u0432\u0430\u0442\u044C CSS", "\u0420\u0435\u0434\u0430\u043A\u0442\u0438\u0440\u043E\u0432\u0430\u043D\u0438\u0435", "format", () => formatDoc("css"));
     cmd2("formatJs", "\u0424\u043E\u0440\u043C\u0430\u0442\u0438\u0440\u043E\u0432\u0430\u0442\u044C JS", "\u0420\u0435\u0434\u0430\u043A\u0442\u0438\u0440\u043E\u0432\u0430\u043D\u0438\u0435", "format", () => formatDoc("js"));
@@ -53428,6 +53683,15 @@ POST /api/run</pre>`,
       setFontZoom,
       toggleWrap,
       windowControl,
+      focusMode: () => ({
+        enabled: state.settings.focusMode !== false,
+        sidebar: state.settings.focusSidebar !== false,
+        panel: state.settings.focusPanel === true,
+        activePane: state.activePane,
+        collapsed: { ...state.collapsed }
+      }),
+      setFocusMode,
+      folded: () => isPaneFolded(),
       console: {
         clear: () => {
           state.logs = [];

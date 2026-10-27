@@ -28,6 +28,7 @@ const MENUS = {
       { label: 'Редактор', items: [
         ['format', 'Форматировать'], ['snippets', 'Сниппеты'], ['emmet', 'Развернуть Emmet'],
         ['gotoLine', 'Перейти к строке'], ['toggleWrap', 'Перенос строк'],
+        ['foldAll', 'Свернуть/развернуть код'], ['unfoldAll', 'Развернуть весь код'],
         ['fontZoomIn', 'Крупнее'], ['fontZoomOut', 'Мельче'] ] },
       { label: 'Запуск и инструменты', items: [
         ['liveServer', 'Live Server'], ['openSite', 'Сайт в окне'],
@@ -35,6 +36,10 @@ const MENUS = {
         ['cssLab', 'CSS-лаборатория'], ['jsTools', 'JS-инструменты'],
         ['htmlTools', 'HTML-генераторы'], ['securityScan', 'Проверка безопасности'] ] },
       { label: 'Вид', items: [
+        ['focusMode', 'Режим редактора (как VS Code)'],
+        ['toggleSidebar', 'Показать/скрыть проводник'],
+        ['toggleFocusPanel', 'Панель предпросмотра'],
+        ['restorePanes', 'Развернуть все панели'],
         ['theme', 'Сменить тему'], ['density', 'Плотность'],
         ['layoutColumns', 'Три колонки'], ['layoutRows', 'Три строки'],
         ['layoutTabs', 'Вкладки'], ['windowedMode', 'Оконный режим'],

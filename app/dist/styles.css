@@ -783,3 +783,97 @@ body.windowed-app .start-screen { background: rgba(4, 6, 12, .78); }
 body.native-frame.windowed-app { padding: 0; }
 
 .chip-swatch { display:inline-block; width:10px; height:10px; border-radius:3px; border:1px solid var(--border-strong); vertical-align:-1px; }
+
+/* ══════════════════════════════════════════════════════════════════════
+   Focus workspace — VS Code-like single-file editor.
+   One open file fills the screen; Explorer and the preview/analysis panel
+   are on demand instead of permanently squeezing the code into a corner.
+   ══════════════════════════════════════════════════════════════════════ */
+.code-area { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+.code-area > .editors { flex: 1 1 auto; min-height: 0; }
+
+/* Tab strip — visible only in focus mode */
+.editor-tabs { display: none; align-items: center; gap: 5px; height: 38px; flex: 0 0 38px;
+  padding: 0 6px; background: var(--head); border: 1px solid var(--border);
+  border-bottom: 0; border-radius: var(--r-xl) var(--r-xl) 0 0; }
+.editor-tab-list { display: flex; align-items: stretch; gap: 2px; flex: 0 1 auto; min-width: 0;
+  height: 100%; overflow-x: auto; scrollbar-width: none; }
+.editor-tab-list::-webkit-scrollbar { display: none; }
+.editor-tab { display: inline-flex; align-items: center; gap: 7px; max-width: 260px;
+  padding: 0 13px; border: 0; border-right: 1px solid var(--border);
+  border-bottom: 2px solid transparent; background: transparent; color: var(--muted);
+  font-size: 12.5px; white-space: nowrap; cursor: pointer; }
+.editor-tab:hover { background: var(--card-2); color: var(--text); }
+.editor-tab.active { background: var(--code-bg); color: var(--text); border-bottom-color: var(--accent); }
+.editor-tab .tab-name { overflow: hidden; text-overflow: ellipsis; }
+.editor-tab-actions { margin-left: auto; display: flex; gap: 2px; flex: 0 0 auto; }
+.tab-action { width: 28px; height: 27px; border: 0; border-radius: 6px; background: transparent;
+  color: var(--muted); display: grid; place-items: center; }
+.tab-action:hover { background: var(--card-2); color: var(--text); }
+.tab-action.active { color: var(--accent); background: color-mix(in srgb, var(--accent) 16%, transparent); }
+.collapsed-chips { display: flex; align-items: center; gap: 4px; flex: 0 0 auto; }
+.expand-chip { display: inline-flex; align-items: center; gap: 4px; height: 24px; padding: 0 8px;
+  border: 1px dashed var(--border-strong); border-radius: 6px; background: var(--card-2);
+  color: var(--muted); font-size: 11px; }
+.expand-chip:hover { color: var(--accent); border-color: var(--accent); }
+
+/* Focus layout: Explorer + code, nothing else steals space by default */
+body.focus-mode .workspace { position: relative; grid-template-columns: var(--rail-w, 268px) 6px minmax(280px, 1fr); grid-template-rows: none; }
+body.focus-mode .splitter[data-splitter="dock"] { display: none; }
+body.focus-mode .dock { display: none; }
+body.focus-mode .editor-tabs { display: flex; }
+body.focus-mode .toolbar { min-height: 40px; padding: 4px 8px; }
+body.focus-mode .editors > .h-splitter { display: none; }
+body.focus-mode .editors > .editor-pane { display: none; }
+body.focus-mode .editors > .editor-pane.focus-active { display: flex; }
+body.focus-mode .editors > .editor-pane { border-radius: 0 0 var(--r-xl) var(--r-xl); border-top: 0; }
+body.focus-mode .editor-pane .pane-head { height: 33px; flex: 0 0 33px; background: var(--code-bg); border-bottom-color: transparent; }
+body.focus-mode .editor-pane .pane-btn:not([data-cmd="collapsePane"]):not([data-cmd="fullscreenPane"]) { display: none; }
+body.focus-mode .editor-pane .pane-tab { font-size: 13px; }
+body.focus-mode .editor-pane .pane-tab strong { font-size: 11px; }
+body.focus-mode .editor-pane .pane-file { font-size: 12px; max-width: 300px; color: var(--muted); }
+body.focus-mode .cm-host .cm-content { padding-bottom: 40vh; }
+body.focus-mode .pane-foot { height: 23px; flex: 0 0 23px; }
+
+/* Ctrl+B: hide the Explorer so the code literally fills the window */
+body.focus-mode.sidebar-hidden .workspace { grid-template-columns: minmax(280px, 1fr); }
+body.focus-mode.sidebar-hidden #rail,
+body.focus-mode.sidebar-hidden .splitter[data-splitter="rail"] { display: none; }
+
+/* Ctrl+J: preview/analysis slides in only when asked */
+body.focus-mode.focus-panel .dock { display: flex; position: absolute; z-index: 45;
+  top: 0; right: 0; bottom: 0; width: min(46vw, 620px); padding-left: 7px;
+  box-shadow: -14px 0 34px rgba(0,0,0,.28); }
+body.focus-mode.focus-panel .dock .preview-card,
+body.focus-mode.focus-panel .dock .inspector { box-shadow: var(--shadow); }
+
+/* A collapsed pane keeps a big, always reachable expand button.
+   Before, it became a 38px column whose header buttons were clipped away,
+   so there was no visible way to expand the code again. */
+.editor-pane.collapsed { flex: 0 0 40px !important; min-width: 40px; }
+.editor-pane.collapsed .pane-head { padding: 0; justify-content: center; }
+.editor-pane.collapsed .pane-tab { display: none; }
+.editor-pane.collapsed .pane-tools { flex-direction: column; gap: 2px; }
+.editor-pane.collapsed .pane-tools .pane-btn:not([data-cmd="collapsePane"]) { display: none; }
+.editor-pane.collapsed .pane-btn[data-cmd="collapsePane"] { width: 32px; height: 32px; min-width: 32px;
+  color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, transparent); }
+.editor-pane.collapsed .pane-editor, .editor-pane.collapsed .pane-foot { display: none; }
+
+.status-mode { display: inline-flex; align-items: center; gap: 5px; }
+.status-mode.active { color: var(--accent); }
+.status-mode .ico, .tab-action .ico, .expand-chip .ico { width: 13px; height: 13px; }
+@media (max-width: 960px) {
+  body.focus-mode .workspace { grid-template-columns: minmax(280px, 1fr); grid-template-rows: none; }
+  body.focus-mode #rail, body.focus-mode .splitter[data-splitter="rail"] { display: none; }
+  body.focus-mode.focus-panel .dock { width: min(80vw, 520px); }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .editor-tab, .tab-action, .expand-chip { transition: background .15s, color .15s, border-color .15s; }
+}
+
+/* Keep the VS Code-style status bar readable on narrow windows */
+@media (max-width: 1180px) {
+  #statusEncoding, #statusAutosave, #statusIndent { display: none; }
+  .statusbar { gap: 7px; }
+  .editor-tab { padding: 0 9px; max-width: 170px; }
+}
