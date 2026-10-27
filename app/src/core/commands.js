@@ -36,7 +36,7 @@ import {
   cycleDensity, snippetsModal, cssLabModal, jsToolsModal, htmlToolsModal,
   gotoLineDialog, colorToolDialog, librarySearchDialog, collaborationDialog,
   selectRailTab, selectInspTab, setFocusMode, toggleFocusMode, toggleSidebar,
-  toggleFocusPanel, restorePanes, refreshFocusUI
+  toggleFocusPanel, restorePanes
 } from './ui.js';
 import { startLiveServer, stopLiveServer, toggleLiveServer, openSiteWindow, openSiteExternal, liveServerDialog, liveStatus } from './liveserver.js';
 import { toggleWindowedMode, detachEditor, openSiteWindow as openSiteWin, closeAllWindows, windowCount, isWindowed, movePanelWindow } from './windows.js';
